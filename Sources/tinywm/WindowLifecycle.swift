@@ -128,6 +128,12 @@ final class WindowLifecycle {
             Log.note("place", "\(Log.name(id)) is already on a strip; left as it is")
             return nil
         }
+        if let old = tabReplaced(by: id, at: judged.frame) {
+            Log.note("place", "\(Log.name(id)) is another tab of \(Log.name(old)); it takes that tab's place")
+            displays.windowReplaced(old, by: id)
+            forget(old)
+            return displays.engine(holding: id)?.frame(of: id)
+        }
         if let number = windows.number(of: id), let slot = hiddenSlots.removeValue(forKey: number),
            displays.restore(id, to: slot) {
             Log.note("place", "\(Log.name(id)) returns to its slot from before it hid: \(slot)")
@@ -137,6 +143,7 @@ final class WindowLifecycle {
             Log.note("place", "\(Log.name(id)) held for the layout restore as \(recognition.placement)")
             return nil
         }
+        placedAt[id] = ProcessInfo.processInfo.systemUptime
         // A window that cannot take a tile floats until it can.
         if recognition.placement == .undockable { autoFloats.insert(id) }
         let openOn = rules().openOn(judged.facts)
@@ -146,6 +153,33 @@ final class WindowLifecycle {
                                 floating: recognition.placement != .tiled, takesFocus: recognition.allowsFocus, openOn: openOn)
         return displays.engine(holding: id)?.frame(of: id)
     }
+
+    /// The window on a strip that a new one replaces as a tab: one of the same app at the same
+    /// frame that is no longer shown, or no longer there. Each native macOS tab is a window of its
+    /// own, and the app hides the old tab as it shows the new one.
+    private func tabReplaced(by id: String, at frame: Rect?) -> String? {
+        guard let frame, let pid = windows.pid(of: id) else { return nil }
+        let candidates = windows.ids(ofPID: pid).filter {
+            $0 != id && displays.engine(holding: $0) != nil
+                && windows.frameOf($0)?.isApproximately(frame, tolerance: 2) == true
+        }
+        let states = WindowNumbers.states(candidates.compactMap { windows.number(of: $0) })
+        return candidates.first { windows.number(of: $0).map { states[$0] != true } ?? false }
+    }
+
+    /// The tab that just replaced a window its app hid: a window of the same app placed a moment
+    /// ago and shown now. An app may show a new tab as a window of its own before it hides the old tab.
+    private func tabShown(replacing id: String) -> String? {
+        guard let pid = windows.pid(of: id) else { return nil }
+        let now = ProcessInfo.processInfo.systemUptime
+        let candidates = windows.ids(ofPID: pid).filter {
+            $0 != id && displays.engine(holding: $0) != nil && now - (placedAt[$0] ?? 0) < 2
+        }
+        let states = WindowNumbers.states(candidates.compactMap { windows.number(of: $0) })
+        return candidates.first { windows.number(of: $0).map { states[$0] == true } ?? false }
+    }
+    /// When each window was last put on a strip as a new window.
+    private var placedAt: [String: Double] = [:]
 
     // MARK: Removal
 
@@ -168,6 +202,13 @@ final class WindowLifecycle {
             }
             forget(id)
         }
+        tracker.onHidden = { [unowned self] element in
+            guard !screenLocked, let id = windows.knownID(for: element), displays.engine(holding: id) != nil,
+                  let tab = tabShown(replacing: id) else { return }
+            Log.note("place", "\(Log.name(id)) hid as \(Log.name(tab)) showed; that tab takes its place")
+            displays.windowReplaced(id, by: tab)
+            forget(id)
+        }
         tracker.onAppQuit = { [unowned self] pid in
             Log.note("tracker", "app \(pid) quit; removing \(Log.names(windows.ids(ofPID: pid)))")
             for id in windows.ids(ofPID: pid) { forget(id) }
@@ -184,6 +225,7 @@ final class WindowLifecycle {
     private func forget(_ id: String) {
         autoFloats.remove(id)
         snapTimes[id] = nil
+        placedAt[id] = nil
         heldWhileLocked.remove(id)
         displays.windowRemoved(id)
         dragger.windowRemoved(id)

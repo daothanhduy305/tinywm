@@ -19,6 +19,11 @@ under the screen, and workspaces stack vertically, as in niri.
 - `TinyWMApp` in `main.swift` starts the app. It shows the menu and the welcome window, then waits for Accessibility access.
 - `Runtime` holds everything that needs that access. The app builds it once, when access is granted.
 - `WindowLifecycle` handles what the system reports about windows: arrivals, moves, focus, hides, removals and screen locks.
+  A new native tab takes the place of the tab it hides, with the same column and width.
+- `WindowTracker` asks the window server about each window several times a second. Most apps
+  send no destroyed notification on close, and none when they switch tabs. A window gone from
+  the window server is removed. A window that stops being shown makes its app's windows be
+  read again, so the tab that replaced it is found. A slower sweep of each app's window list catches the rest.
 - `ShortcutCommands` turns each shortcut into its action.
 - `StatusMenu` shows the menu-bar menu and reports what the user chooses.
 

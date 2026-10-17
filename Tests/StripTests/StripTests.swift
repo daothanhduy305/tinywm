@@ -219,6 +219,30 @@ final class FakeWindows: WindowSystem {
         e.windowRemoved("a")
         #expect(f.frames["b"]?.x == 0)
     }
+
+    @Test func aNewTabTakesTheOldTabsColumnAndWidth() {
+        let (e, f) = make()
+        for id in ["a", "b", "c"] { f.focusedWindow = id; e.windowAdded(id) }
+        f.focusedWindow = "b"; e.windowFocused("b")
+        e.toggleFullWidth()
+        f.focusedWindow = "t"
+        e.windowReplaced("b", by: "t")
+        #expect(e.strip.columns.map(\.windows) == [["a"], ["t"], ["c"]])
+        #expect(e.strip.columns[1].width == 1)
+        #expect(e.strip.focusedWindow == "t")
+        #expect(f.frames["t"]?.width == 1000)
+    }
+
+    @Test func aTabShownBeforeTheOldOneHidLeavesItsOwnColumn() {
+        let (e, f) = make()
+        for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
+        e.toggleFullWidth()
+        f.focusedWindow = "t"; e.windowAdded("t")
+        e.windowReplaced("b", by: "t")
+        #expect(e.strip.columns.map(\.windows) == [["a"], ["t"]])
+        #expect(e.strip.columns[1].width == 1)
+        #expect(e.strip.focusedWindow == "t")
+    }
 }
 
 @Suite struct WorkspaceTests {

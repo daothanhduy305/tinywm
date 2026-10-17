@@ -62,6 +62,13 @@ extension Strip {
         }
     }
 
+    /// Puts `new` where `window` is, in its column or among the floats, and takes `window` out.
+    public mutating func replace(_ window: String, with new: String) {
+        if let i = floating.firstIndex(of: window) { floating[i] = new }
+        guard let c = column(of: window), let r = columns[c].windows.firstIndex(of: window) else { return }
+        columns[c].windows[r] = new
+    }
+
     /// Marks `window` as focused, for focus changes that come from the user clicking a window.
     public mutating func focus(window: String) {
         guard let c = column(of: window), let r = columns[c].windows.firstIndex(of: window) else { return }

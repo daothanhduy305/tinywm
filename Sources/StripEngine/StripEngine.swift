@@ -164,6 +164,21 @@ public final class StripEngine {
         changeWorkspaces { $0.remove(id) }
     }
 
+    /// Gives `new` the place of `old`, which leaves, as when an app shows another tab of the same
+    /// window. The column keeps its width, and focus stays where it was. When `new` already has a
+    /// place of its own, as a tab the app showed before hiding the old one, it leaves that place.
+    public func windowReplaced(_ old: String, by new: String) {
+        Log.note("engine", "\(label) windowReplaced \(Log.name(old)) by \(Log.name(new))")
+        guard workspaces.workspace(of: old) != nil else { return }
+        targetFrames[old] = nil
+        parked.remove(old)
+        floatHomes[old] = nil
+        changeWorkspaces(raise: false) {
+            $0.remove(new)
+            if let w = $0.workspace(of: old) { $0.strips[w].replace(old, with: new) }
+        }
+    }
+
     // MARK: Windows that hide for a while
 
     /// Where a window sits, so it can come back there after its app hid it, as Steam does.

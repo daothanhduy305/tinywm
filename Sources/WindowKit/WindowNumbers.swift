@@ -31,6 +31,22 @@ public enum WindowNumbers {
         return getWindow(element, &id) == .success && id != 0 ? id : nil
     }
 
+    /// Which of these windows still exist, and whether each is shown. An app's hidden tab, a
+    /// minimized window or one of a hidden app still exists but is not shown. Asks only the window
+    /// server, never the app, so it is quick and never waits.
+    public static func states(_ numbers: [CGWindowID]) -> [CGWindowID: Bool] {
+        guard !numbers.isEmpty else { return [:] }
+        var values = numbers.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+        let array = CFArrayCreate(nil, &values, values.count, nil)
+        let list = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]] ?? []
+        var states: [CGWindowID: Bool] = [:]
+        for info in list {
+            guard let id = info[kCGWindowNumber as String] as? CGWindowID else { continue }
+            states[id] = info[kCGWindowIsOnscreen as String] as? Bool ?? false
+        }
+        return states
+    }
+
     private static func match(pid: pid_t, frame: Rect?, title: String?) -> CGWindowID? {
         guard let frame,
               let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID)

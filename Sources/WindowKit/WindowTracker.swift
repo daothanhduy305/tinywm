@@ -36,6 +36,8 @@ public final class WindowTracker {
     public var onAdded: (AXUIElement, pid_t, WindowProbe?) -> Void = { _, _, _ in }
     /// A window left. `temporary` windows (minimized, or their app hidden) keep their slot.
     public var onRemoved: (AXUIElement, _ temporary: Bool) -> Void = { _, _ in }
+    /// A window stopped being shown but still exists, as an app's tab when another tab shows.
+    public var onHidden: (AXUIElement) -> Void = { _ in }
     public var onAppQuit: (pid_t) -> Void = { _ in }
     /// An app hid. Its windows leave temporarily.
     public var onAppHidden: (pid_t) -> Void = { _ in }
@@ -65,6 +67,9 @@ public final class WindowTracker {
         for app in NSWorkspace.shared.runningApplications { watch(app) }
         sweeper = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.sweep() }
+        }
+        windowServerWatch = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.watchWindowServer() }
         }
         let nc = NSWorkspace.shared.notificationCenter
         tokens.append(nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { n in
@@ -220,6 +225,47 @@ public final class WindowTracker {
         missing = missing.filter { !seen.contains($0) && registered.contains($0) }
     }
     private var sweeper: Timer?
+
+    /// Follows windows in the window server, which knows at once what apps often do not report.
+    /// Most apps keep a closed window's object around, so no destroyed notification comes; a
+    /// window gone from the window server twice in a row is removed. An app switching tabs hides
+    /// the old tab's window and reports nothing; a window that stops being shown is reported, and
+    /// its app's windows are read again to find the tab that replaced it.
+    private func watchWindowServer() {
+        numbers = numbers.filter { registered.contains($0.key) }
+        let states = WindowNumbers.states(Array(numbers.values))
+        var vanishedNow: Set<AXRef> = []
+        var shownNow: Set<AXRef> = []
+        var hiddenPIDs: Set<pid_t> = []
+        for (ref, number) in numbers {
+            switch states[number] {
+            case nil:
+                guard vanished.contains(ref) else { vanishedNow.insert(ref); continue }
+                numbers[ref] = nil
+                registered.remove(ref)
+                missing.remove(ref)
+                onRemoved(ref.element, false)
+            case true?:
+                shownNow.insert(ref)
+            case false?:
+                guard shown.contains(ref) else { continue }
+                var pid: pid_t = 0
+                AXUIElementGetPid(ref.element, &pid)
+                onHidden(ref.element)
+                hiddenPIDs.insert(pid)
+            }
+        }
+        vanished = vanishedNow
+        shown = shownNow
+        for pid in hiddenPIDs { rescan(pid: pid) }
+    }
+    private var windowServerWatch: Timer?
+    /// Each accepted window's number in the window server.
+    private var numbers: [AXRef: CGWindowID] = [:]
+    /// Windows the window server did not list on the last check.
+    private var vanished: Set<AXRef> = []
+    /// Windows the window server showed on the last check.
+    private var shown: Set<AXRef> = []
     private let sweepQueue = DispatchQueue(label: "tinywm.sweep", qos: .utility)
     private var sweeping = false
     /// Skips the sweep while windows move. Its calls block until each app answers, and apps
@@ -335,6 +381,7 @@ public final class WindowTracker {
                      kAXWindowResizedNotification, kAXTitleChangedNotification] {
             AXObserverAddNotification(observer, ref.element, name as CFString, context)
         }
+        numbers[ref] = WindowNumbers.exactWindowID(of: ref.element)
         onAdded(ref.element, pid, probe)
         if !probe.isDockable { recheckDockable(ref, pid: pid, attempts: [1, 3]) }
     }

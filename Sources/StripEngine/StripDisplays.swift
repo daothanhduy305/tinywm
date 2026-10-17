@@ -281,6 +281,13 @@ public final class StripDisplays {
         for d in retired.keys { retired[d]?.remove(id) }
     }
 
+    public func windowReplaced(_ old: String, by new: String) {
+        apps[old] = nil
+        guard let e = engine(holding: old) else { return }
+        if let other = engine(holding: new), other !== e { other.windowRemoved(new) }
+        e.windowReplaced(old, by: new)
+    }
+
     public func windowFocused(_ id: String) {
         guard let e = engine(holding: id) else { return Log.note("focus", "\(Log.name(id)) focused; not on any strip") }
         Log.note("focus", "\(Log.name(id)) focused on \(e.label)")
