@@ -76,8 +76,9 @@ final class WindowLifecycle {
         tracker.onAdded = { [unowned self] element, pid, probe in
             let isNew = windows.knownID(for: element) == nil
             let (id, rebound) = windows.identify(element, pid: pid, known: probe.map { ($0.frame, $0.title) })
+            // A window held since the lock is back, whether with a new element or its old one.
+            heldWhileLocked.remove(id)
             if rebound {
-                heldWhileLocked.remove(id)
                 Log.note("tracker", "\(Log.name(id)) is back with a new element, window number \(windows.number(of: id).map(String.init) ?? "?"); it keeps its place")
                 return
             }
