@@ -1,0 +1,104 @@
+# tinywm config. Lines starting with # are ignored; the file reloads when you save it.
+# Only the lines you uncomment or add change anything; the rest keeps the default shown here.
+#
+# The meta key is implied in every binding. Extra modifiers: shift, option and control
+# (with meta = control-option, command instead of option, and no control). Keys: letters, digits, left right up
+# down pageup pagedown esc tab return space, and = - [ ] , . / ; ' or the names
+# equal minus leftbracket rightbracket comma period slash semicolon quote.
+# "unbind <action>" removes a default binding. Two actions on one key: the later line wins.
+#
+# Your own shortcuts. "run" starts a shell command; "send" presses other keys, with any of
+# cmd, shift, option and ctrl. They take the key from a default binding the same way.
+# run  shift+return = open -na Ghostty
+# send space = cmd+space
+
+# meta = right-command
+meta = control-option
+# gap = 8
+# default-width = 0.333
+# width-presets = 0.333, 0.5, 0.667
+# focus-border = on
+# swipe = on
+swipe-fingers = 4
+# focus-crosses-displays = off
+# restore-layout = on
+
+# bind focus-left = h
+# bind focus-left-arrow = left
+# bind focus-down = j
+bind focus-down-arrow = option+down
+# bind focus-up = k
+bind focus-up-arrow = option+up
+# bind focus-right = l
+# bind focus-right-arrow = right
+# bind move-left = shift+h
+bind move-left-arrow = shift+command+left
+# bind move-down = shift+j
+# bind move-down-arrow = shift+down
+# bind move-up = shift+k
+# bind move-up-arrow = shift+up
+# bind move-right = shift+l
+bind move-right-arrow = shift+command+right
+# bind workspace-down = u
+# bind workspace-up = i
+# bind workspace-move-down = shift+u
+# bind workspace-move-up = shift+i
+# bind workspace-down-arrow = option+down
+# bind workspace-up-arrow = option+up
+bind workspace-down-arrow = down
+bind workspace-up-arrow = up
+# bind workspace-move-down-arrow = shift+option+down
+# bind workspace-move-up-arrow = shift+option+up
+# bind workspace-down-page = pagedown
+# bind workspace-up-page = pageup
+# bind workspace-move-down-page = shift+pagedown
+# bind workspace-move-up-page = shift+pageup
+# bind focus-column-1 = 1
+# bind focus-column-2 = 2
+# bind focus-column-3 = 3
+# bind focus-column-4 = 4
+# bind focus-column-5 = 5
+# bind focus-column-6 = 6
+# bind focus-column-7 = 7
+# bind focus-column-8 = 8
+# bind focus-column-9 = 9
+# bind width-cycle = r
+# bind width-full = f
+# bind center = c
+# bind wider = equal
+# bind narrower = minus
+# bind stack-right = rightbracket
+# bind stack-left = leftbracket
+# bind pop-out = shift+rightbracket
+# bind float = t
+# bind float-focus = v
+# bind display-next = period
+# bind display-previous = comma
+# bind display-move-next = shift+period
+# bind display-move-previous = shift+comma
+# bind display-left = a
+# bind display-down = s
+# bind display-up = w
+# bind display-right = d
+bind display-move-left = shift+command+a
+bind display-move-down = shift+command+s
+bind display-move-up = shift+command+w
+bind display-move-right = shift+command+d
+# bind overview = esc
+# bind close-window = q
+
+# Rules. Match an app by bundle ID or app name (case-insensitive, exact), optionally with a
+# window title substring after a colon in quotes. Several patterns per line, comma-separated.
+# A * in an app stands for anything, as in com.jetbrains.*. Between slashes, an app or a
+# title is a regular expression found anywhere in it, as in /^micro/.
+# Each kind may appear on any number of lines; all of them count.
+#   float    windows open floating, off the strip (meta+T tiles one)
+#   ignore   the app is not managed at all
+#   no-focus new windows join without taking focus, and the app cannot pull focus on its own
+#   open-on  new windows open on a display, a workspace, or both; the first matching line wins
+# float    = com.apple.calculator, System Settings
+# float    = Brave Browser: "Picture in Picture"
+# ignore   = com.apple.finder
+# no-focus = Slack, com.spotify.client
+# open-on  = /^microcube/ -> workspace 2
+# open-on  = Slack, com.tinyspeck.* -> display Built-in workspace 1
