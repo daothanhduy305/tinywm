@@ -218,11 +218,12 @@ public final class StripEngine {
         change { $0.insert(id, width: width, columnID: newColumnID(), focus: focus) }
     }
 
-    /// Takes the focused window off this strip so another display can adopt it.
+    /// Takes the focused window off this strip so another display can adopt it. The window keeps
+    /// system focus: focusing a window left behind would arrive after the move and pull focus back.
     public func takeFocused() -> (id: String, width: Double)? {
         guard let f = strip.focusedColumn, let id = strip.focusedWindow else { return nil }
         let width = strip.columns[f].width
-        windowRemoved(id)
+        windowRemoved(id, refocus: false)
         return (id, width)
     }
 

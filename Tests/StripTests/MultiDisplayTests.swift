@@ -114,10 +114,11 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
     final class Windows: WindowSystem {
         var frames: [String: Rect] = [:]
         var focusedWindow: String?
+        var focused: [String] = []
         func setFrame(_ id: String, _ rect: Rect, completion: @escaping @MainActor (Rect?) -> Void) {
             frames[id] = rect; completion(rect)
         }
-        func focus(_ id: String) { focusedWindow = id }
+        func focus(_ id: String) { focusedWindow = id; focused.append(id) }
     }
 
     let a = TiledDisplay(id: "A", frame: rect(0, 0), visible: rect(0, 0))
@@ -287,6 +288,18 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(w.focusedWindow == "x")
         #expect(d.engines["A"]?.strip.allWindows == [])
         #expect((w.frames["x"]?.x ?? 0) >= 1000)
+    }
+
+    @Test func movingTheFocusedWindowDoesNotFocusTheOneLeftBehind() {
+        let (d, w) = make()
+        d.update([a, b])
+        w.focusedWindow = "y"; d.windowAdded("y", frame: rect(100, 100, 300, 300))
+        w.focusedWindow = "x"; d.windowAdded("x", frame: rect(100, 100, 300, 300))
+        w.focused = []
+        #expect(d.moveFocused(by: 1, from: d.engines["A"]) == "B")
+        #expect(!w.focused.contains("y"))
+        #expect(w.focusedWindow == "x")
+        #expect(d.engines["A"]?.strip.focusedWindow == "y")
     }
 
     @Test func focusingAnEmptyDisplayRoutesCommandsThere() {
