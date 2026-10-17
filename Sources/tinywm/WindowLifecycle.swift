@@ -31,6 +31,8 @@ final class WindowLifecycle {
     /// Slots of windows their apps hid instead of closing, by window number, so each comes back
     /// where it was when the app shows it again.
     private var hiddenSlots: [CGWindowID: StripDisplays.Slot] = [:]
+    /// Slots of windows that went fullscreen, so each comes back where it was.
+    private var fullScreenSlots: [String: StripDisplays.Slot] = [:]
     private var closeFocus = CloseFocus()
     private var framesBeingRead: Set<String> = []
     private var framesChangedAgain: Set<String> = []
@@ -76,12 +78,14 @@ final class WindowLifecycle {
         tracker.onAdded = { [unowned self] element, pid, probe in
             let isNew = windows.knownID(for: element) == nil
             let (id, rebound) = windows.identify(element, pid: pid, known: probe.map { ($0.frame, $0.title) })
-            // A window held since the lock is back, whether with a new element or its old one.
-            heldWhileLocked.remove(id)
+            // Some apps, such as Brave, report a window gone during the lock and hand back the
+            // same element after it, so any report of a held window ends its hold.
+            let wasHeld = heldWhileLocked.remove(id) != nil
             if rebound {
                 Log.note("tracker", "\(Log.name(id)) is back with a new element, window number \(windows.number(of: id).map(String.init) ?? "?"); it keeps its place")
                 return
             }
+            if wasHeld { Log.note("tracker", "\(Log.name(id)) is back with the same element; it keeps its place") }
             Log.note("tracker", "window appeared \(Log.name(id)) new=\(isNew) at \(Log.rect(windows.landedFrame(of: id) ?? windows.originalFrames[id]))")
             // Dialogs and fixed-size windows stay floating where the app put them.
             if isNew { arrivals.arrived(id, element: element) }
@@ -200,7 +204,8 @@ final class WindowLifecycle {
             if !temporary, windows.knownFocus == id, let pid = windows.pid(of: id), closeFocus.closing == nil {
                 closeFocus.closing(id, app: pid)
             }
-            forget(id)
+            // A window that hid without focus must not pull another app's window to the front.
+            forget(id, refocus: !temporary || windows.focusedWindow == id)
         }
         tracker.onHidden = { [unowned self] element in
             guard !screenLocked, let id = windows.knownID(for: element), displays.engine(holding: id) != nil,
@@ -222,12 +227,13 @@ final class WindowLifecycle {
     }
 
     /// Takes a window off every strip and drops what is known about it.
-    private func forget(_ id: String) {
+    private func forget(_ id: String, refocus: Bool = true) {
         autoFloats.remove(id)
         snapTimes[id] = nil
         placedAt[id] = nil
+        fullScreenSlots[id] = nil
         heldWhileLocked.remove(id)
-        displays.windowRemoved(id)
+        displays.windowRemoved(id, refocus: refocus)
         dragger.windowRemoved(id)
         snapshots.forget(id)
         arrivals.forget(id)
@@ -253,6 +259,12 @@ final class WindowLifecycle {
         ) { [weak self] n in
             guard let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             MainActor.assumeIsolated { self?.activated(app) }
+        }
+        // Entering or leaving a fullscreen window's Space changes which window is in front.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.focusMoved(true) }
         }
         tracker.onFocused = { [unowned self] element, pid in focused(element, pid: pid) }
         tracker.focusListeners.append { [unowned self] _ in focusMoved(true) }
@@ -340,6 +352,14 @@ final class WindowLifecycle {
 
     /// Sends a window the user moved or resized back to its slot, or takes it off or onto a strip.
     private func frameChanged(_ id: String, _ now: Rect) {
+        if windows.isFullScreen(id) {
+            // A fullscreen window, such as a game, keeps its own frame. Snapping it back would fight it.
+            guard let slot = displays.slot(of: id) else { return }
+            Log.note("place", "\(Log.name(id)) went fullscreen; it leaves the strip until it comes back")
+            fullScreenSlots[id] = slot
+            displays.windowRemoved(id, refocus: false)
+            return
+        }
         // During a drag the strip must not move under the pointer; snapBack looks again at mouse-up.
         if NSEvent.pressedMouseButtons == 0 { displays.windowSeen(id, width: now.width) }
         if let engine = displays.engine(holding: id) {
@@ -357,6 +377,10 @@ final class WindowLifecycle {
             recognize(id, log: false) { [unowned self] r, _ in
                 guard r.placement == .tiled || r.placement == .floating, displays.engine(holding: id) == nil,
                       !arrivals.isPending(id), displays.engine(owning: now) != nil else { return }
+                if let slot = fullScreenSlots.removeValue(forKey: id), displays.restore(id, to: slot) {
+                    Log.note("place", "\(Log.name(id)) left fullscreen; it returns to its slot \(slot)")
+                    return
+                }
                 Log.note("drag", "\(Log.name(id)) moved onto a tiled display at \(Log.rect(now)); joins as \(r.placement)")
                 displays.windowAdded(id, frame: now, floating: r.placement == .floating, takesFocus: false)
             }
@@ -381,6 +405,7 @@ final class WindowLifecycle {
     }
 
     private func settle(_ id: String, at now: Rect) {
+        guard !windows.isFullScreen(id) else { return frameChanged(id, now) }
         displays.windowSeen(id, width: now.width)
         guard let engine = displays.engine(holding: id), let asked = engine.frame(of: id),
               displays.engine(owning: now) != nil,

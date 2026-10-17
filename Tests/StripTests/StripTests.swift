@@ -243,6 +243,14 @@ final class FakeWindows: WindowSystem {
         #expect(e.strip.columns[1].width == 1)
         #expect(e.strip.focusedWindow == "t")
     }
+
+    @Test func aWindowLeavingForFullscreenKeepsFocus() {
+        let (e, f) = make()
+        for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
+        e.windowRemoved("b", refocus: false)
+        #expect(f.focusedWindow == "b")
+        #expect(e.strip.allWindows == ["a"])
+    }
 }
 
 @Suite struct WorkspaceTests {
