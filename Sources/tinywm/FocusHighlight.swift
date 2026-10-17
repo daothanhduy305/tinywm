@@ -35,8 +35,14 @@ final class FocusHighlight {
 
     }
 
+    /// A panel AppKit leaves where it is put. AppKit otherwise keeps a window below the menu bar,
+    /// so a border meant for a display above the main one landed on the main one instead.
+    private final class FreePanel: NSPanel {
+        override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+    }
+
     private static func makePanel() -> NSPanel {
-        let p = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        let p = FreePanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         p.isOpaque = false
         p.backgroundColor = .clear
         p.hasShadow = false
