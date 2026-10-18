@@ -1,7 +1,7 @@
 /// Finds macOS trackpad gestures that use the same number of fingers as tinywm's swipes.
 ///
-/// tinywm reads raw finger positions but cannot stop macOS from reacting to the same touches,
-/// so a clashing system gesture fires alongside every swipe.
+/// tinywm keeps scroll and gesture events from apps (`SwipeShield`), but system gestures run
+/// before any event tap, so a clashing one fires alongside every swipe.
 public enum SwipeClash {
     /// The trackpad preference keys checked, with what each means when it is on.
     /// Any non-zero value means macOS uses the gesture.

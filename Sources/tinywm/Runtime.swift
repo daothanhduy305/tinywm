@@ -42,6 +42,7 @@ final class Runtime {
     private let lifecycle: WindowLifecycle
     private let commands: ShortcutCommands
     private let touches = Multitouch()
+    private let scrollTap = ScrollTap()
 
     /// Each display's overlay and minimap, by display ID.
     private var overlays: [String: (pictures: PictureMotion, minimap: MinimapPanel)] = [:]
@@ -128,6 +129,8 @@ final class Runtime {
         highlight.showBorder = config.focusBorder
         swipeEnabled = config.swipe
         recognizer.fingers = config.swipeFingers
+        scrollTap.shield.enabled = config.swipe
+        scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
         overview.keys = OverviewKeys(bindings: config.bindings)
         displays.settings = config.applied(to: displays.settings)
@@ -188,6 +191,8 @@ final class Runtime {
         highlight.showBorder = config.focusBorder
         swipeEnabled = config.swipe
         recognizer.fingers = config.swipeFingers
+        scrollTap.shield.enabled = config.swipe
+        scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
         overview.keys = OverviewKeys(bindings: config.bindings)
         showShortcuts()
@@ -397,6 +402,7 @@ final class Runtime {
             for event in recognizer.feed(contacts, at: t) { handle(event) }
         }
         touches.start()
+        scrollTap.start()
     }
 
     private func handle(_ event: SwipeRecognizer.Event) {

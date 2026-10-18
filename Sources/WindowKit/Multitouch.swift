@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Raw trackpad contacts from Apple's private MultitouchSupport framework, through
 /// MTDeviceCreateList, MTRegisterContactFrameCallback, MTDeviceStart, MTDeviceStop.
@@ -9,6 +10,8 @@ import Foundation
 public final class Multitouch {
     /// Positions (0…1, y up) of fingers touching now, and the frame time in seconds.
     public var onFrame: ([(x: Double, y: Double)], Double) -> Void = { _, _ in }
+    /// Fingers touching now, set on the framework's thread so event taps read it without lag.
+    public nonisolated static let touching = OSAllocatedUnfairLock(initialState: 0)
 
     private var devices: [UnsafeMutableRawPointer] = []
     private var stop: StopFn?
@@ -68,6 +71,7 @@ private let contactCallback: @convention(c) (
     UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, Int32, Double, Int32
 ) -> Int32 = { _, data, count, timestamp, _ in
     guard let data, count > 0 else {
+        Multitouch.touching.withLock { $0 = 0 }
         DispatchQueue.main.async { MainActor.assumeIsolated { Multitouch.current?.deliver([], timestamp) } }
         return 0
     }
@@ -81,6 +85,7 @@ private let contactCallback: @convention(c) (
         touches.append((x, y))
     }
     let frame = touches
+    Multitouch.touching.withLock { $0 = frame.count }
     DispatchQueue.main.async { MainActor.assumeIsolated { Multitouch.current?.deliver(frame, timestamp) } }
     return 0
 }

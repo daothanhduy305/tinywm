@@ -278,8 +278,11 @@ are written once, a moment after the pictures go up. The pictures fade after the
 ## Trackpad swipes
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or
-down swipe changes workspace. tinywm reads finger positions but cannot stop macOS from reacting
-to the same touches. If macOS also uses that many fingers (switching Spaces, Mission Control or
+down swipe changes workspace. While that many fingers are down, an event tap keeps the scroll
+and gesture events macOS makes from them away from apps, so the app under the pointer does not
+scroll or go back. The scroll that started then stays blocked through its momentum.
+`SwipeShield` decides what to drop; `ScrollTap` is the tap. macOS's own gestures run before any
+tap and cannot be stopped. If macOS also uses that many fingers (switching Spaces, Mission Control or
 three-finger drag), both react to every swipe, and the menu shows a warning that opens Trackpad
 settings. Turn the macOS gesture off or move it to the other finger count, or set
 `swipe-fingers` to the count macOS does not use.
