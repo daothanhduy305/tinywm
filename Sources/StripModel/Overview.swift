@@ -21,7 +21,9 @@ public struct OverviewRow: Equatable, Sendable {
 public struct OverviewStyle: Equatable, Sendable {
     /// Space kept free around the rows.
     public var margin = 48.0
-    public var rowGap = 24.0
+    public var rowGap = 44.0
+    /// Extra space under each stacked window but the last, so its label does not cover the next.
+    public var labelGap = 24.0
     /// A lone small strip is not blown up past this share of its real size.
     public var maxScale = 0.6
     /// Below this a wide strip stops shrinking and the view pans sideways instead. Rows still
@@ -97,9 +99,18 @@ public func overviewLayout(
         let top = y0 + Double(r) * (rowH + style.rowGap)
         var windows: [OverviewWindow] = []
         for (c, column) in strip.columns.enumerated() {
+            // A stack frees `labelGap` under each window but the last for its label: every window
+            // gives up an equal share of height and shrinks in proportion, centred in its column.
+            let k = Double(column.windows.count)
+            let share = (k - 1) * style.labelGap / k
             for (j, id) in column.windows.enumerated() {
                 guard let f = frames[id] else { continue }
-                let rect = Rect(x: x0 - shift + f.x * scale, y: top + f.y * scale, width: f.width * scale, height: f.height * scale)
+                var rect = Rect(x: x0 - shift + f.x * scale, y: top + f.y * scale, width: f.width * scale, height: f.height * scale)
+                if k > 1, rect.height > share {
+                    let s = (rect.height - share) / rect.height
+                    rect = Rect(x: rect.center.x - rect.width * s / 2, y: rect.y + Double(j) * (style.labelGap - share),
+                                width: rect.width * s, height: rect.height - share)
+                }
                 windows.append(OverviewWindow(id: id, workspace: i, column: c, index: j, rect: rect))
             }
         }

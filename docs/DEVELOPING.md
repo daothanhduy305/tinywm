@@ -225,6 +225,7 @@ keys both work out of the box.
 
 In the overview, the focus keys (letters and arrows, with or without the meta key) move the
 selection, Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels.
+Each picture has its app name and window title under it.
 
 ## Dragging windows
 

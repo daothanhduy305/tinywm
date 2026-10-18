@@ -9,12 +9,14 @@ final class MinimapPanel {
     private let panel: NSPanel
     private let view = MinimapView()
     private var hideWork: DispatchWorkItem?
-    private let rowHeight: CGFloat = 54
+    private let rowHeight: CGFloat = 64
     private let rowSpacing: CGFloat = 8
     private let padding: CGFloat = 10
 
     /// Looks up the app icon for a window ID.
     var icon: (String) -> NSImage? = { _ in nil }
+    /// Looks up the app name for a window ID.
+    var name: (String) -> String? = { _ in nil }
     /// The screen the minimap appears on.
     var screen: () -> NSScreen? = { NSScreen.main }
 
@@ -48,14 +50,14 @@ final class MinimapPanel {
         // The outline glides only while the minimap is already showing; a fresh one starts in place.
         let visible = panel.isVisible && panel.alphaValue > 0
         view.update(rows: rows, scale: scale, rowHeight: h, spacing: rowSpacing, padding: padding, icon: icon,
-                    animate: visible)
+                    name: name, animate: visible)
         panel.alphaValue = 1
         panel.orderFrontRegardless()
 
         hideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.hide() } }
         hideWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: work)
     }
 
     func close() { hideWork?.cancel(); panel.orderOut(nil) }
@@ -77,6 +79,7 @@ private final class MinimapView: NSView {
     private var spacing: CGFloat = 0
     private var padding: CGFloat = 0
     private var icon: (String) -> NSImage? = { _ in nil }
+    private var name: (String) -> String? = { _ in nil }
     /// The viewport outline as drawn now, plus the motion toward its target.
     private var outline: NSRect?
     private var outlineFrom = NSRect.zero
@@ -90,9 +93,9 @@ private final class MinimapView: NSView {
     override var isFlipped: Bool { true }
 
     func update(rows: [MinimapRow], scale: CGFloat, rowHeight: CGFloat, spacing: CGFloat, padding: CGFloat,
-                icon: @escaping (String) -> NSImage?, animate: Bool) {
+                icon: @escaping (String) -> NSImage?, name: @escaping (String) -> String?, animate: Bool) {
         self.rows = rows; self.scale = scale; self.rowHeight = rowHeight
-        self.spacing = spacing; self.padding = padding; self.icon = icon
+        self.spacing = spacing; self.padding = padding; self.icon = icon; self.name = name
 
         guard let r = rows.firstIndex(where: { $0.isActive }), let v = rows[r].viewport else {
             outline = nil
@@ -148,7 +151,7 @@ private final class MinimapView: NSView {
 
     private func drawRows() {
         let bg = NSBezierPath(roundedRect: bounds, xRadius: 12, yRadius: 12)
-        NSColor(white: 0.08, alpha: 0.82).setFill()
+        NSColor(white: 0.08, alpha: 0.94).setFill()
         bg.fill()
         NSColor.white.withAlphaComponent(0.12).setStroke()
         bg.stroke()
@@ -165,16 +168,32 @@ private final class MinimapView: NSView {
                 let box = map(w.rect).insetBy(dx: 1, dy: 1)
                 let path = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
                 (w.focused ? NSColor.controlAccentColor.withAlphaComponent(0.55)
-                           : NSColor.white.withAlphaComponent(0.16 * dim)).setFill()
+                           : NSColor.white.withAlphaComponent(0.22 * dim)).setFill()
                 path.fill()
                 NSColor.white.withAlphaComponent(0.25 * dim).setStroke()
                 path.stroke()
+                // The name takes a line at the bottom when the box is wide enough; the icon centres above it.
+                let label = box.width >= 24 ? name(w.id) : nil
+                let textH: CGFloat = label == nil ? 0 : 15
                 if let image = icon(w.id) {
-                    let side = min(box.width, box.height) * 0.62
-                    guard side >= 8 else { continue }
-                    let iconRect = NSRect(x: box.midX - side / 2, y: box.midY - side / 2, width: side, height: side)
-                    image.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: dim,
-                               respectFlipped: true, hints: nil)
+                    let side = min(box.width, box.height - textH) * (label == nil ? 0.62 : 0.55)
+                    if side >= 8 {
+                        let iconRect = NSRect(x: box.midX - side / 2, y: box.midY - textH / 2 - side / 2,
+                                              width: side, height: side)
+                        image.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: dim,
+                                   respectFlipped: true, hints: nil)
+                    }
+                }
+                if let label {
+                    let style = NSMutableParagraphStyle()
+                    style.alignment = .center
+                    style.lineBreakMode = .byTruncatingTail
+                    let text = NSRect(x: box.minX + 2, y: box.maxY - textH - 3, width: box.width - 4, height: 12)
+                    (label as NSString).draw(in: text, withAttributes: [
+                        .font: NSFont.systemFont(ofSize: 9, weight: .medium),
+                        .foregroundColor: NSColor.white.withAlphaComponent(0.85 * dim),
+                        .paragraphStyle: style,
+                    ])
                 }
             }
 

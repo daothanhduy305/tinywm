@@ -31,6 +31,8 @@ final class Overview {
     private let dim = CALayer()
     private let ring = CALayer()
     private var layers: [String: WindowLayer] = [:]
+    /// Each window's "App — Title" line, under its picture.
+    private var labels: [String: CATextLayer] = [:]
 
     private var phase = Phase.closed
     private var engine: StripEngine?
@@ -130,8 +132,7 @@ final class Overview {
         refreshBackdrop()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for (_, layer) in layers { layer.removeFromSuperlayer() }
-        layers = [:]
+        removeLayers()
         for w in layout!.windows {
             guard let r = real[w.id] else { continue }
             let layer = WindowLayer()
@@ -140,6 +141,11 @@ final class Overview {
             pictures.show(w.id, on: layer)
             root.addSublayer(layer)
             layers[w.id] = layer
+            let label = makeLabel(w.id, scale: screen.backingScaleFactor)
+            label.frame = labelFrame(r)
+            label.opacity = 0
+            root.addSublayer(label)
+            labels[w.id] = label
         }
         styleRing()
         ring.removeAllAnimations()
@@ -161,6 +167,10 @@ final class Overview {
         fade.duration = 0.25
         dim.add(fade, forKey: "dim")
         dim.opacity = 1
+        for (_, label) in labels {
+            label.add(fade, forKey: "fade")
+            label.opacity = 1
+        }
     }
 
     // MARK: Keys and selection
@@ -220,6 +230,15 @@ final class Overview {
         fade.duration = longest
         dim.add(fade, forKey: "dim")
         dim.opacity = 0
+        // Labels leave quickly so they do not trail the pictures zooming in.
+        let out = CABasicAnimation(keyPath: "opacity")
+        out.fromValue = 1
+        out.toValue = 0
+        out.duration = 0.15
+        for (_, label) in labels {
+            label.add(out, forKey: "fade")
+            label.opacity = 0
+        }
         CATransaction.commit()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + longest) { [weak self] in
@@ -236,8 +255,7 @@ final class Overview {
             MainActor.assumeIsolated {
                 guard let self, self.phase == .closing, self.token == mine else { return }
                 self.panel.orderOut(nil)
-                for (_, layer) in self.layers { layer.removeFromSuperlayer() }
-                self.layers = [:]
+                self.removeLayers()
                 self.engine = nil
                 self.layout = nil
                 self.snapshots.endLive(after: 1.0)
@@ -265,6 +283,15 @@ final class Overview {
                 layer.removeAllAnimations()
                 layer.position = centre
                 layer.transform = CATransform3DMakeScale(scale, scale, 1)
+            }
+            if let label = labels[w.id] {
+                let target = labelFrame(w.rect)
+                let from = fromModel ? label.position : (label.presentation()?.position ?? label.position)
+                label.removeAnimation(forKey: "move")
+                label.frame = target
+                if animated {
+                    label.add(spring("position", NSValue(point: from), NSValue(point: label.position)), forKey: "move")
+                }
             }
         }
         if let selected, let w = next.window(selected) {
@@ -328,6 +355,38 @@ final class Overview {
         ring.shadowOpacity = ringStyle.glowRadius > 0 ? 0.9 : 0
         ring.shadowRadius = ringStyle.glowRadius
         ring.shadowOffset = .zero
+    }
+
+    private func removeLayers() {
+        for (_, layer) in layers { layer.removeFromSuperlayer() }
+        for (_, label) in labels { label.removeFromSuperlayer() }
+        layers = [:]
+        labels = [:]
+    }
+
+    /// A pill reading "App — Title", or just the app when the window has no title.
+    private func makeLabel(_ id: String, scale: CGFloat) -> CATextLayer {
+        let app = windows.pid(of: id).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+        let title = windows.cachedTitle(of: id).flatMap { $0.isEmpty ? nil : $0 }
+        let label = CATextLayer()
+        label.string = [app, title].compactMap { $0 }.joined(separator: " — ")
+        label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        label.fontSize = 12
+        label.foregroundColor = NSColor.white.cgColor
+        label.alignmentMode = .center
+        label.truncationMode = .end
+        label.contentsScale = scale
+        // The pill keeps it readable where it lies over the top of a stacked window below.
+        label.backgroundColor = NSColor(white: 0, alpha: 0.55).cgColor
+        label.cornerRadius = 6
+        label.zPosition = 5
+        return label
+    }
+
+    /// Just under the picture, centred on it, at least wide enough for a short name.
+    private func labelFrame(_ r: Rect) -> NSRect {
+        let w = max(80, r.width)
+        return NSRect(x: r.center.x - w / 2, y: r.maxY + 4, width: w, height: 20)
     }
 
     private func outset(_ r: NSRect) -> NSRect { r.insetBy(dx: -ringStyle.borderWidth, dy: -ringStyle.borderWidth) }

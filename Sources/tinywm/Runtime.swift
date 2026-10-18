@@ -356,6 +356,9 @@ final class Runtime {
             icons[pid] = image
             return image
         }
+        minimap.name = { [unowned self] wid in
+            windows.pid(of: wid).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+        }
         overlays[id] = (pictures, minimap)
 
         engine.clock = MacClock()

@@ -36,9 +36,19 @@ private func sample(active: Int = 1) -> Workspaces {
         let layout = overviewLayout(sample(), metrics, screen: display)
         for w in layout.windows {
             let r = real[w.id]!
-            #expect(abs(w.rect.width / r.width - layout.scale) < 1e-9)
-            #expect(abs(w.rect.height / r.height - layout.scale) < 1e-9)
+            #expect(abs(w.rect.width / r.width - w.rect.height / r.height) < 1e-9)
+            // Only stacked windows shrink below the overview's scale, to make room for labels.
+            let stacked = w.id == "b" || w.id == "c"
+            #expect(stacked ? w.rect.width / r.width < layout.scale : abs(w.rect.width / r.width - layout.scale) < 1e-9)
         }
+    }
+
+    @Test func stackedWindowsLeaveRoomForALabel() {
+        let layout = overviewLayout(sample(), metrics, screen: display)
+        let b = layout.window("b")!.rect, c = layout.window("c")!.rect, a = layout.window("a")!.rect
+        #expect(c.y - b.maxY >= OverviewStyle().labelGap)
+        // The stack still spans the same height as a lone window.
+        #expect(abs(b.y - a.y) < 1e-9 && abs(c.maxY - a.maxY) < 1e-9)
     }
 
     @Test func scaleFitsAllRowsAndStaysUnderTheCap() {
