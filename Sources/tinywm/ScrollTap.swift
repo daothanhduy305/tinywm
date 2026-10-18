@@ -29,7 +29,8 @@ final class ScrollTap {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return false
         }
-        return shield.shouldDrop(e, touching: Multitouch.touching.withLock { $0 })
+        let t = Multitouch.touching.withLock { $0 }
+        return shield.shouldDrop(e, touching: t.fingers, touch: t.touch)
     }
 }
 
