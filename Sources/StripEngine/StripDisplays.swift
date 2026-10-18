@@ -120,10 +120,12 @@ public final class StripDisplays {
         let e = StripEngine(windows: windows, viewport: d.visible, settings: settings)
         e.label = Self.short(d.id)
         e.neighbours = others
-        e.minimumWidth = { [unowned self] id in app(of: id).flatMap(minimums.width(for:)) }
+        e.minimumWidth = { [unowned self] id in
+            settings.learnMinimumWidths ? app(of: id).flatMap(minimums.width(for:)) : nil
+        }
         e.rememberedWidth = { [unowned self] id in app(of: id).flatMap { widths[$0] } }
         e.onRefusedWidth = { [unowned self, unowned e] id, asked, took in
-            guard let app = app(of: id),
+            guard settings.learnMinimumWidths, let app = app(of: id),
                   minimums.refused(app: app, asked: asked.width, took: took.width, screenWidth: e.viewport.width) else { return }
             Log.note("minimum", "\(Log.name(id)) took \(Int(took.width)) points when asked for \(Int(asked.width)); \(app) columns widen to it")
             minimumsChanged()
@@ -262,7 +264,7 @@ public final class StripDisplays {
 
     /// A tiled window seen narrower than its app's learned width proves the app allows it.
     public func windowSeen(_ id: String, width: Double) {
-        guard engine(holding: id)?.frame(of: id) != nil, let app = app(of: id),
+        guard settings.learnMinimumWidths, engine(holding: id)?.frame(of: id) != nil, let app = app(of: id),
               minimums.seen(app: app, width: width) else { return }
         Log.note("minimum", "\(Log.name(id)) is \(Int(width)) points wide; \(app) columns narrow to it")
         minimumsChanged()

@@ -138,6 +138,7 @@ every option with a short explanation.
 - **Some windows refuse to resize**, like fixed-size dialogs and a few apps. tinywm floats them.
   An app that refuses a narrow width, such as Slack, gets wider columns: tinywm learns the
   narrowest width each app takes and remembers it. Drag the window narrower to lower it again.
+  Turn this off with `learn-minimum-widths = off` in the config.
 - **Password fields pause the meta key.** macOS blocks keyboard shortcuts from other apps while
   you type a password. Use ⌃⌥ instead if you need tinywm there.
 - **Trackpad swipes clash with macOS gestures** that use the same number of fingers. The welcome

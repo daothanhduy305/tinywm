@@ -61,12 +61,15 @@ final class StubbornWindows: WindowSystem {
     var minimums: [String: Double] = [:]
     /// Report the frame from before the next write, as an app still busy with the change does.
     var staleOnce: Set<String> = []
+    /// Points added to a frame that starts left of the screen, as macOS does to a window it would leave almost hidden.
+    var growOffLeft = 0.0
     private(set) var asked: [String: [Double]] = [:]
 
     func setFrame(_ id: String, _ rect: Rect, completion: @escaping @MainActor (Rect?) -> Void) {
         asked[id, default: []].append(rect.width)
         let before = frames[id]
-        let took = Rect(x: rect.x, y: rect.y, width: max(rect.width, minimums[id] ?? 0), height: rect.height)
+        let grow = rect.x < 0 ? growOffLeft : 0
+        let took = Rect(x: rect.x - grow, y: rect.y, width: max(rect.width, minimums[id] ?? 0) + grow, height: rect.height)
         frames[id] = took
         if staleOnce.remove(id) != nil, let before { completion(before) } else { completion(took) }
     }
@@ -154,6 +157,26 @@ final class StubbornWindows: WindowSystem {
         add(d, w, ["s2", "a"])
         #expect(e.strip.columns[e.strip.column(of: "s2")!].width == width)
         #expect(e.strip.columns[e.strip.column(of: "a")!].width == d.settings.defaultWidth)
+    }
+
+    @Test func turnedOffNothingIsLearnedOrUsed() {
+        let (d, w) = make()
+        d.settings.learnMinimumWidths = false
+        add(d, w, ["a", "s"])
+        #expect(d.minimums.widths.isEmpty)
+        d.minimums = MinimumWidths(["slack": 600])
+        add(d, w, ["s2"])
+        #expect(w.asked["s2"]?.allSatisfy { $0 < 600 } == true)
+        d.windowSeen("s", width: 100)
+        #expect(d.minimums.width(for: "slack") == 600)
+    }
+
+    @Test func aFrameOffTheScreenTeachesNothing() {
+        let (d, w) = make()
+        w.growOffLeft = 21
+        add(d, w, ["a", "b", "c", "e", "f"])
+        #expect(w.frames["a"]!.x < 0)
+        #expect(d.minimums.widths.isEmpty)
     }
 
     @Test func aWindowOffTheStripLowersNothing() {

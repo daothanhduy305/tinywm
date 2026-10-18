@@ -8,6 +8,8 @@ public struct StripSettings: Codable, Equatable, Sendable {
     public var widthPresets: [Double] = [0.333, 0.5, 0.667]
     public var nudge: Double = 0.1
     public var scrollMode: ScrollMode = .fit
+    /// Whether columns widen to the narrowest width each app was seen to take.
+    public var learnMinimumWidths = true
     public init() {}
 }
 
@@ -689,8 +691,10 @@ public final class StripEngine {
 
     /// Reports a tiled window that took a wider frame than asked, with the frame a second read
     /// finds a moment later, since an app still busy with the change can report its old size.
+    /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
     private func checkWidth(_ id: String, asked: Rect, took: Rect?) {
-        guard let onRefusedWidth, let took, took.width > asked.width + 2 else { return }
+        guard let onRefusedWidth, let took, took.width > asked.width + 2,
+              asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2 else { return }
         let confirm: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
             windows.readFrame(id) { [weak self] again in

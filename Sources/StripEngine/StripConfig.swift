@@ -21,6 +21,8 @@ public struct StripConfig: Equatable, Sendable {
     public var focusCrossesDisplays = false
     /// Whether the layout is saved and brought back when tinywm starts.
     public var restoreLayout = true
+    /// Whether columns widen for apps that refuse narrow widths.
+    public var learnMinimumWidths = true
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
@@ -40,6 +42,7 @@ public struct StripConfig: Equatable, Sendable {
         s.gap = gap
         s.defaultWidth = defaultWidth
         s.widthPresets = widthPresets
+        s.learnMinimumWidths = learnMinimumWidths
         return s
     }
 
@@ -226,6 +229,8 @@ public struct StripConfig: Equatable, Sendable {
             config.swipeFingers = n
         case "restore-layout":
             config.restoreLayout = try onOff(value, for: name)
+        case "learn-minimum-widths":
+            config.learnMinimumWidths = try onOff(value, for: name)
         default:
             throw Failure(message: "unknown setting '\(name)'")
         }
@@ -328,6 +333,7 @@ public struct StripConfig: Equatable, Sendable {
             "swipe-fingers = \(d.swipeFingers)",
             "focus-crosses-displays = off",
             "restore-layout = on",
+            "learn-minimum-widths = on",
         ]
     }
 

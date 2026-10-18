@@ -59,6 +59,15 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(bad.config.restoreLayout)
     }
 
+    @Test func learnMinimumWidthsDefaultsOnAndParses() {
+        #expect(StripConfig().learnMinimumWidths)
+        #expect(StripConfig.parse("learn-minimum-widths = off").config.learnMinimumWidths == false)
+        #expect(StripConfig.parse("learn-minimum-widths = off").config.applied(to: StripSettings()).learnMinimumWidths == false)
+        let bad = StripConfig.parse("learn-minimum-widths = sometimes")
+        #expect(bad.issues.count == 1)
+        #expect(bad.config.learnMinimumWidths)
+    }
+
     @Test func commentsAndBlankLinesAreIgnored() {
         let r = StripConfig.parse("# a comment\n\n   \n  gap = 3   # trailing\r\n\t# indented\n")
         #expect(r.issues.isEmpty)
