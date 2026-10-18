@@ -61,6 +61,13 @@ public final class StripEngine {
         strip.column(of: id) != nil ? targetFrames[id] : nil
     }
 
+    /// Whether a window on the active strip is narrowed to the part of its column on screen,
+    /// as beside another display. Its width then says nothing about what its app accepts.
+    public func isTrimmed(_ id: String) -> Bool {
+        guard let target = frame(of: id), let full = stripFrames(strip, metrics, clamp: false)[id] else { return false }
+        return target.width < full.width - 0.5
+    }
+
     /// Every floating window's frame relative to the viewport's top-left: where it is now on the
     /// active workspace, and where it will return to on the others.
     public func floatFrames() -> [String: Rect] {
@@ -692,9 +699,10 @@ public final class StripEngine {
     /// Reports a tiled window that took a wider frame than asked, with the frame a second read
     /// finds a moment later, since an app still busy with the change can report its old size.
     /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
+    /// Nor does a trimmed one, which the app may refuse though it takes its column's width.
     private func checkWidth(_ id: String, asked: Rect, took: Rect?) {
         guard let onRefusedWidth, let took, took.width > asked.width + 2,
-              asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2 else { return }
+              asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2, !isTrimmed(id) else { return }
         let confirm: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
             windows.readFrame(id) { [weak self] again in

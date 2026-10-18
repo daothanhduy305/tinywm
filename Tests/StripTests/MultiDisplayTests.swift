@@ -95,17 +95,34 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(s.y == 598)
     }
 
-    @Test func aColumnPeekingOntoANeighbourIsHiddenButOneOnAFreeSideIsKept() {
+    @Test func aColumnPeekingOntoANeighbourIsTrimmedButOneOnAFreeSideIsKept() {
         var s = Strip()
         s.columns = (0..<3).map { Column(id: "c\($0)", windows: ["w\($0)"], width: 0.4) }
         s.focusedColumn = 0
+        s.scroll = 200
         let screen = rect(1000, 0)
         let m = StripMetrics(viewport: screen, gap: 0)
-        let blocked = stripFrames(s, m, hideaway: Hideaway(screen: screen, others: [rect(2000, 0)]))
-        #expect(blocked["w2"].map { !overlapsAny($0, [rect(2000, 0)]) } == true)
-        #expect(blocked["w1"] == Rect(x: 1400, y: 0, width: 400, height: 600))
-        let free = stripFrames(s, m, hideaway: Hideaway(screen: screen, others: [rect(0, 0)]))
-        #expect(free["w2"] == Rect(x: 1800, y: 0, width: 400, height: 600))
+        // w0 hangs 200 points past the left edge, w2 200 past the right edge.
+        let both = [rect(0, 0), rect(2000, 0)]
+        let blocked = stripFrames(s, m, hideaway: Hideaway(screen: screen, others: both))
+        #expect(blocked["w0"] == Rect(x: 1000, y: 0, width: 200, height: 600))
+        #expect(blocked["w1"] == Rect(x: 1200, y: 0, width: 400, height: 600))
+        #expect(blocked["w2"] == Rect(x: 1600, y: 0, width: 400, height: 600).overlap(screen))
+        let free = stripFrames(s, m, hideaway: Hideaway(screen: screen, others: []))
+        #expect(free["w0"] == Rect(x: 800, y: 0, width: 400, height: 600))
+        #expect(free["w2"] == Rect(x: 1600, y: 0, width: 400, height: 600))
+    }
+
+    @Test func aColumnShowingTooLittleBesideANeighbourIsHidden() {
+        var s = Strip()
+        s.columns = [Column(id: "c0", windows: ["w0"], width: 0.95), Column(id: "c1", windows: ["w1"], width: 0.4)]
+        s.focusedColumn = 0
+        let screen = rect(1000, 0)
+        let m = StripMetrics(viewport: screen, gap: 0)
+        let neighbour = rect(2000, 0)
+        let frames = stripFrames(s, m, hideaway: Hideaway(screen: screen, others: [neighbour]))
+        #expect(frames["w1"].map { !overlapsAny($0, [neighbour]) && $0.width == 400 } == true)
+        #expect(frames["w1"].map { $0.x < 1000 || $0.x >= 2000 - 2 } == true)
     }
 }
 

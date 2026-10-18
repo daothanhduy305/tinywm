@@ -179,6 +179,27 @@ final class StubbornWindows: WindowSystem {
         #expect(d.minimums.widths.isEmpty)
     }
 
+    @Test func aWindowTrimmedBesideAnotherDisplayTeachesNothing() {
+        let w = StubbornWindows()
+        w.minimums = ["s": 600]
+        let d = StripDisplays(windows: w, configure: { _, _ in }, discard: { _ in })
+        d.settings.gap = 0
+        d.settings.defaultWidth = 0.7
+        d.appOf = { [apps] id in apps[id] ?? "app.\(id)" }
+        d.update([display, TiledDisplay(id: "B", frame: Rect(x: 1200, y: 0, width: 1200, height: 600),
+                                        visible: Rect(x: 1200, y: 0, width: 1200, height: 600))])
+        add(d, w, ["a", "s"])
+        let e = d.engine(holding: "s")!
+        e.focus(.left)
+        // s is trimmed to the 360 points left of display B; it refuses that, wanting 600.
+        #expect(e.isTrimmed("s"))
+        #expect(w.asked["s"]?.last == 360)
+        #expect(d.minimums.widths.isEmpty)
+        d.minimums = MinimumWidths(["slack": 600])
+        d.windowSeen("s", width: 360)
+        #expect(d.minimums.width(for: "slack") == 600)
+    }
+
     @Test func aWindowOffTheStripLowersNothing() {
         let (d, _) = make()
         d.minimums = MinimumWidths(["slack": 600])

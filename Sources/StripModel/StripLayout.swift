@@ -8,11 +8,15 @@ public enum ScrollMode: String, Codable, Sendable {
     case center
 }
 
+/// The least of a column next to another display worth showing; less than this hides it.
+public let minPeek = 100.0
+
 /// Screen frames for every window on the strip, in Accessibility coordinates.
 ///
 /// Columns outside the screen are pushed just past the screen edge with a thin sliver showing.
 /// Real positions further out could land on a neighbouring display, so a column that would
-/// reach one is hidden at a spot `hideaway` finds clear of it.
+/// reach one is narrowed to the part on screen, or hidden at a spot `hideaway` finds clear of
+/// it when less than `minPeek` points would show.
 public func stripFrames(
     _ strip: Strip, _ m: StripMetrics, sliver: Double = 2, clamp: Bool = true, hideaway: Hideaway? = nil
 ) -> [String: Rect] {
@@ -34,7 +38,15 @@ public func stripFrames(
                 } else if r.x >= v.maxX {
                     r = hideaway.sliver(r, pastRight: true, sliver: sliver)
                 } else if (r.x < v.x || r.maxX > v.maxX), hideaway.touchesOthers(r) {
-                    r = hideaway.sliver(r, pastRight: r.x >= v.x, sliver: sliver)
+                    // ponytail: an app whose minimum width is above the trimmed width still widens onto
+                    // the neighbour; hide instead when its learned minimum is wider, if that bites.
+                    let left = max(r.x, v.x), right = min(r.maxX, v.maxX)
+                    if right - left < minPeek {
+                        r = hideaway.sliver(r, pastRight: r.x >= v.x, sliver: sliver)
+                    } else {
+                        r.x = left
+                        r.width = right - left
+                    }
                 }
             }
             out[window] = r

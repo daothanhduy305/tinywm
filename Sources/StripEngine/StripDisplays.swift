@@ -264,7 +264,8 @@ public final class StripDisplays {
 
     /// A tiled window seen narrower than its app's learned width proves the app allows it.
     public func windowSeen(_ id: String, width: Double) {
-        guard settings.learnMinimumWidths, engine(holding: id)?.frame(of: id) != nil, let app = app(of: id),
+        guard settings.learnMinimumWidths, let e = engine(holding: id), e.frame(of: id) != nil, !e.isTrimmed(id),
+              let app = app(of: id),
               minimums.seen(app: app, width: width) else { return }
         Log.note("minimum", "\(Log.name(id)) is \(Int(width)) points wide; \(app) columns narrow to it")
         minimumsChanged()

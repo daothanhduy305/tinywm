@@ -277,6 +277,11 @@ The code has three layers.
 When a layout changes, pictures of the windows glide to their new places. The real windows
 are written once, a moment after the pictures go up. The pictures fade after the windows land.
 
+macOS cannot hide a single window, so columns off the screen wait just past its edge with a
+thin sliver showing. A column partly on screen would spill onto a display next to it, so it is
+narrowed to the part on screen. With less than 100 points showing, it hides instead.
+`stripFrames` places them. A narrowed window teaches nothing about its app's minimum width.
+
 ## Trackpad swipes
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or
