@@ -27,6 +27,8 @@ public final class StripEngine {
     public var observers: [(StripEngine) -> Void] = []
     /// The narrowest width in points a window's app accepts, if one has been learned.
     public var minimumWidth: (String) -> Double? = { _ in nil }
+    /// The width a new window takes when its app had a column before; nil means the default.
+    public var rememberedWidth: (String) -> Double? = { _ in nil }
     /// Called when a tiled window keeps a wider frame than it was asked to take.
     public var onRefusedWidth: ((_ id: String, _ asked: Rect, _ took: Rect) -> Void)?
 
@@ -132,7 +134,7 @@ public final class StripEngine {
             return Log.note("anomaly", "\(label) windowAdded: \(Log.name(id)) is already in workspace \(workspaces.workspace(of: id)!)")
         }
         if let workspace, workspaces.index(ofWorkspace: workspace) != workspaces.active {
-            let width = settings.defaultWidth
+            let width = rememberedWidth(id) ?? settings.defaultWidth
             changeWorkspaces(raise: false) { $0.add(id, toWorkspace: workspace, width: width, columnID: newColumnID(), floating: floating) }
             return
         }
@@ -141,7 +143,7 @@ public final class StripEngine {
             return
         }
         let focus = takesFocus && (windows.focusedWindow == id || strip.focusedColumn == nil)
-        change(raise: takesFocus) { $0.insert(id, width: settings.defaultWidth, columnID: newColumnID(), focus: focus) }
+        change(raise: takesFocus) { $0.insert(id, width: rememberedWidth(id) ?? settings.defaultWidth, columnID: newColumnID(), focus: focus) }
     }
 
     /// Takes a tiled window off the strip, wherever it sits, without moving focus.

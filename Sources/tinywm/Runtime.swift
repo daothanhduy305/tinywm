@@ -10,6 +10,7 @@ enum Defaults {
     static let disabledDisplays = "disabledDisplays"
     static let livePictures = "liveWindowPictures"
     static let minimumWidths = "minimumWidths"
+    static let appWidths = "appWidths"
 }
 
 /// tinywm while it runs: everything that needs Accessibility access, built at once when access
@@ -113,6 +114,8 @@ final class Runtime {
         displays.appOf = { [unowned self] id in windows.bundleID(of: id) }
         displays.minimums = MinimumWidths(UserDefaults.standard.dictionary(forKey: Defaults.minimumWidths) as? [String: Double] ?? [:])
         displays.onMinimumsChanged = { UserDefaults.standard.set($0.widths, forKey: Defaults.minimumWidths) }
+        displays.widths = UserDefaults.standard.dictionary(forKey: Defaults.appWidths) as? [String: Double] ?? [:]
+        displays.onWidthsChanged = { UserDefaults.standard.set($0, forKey: Defaults.appWidths) }
         release.beforeRelease = { [unowned self] in persistence.saveNow(wait: true) }
         release.install()
         persistence.enabled = { [unowned self] in config.restoreLayout }

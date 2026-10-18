@@ -29,6 +29,10 @@ public final class StripDisplays {
     public var appOf: (String) -> String? = { _ in nil }
     /// Called after a learned width changed, so it can be saved.
     public var onMinimumsChanged: ((MinimumWidths) -> Void)?
+    /// The width each app's last closed column had, by bundle ID, so its next window opens at it.
+    public var widths: [String: Double] = [:]
+    /// Called after a remembered width changed, so it can be saved.
+    public var onWidthsChanged: (([String: Double]) -> Void)?
     /// Each window's app, looked up once, since layout asks on every frame.
     private var apps: [String: String] = [:]
 
@@ -117,6 +121,7 @@ public final class StripDisplays {
         e.label = Self.short(d.id)
         e.neighbours = others
         e.minimumWidth = { [unowned self] id in app(of: id).flatMap(minimums.width(for:)) }
+        e.rememberedWidth = { [unowned self] id in app(of: id).flatMap { widths[$0] } }
         e.onRefusedWidth = { [unowned self, unowned e] id, asked, took in
             guard let app = app(of: id),
                   minimums.refused(app: app, asked: asked.width, took: took.width, screenWidth: e.viewport.width) else { return }
@@ -276,6 +281,10 @@ public final class StripDisplays {
     }
 
     public func windowRemoved(_ id: String, refocus: Bool = true) {
+        if let s = slot(of: id)?.slot, s.column != nil, let app = app(of: id), widths[app] != s.width {
+            widths[app] = s.width
+            onWidthsChanged?(widths)
+        }
         apps[id] = nil
         engine(holding: id)?.windowRemoved(id, refocus: refocus)
         for d in retired.keys { retired[d]?.remove(id) }

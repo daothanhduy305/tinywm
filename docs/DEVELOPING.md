@@ -303,3 +303,6 @@ that no slot claimed join the usual way. Displays that are unplugged or switched
 saved layout in the file. With `restore-layout = off` the file is neither read nor written.
 The matching and rebuilding live in `StripModel/LayoutRestore.swift` and are covered by
 `PersistenceTests`.
+
+When a tiled window closes, its column width is kept for its app in the user defaults. The
+app's next window opens at that width. Apps tinywm has not seen yet use `default-width`.

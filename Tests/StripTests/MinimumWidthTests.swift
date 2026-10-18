@@ -140,6 +140,22 @@ final class StubbornWindows: WindowSystem {
         #expect(w.frames["b"]!.x == w.frames["s"]!.maxX)
     }
 
+    @Test func anAppsNextWindowOpensAtItsLastClosedWidth() {
+        let (d, w) = make()
+        var saved: [String: Double]?
+        d.onWidthsChanged = { saved = $0 }
+        add(d, w, ["s"])
+        let e = d.engine(holding: "s")!
+        e.cycleWidth()
+        let width = e.strip.columns[e.strip.column(of: "s")!].width
+        #expect(width != d.settings.defaultWidth)
+        d.windowRemoved("s")
+        #expect(saved?["slack"] == width)
+        add(d, w, ["s2", "a"])
+        #expect(e.strip.columns[e.strip.column(of: "s2")!].width == width)
+        #expect(e.strip.columns[e.strip.column(of: "a")!].width == d.settings.defaultWidth)
+    }
+
     @Test func aWindowOffTheStripLowersNothing() {
         let (d, _) = make()
         d.minimums = MinimumWidths(["slack": 600])
