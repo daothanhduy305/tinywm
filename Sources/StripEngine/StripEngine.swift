@@ -10,6 +10,8 @@ public struct StripSettings: Codable, Equatable, Sendable {
     public var scrollMode: ScrollMode = .fit
     /// Whether columns widen to the narrowest width each app was seen to take.
     public var learnMinimumWidths = true
+    /// Whether a column that would reach another display hides behind a card instead of narrowing.
+    public var peekCovers = false
     public init() {}
 }
 
@@ -29,6 +31,8 @@ public final class StripEngine {
     public var observers: [(StripEngine) -> Void] = []
     /// Whether the last change moved any window, so UI that follows motion can skip a focus-only change.
     public private(set) var moved = false
+    /// With `peekCovers`, where a card stands in for each hidden window's part on screen.
+    public private(set) var peeks: [String: Rect] = [:]
     /// The narrowest width in points a window's app accepts, if one has been learned.
     public var minimumWidth: (String) -> Double? = { _ in nil }
     /// The width a new window takes when its app had a column before; nil means the default.
@@ -49,6 +53,9 @@ public final class StripEngine {
     private var parked: Set<String> = []
     /// Where each parked floating window was on screen, so it returns there with its own size.
     private var floatHomes: [String: Rect] = [:]
+    /// Where each window behind a peek card sits on the strip. Its picture moves from and to
+    /// there, by the card, not from where the hidden window really is.
+    private var peekStrip: [String: Rect] = [:]
     private var nextID = 0
 
     public init(windows: WindowSystem, viewport: Rect, settings: StripSettings = StripSettings()) {
@@ -610,7 +617,11 @@ public final class StripEngine {
     /// Writes frames that changed since the last write. Windows on other workspaces wait
     /// just past the screen's bottom-right corner, since macOS cannot hide single windows.
     public func apply() {
-        var frames = stripFrames(strip, metrics, hideaway: hideaway)
+        var frames = stripFrames(strip, metrics, trim: !settings.peekCovers, hideaway: hideaway)
+        peeks = settings.peekCovers ? blockedPeeks(strip, metrics, hideaway: hideaway) : [:]
+        let unclamped = peeks.isEmpty ? [:] : stripFrames(strip, metrics, clamp: false)
+        let peekStripBefore = peekStrip
+        peekStrip = unclamped.filter { peeks[$0.key] != nil }
         var parkedNow: Set<String> = []
         for (i, other) in workspaces.strips.enumerated() where i != workspaces.active {
             for id in other.floating where !parked.contains(id) {
@@ -657,8 +668,13 @@ public final class StripEngine {
                                  width: target.width, height: target.height)
                 moves[id] = (enter, target, nil)
             } else {
-                moves[id] = (before, target, nil)
+                // A window going behind a card slides to the card, then is written out of sight.
+                moves[id] = (peekStripBefore[id] ?? before, peekStrip[id] ?? target, peekStrip[id] == nil ? nil : target)
             }
+        }
+        // A window staying behind a card keeps its hidden frame, but its picture follows the strip.
+        for (id, to) in peekStrip where moves[id] == nil {
+            if let from = peekStripBefore[id], !from.isApproximately(to) { moves[id] = (from, to, frames[id]) }
         }
         targetFrames = frames
         for (id, r) in direct {
@@ -667,11 +683,11 @@ public final class StripEngine {
         }
         for (id, m) in moves {
             Log.note("frame", "\(label) \(Log.name(id)) \(Log.rect(m.from)) -> \(Log.rect(m.to))"
-                + (m.then.map { " then \(Log.rect($0)) (parked)" } ?? ""))
+                + (m.then.map { " then \(Log.rect($0))\(peekStrip[id] != nil ? " (behind a card)" : " (parked)")" } ?? ""))
         }
 
         var still: [String: Rect] = [:]
-        for id in strip.allWindows where moves[id] == nil { still[id] = frames[id] }
+        for id in strip.allWindows where moves[id] == nil { still[id] = peekStrip[id] ?? frames[id] }
         let finals = moves.mapValues { $0.then ?? $0.to }
         if !moves.isEmpty, let presenter,
            let token = presenter.begin(moves: moves.mapValues { (from: $0.from, to: $0.to) }, still: still,

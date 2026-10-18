@@ -113,6 +113,21 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(free["w2"] == Rect(x: 1600, y: 0, width: 400, height: 600))
     }
 
+    @Test func withoutTrimmingAColumnBesideANeighbourHidesAndLeavesItsPartOnScreenForACard() {
+        var s = Strip()
+        s.columns = (0..<3).map { Column(id: "c\($0)", windows: ["w\($0)"], width: 0.4) }
+        s.focusedColumn = 0
+        let screen = rect(1000, 0)
+        let m = StripMetrics(viewport: screen, gap: 0)
+        let neighbour = rect(2000, 0)
+        let h = Hideaway(screen: screen, others: [neighbour])
+        let frames = stripFrames(s, m, trim: false, hideaway: h)
+        #expect(frames["w2"].map { !overlapsAny($0, [neighbour]) && $0.width == 400 } == true)
+        #expect(frames["w1"] == Rect(x: 1400, y: 0, width: 400, height: 600))
+        #expect(blockedPeeks(s, m, hideaway: h) == ["w2": Rect(x: 1800, y: 0, width: 200, height: 600)])
+        #expect(blockedPeeks(s, m, hideaway: Hideaway(screen: screen)).isEmpty)
+    }
+
     @Test func aColumnShowingTooLittleBesideANeighbourIsHidden() {
         var s = Strip()
         s.columns = [Column(id: "c0", windows: ["w0"], width: 0.95), Column(id: "c1", windows: ["w1"], width: 0.4)]

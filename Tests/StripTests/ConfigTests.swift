@@ -59,6 +59,12 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(bad.config.restoreLayout)
     }
 
+    @Test func peekCoverDefaultsOffAndParses() {
+        #expect(!StripConfig().peekCover)
+        #expect(StripConfig.parse("peek-cover = on").config.applied(to: StripSettings()).peekCovers)
+        #expect(StripConfig.parse("peek-cover = maybe").issues.count == 1)
+    }
+
     @Test func learnMinimumWidthsDefaultsOnAndParses() {
         #expect(StripConfig().learnMinimumWidths)
         #expect(StripConfig.parse("learn-minimum-widths = off").config.learnMinimumWidths == false)

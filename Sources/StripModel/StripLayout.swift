@@ -16,9 +16,11 @@ public let minPeek = 100.0
 /// Columns outside the screen are pushed just past the screen edge with a thin sliver showing.
 /// Real positions further out could land on a neighbouring display, so a column that would
 /// reach one is narrowed to the part on screen, or hidden at a spot `hideaway` finds clear of
-/// it when less than `minPeek` points would show.
+/// it when less than `minPeek` points would show. Without `trim` it is always hidden, and
+/// `blockedPeeks` gives the part on screen for a card to stand in.
 public func stripFrames(
-    _ strip: Strip, _ m: StripMetrics, sliver: Double = 2, clamp: Bool = true, hideaway: Hideaway? = nil
+    _ strip: Strip, _ m: StripMetrics, sliver: Double = 2, clamp: Bool = true, trim: Bool = true,
+    hideaway: Hideaway? = nil
 ) -> [String: Rect] {
     let (lefts, _) = m.columnOffsets(strip)
     let v = m.viewport
@@ -41,7 +43,7 @@ public func stripFrames(
                     // ponytail: an app whose minimum width is above the trimmed width still widens onto
                     // the neighbour; hide instead when its learned minimum is wider, if that bites.
                     let left = max(r.x, v.x), right = min(r.maxX, v.maxX)
-                    if right - left < minPeek {
+                    if !trim || right - left < minPeek {
                         r = hideaway.sliver(r, pastRight: r.x >= v.x, sliver: sliver)
                     } else {
                         r.x = left
@@ -53,6 +55,14 @@ public func stripFrames(
         }
     }
     return out
+}
+
+/// The part on screen of each window `stripFrames` would trim beside another display.
+public func blockedPeeks(_ strip: Strip, _ m: StripMetrics, hideaway: Hideaway? = nil) -> [String: Rect] {
+    let full = stripFrames(strip, m, clamp: false)
+    return stripFrames(strip, m, hideaway: hideaway).filter { id, r in
+        full[id].map { r.width < $0.width - 0.5 } ?? false
+    }
 }
 
 /// The scroll offset that shows the focused column, keeping the strip flush with the screen edges.

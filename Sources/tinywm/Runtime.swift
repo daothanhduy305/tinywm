@@ -45,8 +45,8 @@ final class Runtime {
     private let touches = Multitouch()
     private let scrollTap = ScrollTap()
 
-    /// Each display's overlay and minimap, by display ID.
-    private var overlays: [String: (pictures: PictureMotion, minimap: MinimapPanel)] = [:]
+    /// Each display's overlay, minimap and peek cards, by display ID.
+    private var overlays: [String: (pictures: PictureMotion, minimap: MinimapPanel, cards: PeekCards)] = [:]
     private var motionDisplays: Set<String> = []
     private var coveringOverlays = 0
     private var swipeAxis: SwipeRecognizer.Axis?
@@ -342,7 +342,13 @@ final class Runtime {
             windows.holdsNudges = coveringOverlays > 0
             tracker.paused = coveringOverlays > 0
         }
+        let cards = PeekCards(covers: self.pictures.covers)
+        cards.onClick = { [unowned self] wid in
+            guard let e = displays.engine(holding: wid), let column = e.strip.column(of: wid) else { return }
+            e.focusColumn(column)
+        }
         pictures.onActive = { [unowned self] on in
+            cards.setHidden(on)
             if on { motionDisplays.insert(id) } else { motionDisplays.remove(id) }
             highlight.setSuspended(!motionDisplays.isEmpty)
             if !on { updateHighlight() }
@@ -359,7 +365,7 @@ final class Runtime {
         minimap.name = { [unowned self] wid in
             windows.pid(of: wid).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
         }
-        overlays[id] = (pictures, minimap)
+        overlays[id] = (pictures, minimap, cards)
 
         engine.clock = MacClock()
         engine.presenter = pictures
@@ -371,6 +377,7 @@ final class Runtime {
             snapshots.prime(Set(e.workspaces.strips.flatMap(\.allWindows)))
         }
         engine.observers.append { [unowned self] e in if e.moved { overlays[id]?.minimap.show(e) } }
+        engine.observers.append { e in cards.show(e.peeks) }
         engine.observers.append { [unowned self] e in
             let ws = e.workspaces
             // The top empty workspace is 0, so the first one with windows is 1.
@@ -382,6 +389,7 @@ final class Runtime {
         if let ui = overlays.removeValue(forKey: id) {
             ui.pictures.close()
             ui.minimap.close()
+            ui.cards.close()
         }
         motionDisplays.remove(id)
     }

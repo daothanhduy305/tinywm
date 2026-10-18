@@ -23,6 +23,8 @@ public struct StripConfig: Equatable, Sendable {
     public var restoreLayout = true
     /// Whether columns widen for apps that refuse narrow widths.
     public var learnMinimumWidths = true
+    /// Whether a column that would reach another display hides behind a card instead of narrowing.
+    public var peekCover = false
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
@@ -43,6 +45,7 @@ public struct StripConfig: Equatable, Sendable {
         s.defaultWidth = defaultWidth
         s.widthPresets = widthPresets
         s.learnMinimumWidths = learnMinimumWidths
+        s.peekCovers = peekCover
         return s
     }
 
@@ -231,6 +234,8 @@ public struct StripConfig: Equatable, Sendable {
             config.restoreLayout = try onOff(value, for: name)
         case "learn-minimum-widths":
             config.learnMinimumWidths = try onOff(value, for: name)
+        case "peek-cover":
+            config.peekCover = try onOff(value, for: name)
         default:
             throw Failure(message: "unknown setting '\(name)'")
         }
@@ -334,6 +339,7 @@ public struct StripConfig: Equatable, Sendable {
             "focus-crosses-displays = off",
             "restore-layout = on",
             "learn-minimum-widths = on",
+            "peek-cover = off",
         ]
     }
 

@@ -200,6 +200,31 @@ final class StubbornWindows: WindowSystem {
         #expect(d.minimums.width(for: "slack") == 600)
     }
 
+    @Test func withPeekCoversABlockedWindowHidesAndTheEngineReportsItsCard() {
+        let w = StubbornWindows()
+        let d = StripDisplays(windows: w, configure: { _, _ in }, discard: { _ in })
+        d.settings.gap = 0
+        d.settings.defaultWidth = 0.7
+        d.settings.peekCovers = true
+        d.update([display, TiledDisplay(id: "B", frame: Rect(x: 1200, y: 0, width: 1200, height: 600),
+                                        visible: Rect(x: 1200, y: 0, width: 1200, height: 600))])
+        add(d, w, ["a", "b"])
+        let e = d.engine(holding: "b")!
+        let presenter = FakePresenter()
+        e.presenter = presenter
+        e.focus(.left)
+        #expect(e.peeks == ["b": Rect(x: 840, y: 0, width: 360, height: 600)])
+        #expect(w.frames["b"].map { $0.width == 840 && ($0.maxX <= 2 || $0.x >= 1198) } == true)
+        #expect(!e.isTrimmed("b"))
+        // The picture slides to the card's spot on the strip, not to where the window hides.
+        let card = Rect(x: 840, y: 0, width: 840, height: 600)
+        #expect(presenter.begun.last?.moves["b"]?.to == card)
+        e.focus(.right)
+        #expect(e.peeks.isEmpty)
+        #expect(presenter.begun.last?.moves["b"]?.from == card)
+        #expect(w.frames["b"] == Rect(x: 360, y: 0, width: 840, height: 600))
+    }
+
     @Test func aWindowOffTheStripLowersNothing() {
         let (d, _) = make()
         d.minimums = MinimumWidths(["slack": 600])

@@ -111,6 +111,7 @@ swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
 restore-layout = on # save the layout and restore it at start
 learn-minimum-widths = on       # off: never widen columns for apps that refuse narrow widths
+peek-cover = off                # on: a column beside another display hides behind a card, not narrowed
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
 bind move-left = shift+n
@@ -281,6 +282,11 @@ macOS cannot hide a single window, so columns off the screen wait just past its 
 thin sliver showing. A column partly on screen would spill onto a display next to it, so it is
 narrowed to the part on screen. With less than 100 points showing, it hides instead.
 `stripFrames` places them. A narrowed window teaches nothing about its app's minimum width.
+With `peek-cover = on` the column hides and a dark card with the app's icon and the
+window's title stands in for its part on screen. Clicking the card focuses the window.
+`blockedPeeks` gives the cards' frames and `PeekCards` draws them.
+During motion the card steps aside: the window's picture moves to and from the card's spot,
+so the focus ring passes over it, and the card shows again as the pictures fade.
 
 ## Trackpad swipes
 
