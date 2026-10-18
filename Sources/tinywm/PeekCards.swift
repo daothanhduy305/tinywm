@@ -2,7 +2,7 @@ import AppKit
 import QuartzCore
 import WindowCore
 
-/// Translucent cover cards standing in for columns hidden beside another display, as
+/// Dark cover cards standing in for columns hidden beside another display, as
 /// `peek-cover = on` asks. Clicking a card focuses its window.
 @MainActor
 final class PeekCards {
@@ -21,9 +21,9 @@ final class PeekCards {
         refresh()
     }
 
-    /// Hides the cards while motion pictures cover the screen. The window's picture stands at
-    /// the card's spot meanwhile, so the focus ring can pass over it. Cards come back as the
-    /// pictures start to fade, showing through them.
+    /// Hides the cards while motion pictures cover the screen. The overlay draws them among
+    /// the pictures meanwhile, under the focus ring. Cards come back as the pictures start to
+    /// fade, showing through them.
     func setHidden(_ on: Bool) {
         hidden = on
         refresh()
@@ -44,9 +44,7 @@ final class PeekCards {
         for (id, r) in wanted {
             let ui = panels[id] ?? make(id)
             panels[id] = ui
-            let c = covers.cover(of: id)
-            ui.card.setCover(c.cover, icon: c.icon)
-            ui.card.backgroundColor = Self.colour
+            Self.dress(ui.card, as: id, covers: covers)
             ui.panel.setFrame(Screens.appKitRect(r), display: false)
             ui.panel.orderFrontRegardless()
         }
@@ -65,7 +63,6 @@ final class PeekCards {
         view.onClick = { [unowned self] in onClick(id) }
         view.wantsLayer = true
         let card = WindowLayer()
-        card.opacity = 0.92
         card.frame = view.bounds
         card.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
         view.layer?.addSublayer(card)
@@ -73,6 +70,18 @@ final class PeekCards {
         return (p, card)
     }
 
+    /// Makes `card` the dark card for window `id`. `PictureMotion` draws the same during motion.
+    static func dress(_ card: WindowLayer, as id: String, covers: CoverArt) {
+        let c = covers.cover(of: id)
+        card.setCover(c.cover, icon: c.icon)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        card.backgroundColor = colour
+        card.opacity = opacity
+        CATransaction.commit()
+    }
+
+    static let opacity: Float = 1
     private static let colour = NSColor(white: 0.12, alpha: 1).cgColor
 
     /// A panel AppKit leaves where it is put, as `FocusHighlight` needs too.
@@ -80,8 +89,10 @@ final class PeekCards {
         override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
     }
 
+    /// Flipped like the motion overlay's view, so the card lays out its icon and title the same.
     private final class ClickView: NSView {
         var onClick: () -> Void = {}
+        override var isFlipped: Bool { true }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func mouseDown(with event: NSEvent) { onClick() }
     }

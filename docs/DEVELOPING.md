@@ -285,8 +285,10 @@ narrowed to the part on screen. With less than 100 points showing, it hides inst
 With `peek-cover = on` the column hides and a dark card with the app's icon and the
 window's title stands in for its part on screen. Clicking the card focuses the window.
 `blockedPeeks` gives the cards' frames and `PeekCards` draws them.
-During motion the card steps aside: the window's picture moves to and from the card's spot,
-so the focus ring passes over it, and the card shows again as the pictures fade.
+During motion the overlay draws the same card over the pictures and under the focus ring, so
+the ring passes over it. The window's picture moves to and from the card's spot. The card
+springs with it over the picture's part on screen, fading in as the window slides behind it and
+out as it comes back. The card's panel shows again under the pictures as they fade.
 
 ## Trackpad swipes
 

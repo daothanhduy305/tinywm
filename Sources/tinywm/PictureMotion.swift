@@ -32,6 +32,10 @@ final class PictureMotion: StripPresenter {
     private let root = CALayer()
     private let backdrop = CALayer()
     private var layers: [String: WindowLayer] = [:]
+    /// Peek cards, over the pictures and under the ring, as `PeekCards` shows them between motions.
+    private var cards: [String: WindowLayer] = [:]
+    /// Where the motion just begun takes each picture (overlay coordinates), for `showCards`.
+    private var cardMoves: [String: (from: NSRect, to: NSRect)] = [:]
     /// The focus border drawn among the pictures, so it travels with them.
     private let ring = CALayer()
     /// Where the ring was last sent, which is where the real border sits between motions.
@@ -210,6 +214,9 @@ final class PictureMotion: StripPresenter {
             panel.animator().alphaValue = Self.coveringAlpha
         }
 
+        cardMoves = glides.reduce(into: [:]) { out, g in
+            out[g.key] = (start[g.key] ?? local(g.value.from), local(g.value.to))
+        }
         let motion = token
         CATransaction.begin()
         var longest: CFTimeInterval = 0
@@ -249,6 +256,8 @@ final class PictureMotion: StripPresenter {
     func preview(frames: [String: Rect], focused: String?) -> Bool {
         guard pictures.available else { return false }
         token += 1 // a fade or settle still pending from an earlier motion no longer applies
+        // Cards stand still while fingers drag the strip, so they go until the strip settles.
+        showCards([:])
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         if !active { refreshBackdrop() }
@@ -452,6 +461,69 @@ final class PictureMotion: StripPresenter {
         if let url, let image = NSImage(contentsOf: url),
            let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             backdrop.contents = cg
+        }
+    }
+
+    /// Puts a peek card at each frame (Accessibility coordinates). The engine reports right
+    /// after a motion begins. A card then covers just the on-screen part of its window's picture
+    /// with the same spring: it fades in as the window slides behind it, and fades out as the
+    /// window comes out, so the window and its card never seem to swap.
+    func showCards(_ peeks: [String: Rect]) {
+        let moving = cardMoves
+        cardMoves = [:]
+        func onScreen(_ r: NSRect) -> NSRect {
+            let c = r.intersection(root.bounds)
+            return c.isNull || c.isEmpty ? r : c
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (id, card) in cards where peeks[id] == nil {
+            cards[id] = nil
+            guard let m = moving[id] else { card.removeFromSuperlayer(); continue }
+            slide(card, from: card.presentation()?.frame ?? card.frame, to: onScreen(m.to), fade: (PeekCards.opacity, 0)) {
+                card.removeFromSuperlayer()
+            }
+        }
+        for (id, r) in peeks {
+            let to = local(r)
+            let card = cards[id] ?? WindowLayer()
+            let isNew = cards[id] == nil
+            if isNew {
+                card.zPosition = 5
+                root.addSublayer(card)
+                cards[id] = card
+            }
+            PeekCards.dress(card, as: id, covers: pictures.covers)
+            if let m = moving[id] {
+                let from = isNew ? onScreen(m.from) : card.presentation()?.frame ?? card.frame
+                slide(card, from: from, to: to, fade: isNew ? (0, PeekCards.opacity) : nil)
+            } else {
+                card.removeAllAnimations()
+                card.frame = to
+            }
+        }
+        CATransaction.commit()
+    }
+
+    /// Springs a card like a picture, fading it over the visible part of the motion.
+    private func slide(_ card: WindowLayer, from: NSRect, to: NSRect, fade: (Float, Float)?,
+                       then done: (@MainActor () -> Void)? = nil) {
+        card.removeAllAnimations()
+        card.frame = to
+        let group = springs(from: from, to: to)
+        card.add(group, forKey: "move")
+        card.followCover(from: from.size, to: to.size) { spring("position", $0, $1) }
+        if let (a, b) = fade {
+            card.opacity = b
+            let f = CABasicAnimation(keyPath: "opacity")
+            f.fromValue = a
+            f.toValue = b
+            f.duration = group.duration * 0.6
+            f.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            card.add(f, forKey: "fade")
+        }
+        if let done {
+            DispatchQueue.main.asyncAfter(deadline: .now() + group.duration) { MainActor.assumeIsolated { done() } }
         }
     }
 
