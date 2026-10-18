@@ -370,7 +370,7 @@ final class Runtime {
         engine.observers.append { [unowned self] e in
             snapshots.prime(Set(e.workspaces.strips.flatMap(\.allWindows)))
         }
-        engine.observers.append { [unowned self] e in overlays[id]?.minimap.show(e) }
+        engine.observers.append { [unowned self] e in if e.moved { overlays[id]?.minimap.show(e) } }
         engine.observers.append { [unowned self] e in
             let ws = e.workspaces
             // The top empty workspace is 0, so the first one with windows is 1.

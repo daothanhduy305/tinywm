@@ -27,6 +27,8 @@ public final class StripEngine {
     public var label = ""
     /// Called after every change, for UI such as the menu-bar minimap.
     public var observers: [(StripEngine) -> Void] = []
+    /// Whether the last change moved any window, so UI that follows motion can skip a focus-only change.
+    public private(set) var moved = false
     /// The narrowest width in points a window's app accepts, if one has been learned.
     public var minimumWidth: (String) -> Double? = { _ in nil }
     /// The width a new window takes when its app had a column before; nil means the default.
@@ -693,6 +695,7 @@ public final class StripEngine {
                 windows.setFrame(id, r) { [weak self] took in self?.checkWidth(id, asked: r, took: took) }
             }
         }
+        moved = !moves.isEmpty || !direct.isEmpty
         for o in observers { o(self) }
     }
 

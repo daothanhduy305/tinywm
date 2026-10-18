@@ -213,6 +213,16 @@ final class FakeWindows: WindowSystem {
         #expect(f.frames["a"]?.x == 0)
     }
 
+    @Test func focusThatMovesNothingIsNotMotion() {
+        let (e, f) = make()
+        for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
+        f.focusedWindow = "a"; e.windowFocused("a")
+        #expect(e.strip.focusedWindow == "a")
+        #expect(!e.moved)
+        f.focusedWindow = "c"; e.windowAdded("c")
+        #expect(e.moved)
+    }
+
     @Test func closingAWindowClosesTheGap() {
         let (e, f) = make()
         for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
