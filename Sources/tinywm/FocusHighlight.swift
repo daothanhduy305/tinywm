@@ -3,7 +3,8 @@ import QuartzCore
 import WindowCore
 import WindowKit
 
-/// Marks the focused window with a solid border, ordered directly above it in the window stack.
+/// Marks the focused window with a solid border, ordered directly below it in the window stack.
+/// Below, a click on the window, which raises it, leaves the border looking the same.
 @MainActor
 final class FocusHighlight {
     struct Style {
@@ -22,8 +23,6 @@ final class FocusHighlight {
     private let ring = CAShapeLayer()
     private var suspended = false
     private var current: (id: String, frame: Rect)?
-    /// What the panels show now, so an unchanged refresh does not re-stack windows.
-    private var drawn: (window: Int, frame: Rect, border: Bool)?
 
     init(windows: AXWindows) {
         self.windows = windows
@@ -56,10 +55,9 @@ final class FocusHighlight {
     }
 
     /// Shows the highlight on `id` at `frame` (Accessibility coordinates), or hides it for nil.
-    /// `restack` forces re-ordering, for when macOS raised the window over the border.
-    func show(_ id: String?, frame: Rect?, restack: Bool = false) {
+    /// Every show re-orders the border under the window, since other windows may have been raised over it.
+    func show(_ id: String?, frame: Rect?) {
         if let id, let frame { current = (id, frame) } else { current = nil }
-        if restack { drawn = nil }
         refresh()
     }
 
@@ -76,12 +74,9 @@ final class FocusHighlight {
               let element = windows.element(of: id), let pid = windows.pid(of: id),
               let number = WindowNumbers.windowID(of: element, pid: pid) else {
             border.orderOut(nil)
-            drawn = nil
             return
         }
         let target = Int(number)
-        if let d = drawn, d.window == target, d.frame == frame, d.border == showBorder { return }
-        drawn = (target, frame, showBorder)
 
         if showBorder {
             let pad = style.borderWidth + style.glowRadius
@@ -101,7 +96,7 @@ final class FocusHighlight {
             ring.shadowRadius = style.glowRadius
             ring.shadowOffset = .zero
             CATransaction.commit()
-            border.order(.above, relativeTo: target)
+            border.order(.below, relativeTo: target)
         } else {
             border.orderOut(nil)
         }

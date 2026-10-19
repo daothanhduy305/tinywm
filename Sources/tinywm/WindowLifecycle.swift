@@ -10,8 +10,8 @@ import WindowKit
 /// knows a window forgets it in one place.
 @MainActor
 final class WindowLifecycle {
-    /// Called when focus may have moved, so the focus border can follow. `restack` raises the border too.
-    var focusMoved: (_ restack: Bool) -> Void = { _ in }
+    /// Called when focus may have moved, so the focus border can follow.
+    var focusMoved: () -> Void = {}
     /// Writes every window's frame again.
     var retileAll: () -> Void = {}
     /// The rules in force, read afresh each time so a config reload applies at once.
@@ -265,14 +265,14 @@ final class WindowLifecycle {
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.focusMoved(true) }
+            MainActor.assumeIsolated { self?.focusMoved() }
         }
         windows.onFocusRequested.append { [unowned self] id in
             guard let pid = windows.pid(of: id) else { return }
             focusRequest.asked(id, app: pid, at: ProcessInfo.processInfo.systemUptime)
         }
         tracker.onFocused = { [unowned self] element, pid in focused(element, pid: pid) }
-        tracker.focusListeners.append { [unowned self] _ in focusMoved(true) }
+        tracker.focusListeners.append { [unowned self] _ in focusMoved() }
     }
 
     private func activated(_ app: NSRunningApplication) {
@@ -282,9 +282,9 @@ final class WindowLifecycle {
         // An app coming back to the front reports no focused-window change when its window
         // stayed the same, as after a launcher closes, so the border is redrawn here. Its
         // focused window can take a moment to settle.
-        focusMoved(true)
+        focusMoved()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            MainActor.assumeIsolated { self?.focusMoved(true) }
+            MainActor.assumeIsolated { self?.focusMoved() }
         }
         if app.bundleIdentifier == "com.apple.finder" {
             // A click on an empty desktop activates Finder with no window focused. The display
