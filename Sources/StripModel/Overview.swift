@@ -23,7 +23,7 @@ public struct OverviewStyle: Equatable, Sendable {
     public var margin = 48.0
     public var rowGap = 44.0
     /// Extra space under each stacked window but the last, so its label does not cover the next.
-    public var labelGap = 24.0
+    public var labelGap = 30.0
     /// A lone small strip is not blown up past this share of its real size.
     public var maxScale = 0.6
     /// Below this a wide strip stops shrinking and the view pans sideways instead. Rows still

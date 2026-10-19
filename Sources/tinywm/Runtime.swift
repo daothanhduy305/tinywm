@@ -49,6 +49,8 @@ final class Runtime {
     /// Each display's overlay, minimap and peek cards, by display ID.
     private var overlays: [String: (pictures: PictureMotion, minimap: MinimapPanel, cards: PeekCards)] = [:]
     private var motionDisplays: Set<String> = []
+    /// Set while the overview focuses its pick; the overview already shows where it went.
+    private var overviewPicking = false
     private var coveringOverlays = 0
     private var swipeAxis: SwipeRecognizer.Axis?
     private var swipeEngine: StripEngine?
@@ -109,6 +111,8 @@ final class Runtime {
         }
         overview.ringStyle = highlight.style
         overview.activate = { [unowned self] id in
+            overviewPicking = true
+            defer { overviewPicking = false }
             displays.windowFocused(id)
             windows.focus(id)
         }
@@ -381,7 +385,7 @@ final class Runtime {
         engine.observers.append { [unowned self] e in
             snapshots.prime(Set(e.workspaces.strips.flatMap(\.allWindows)))
         }
-        engine.observers.append { [unowned self] e in if e.moved { overlays[id]?.minimap.show(e) } }
+        engine.observers.append { [unowned self] e in if e.moved, !overviewPicking { overlays[id]?.minimap.show(e) } }
         engine.observers.append { [unowned self] e in
             cards.show(e.peeks, windows: e.peekStrip)
             overlays[id]?.pictures.showCards(e.peeks)

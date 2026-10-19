@@ -233,7 +233,7 @@ cancels. When the active display has no
 windows, the next display's overview takes the keys. Pointing at a window on any display
 highlights it, and a click focuses it and makes its display the active one. When the pointer
 leaves a display, its highlight goes back to its focused window, or to the one the keys chose.
-Each picture has its app name and window title under it.
+Each picture has its app name and window title under it. Picking a window does not show the minimap.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
 right after tinywm focuses one. Within a second and with no click or key press since, tinywm

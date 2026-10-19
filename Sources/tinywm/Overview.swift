@@ -382,8 +382,8 @@ final class Overview {
         let title = windows.cachedTitle(of: id).flatMap { $0.isEmpty ? nil : $0 }
         let label = CATextLayer()
         label.string = [app, title].compactMap { $0 }.joined(separator: " — ")
-        label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        label.fontSize = 12
+        label.font = NSFont.systemFont(ofSize: 16, weight: .medium)
+        label.fontSize = 16
         label.foregroundColor = NSColor.white.cgColor
         label.alignmentMode = .center
         label.truncationMode = .end
@@ -397,8 +397,8 @@ final class Overview {
 
     /// Just under the picture, centred on it, at least wide enough for a short name.
     private func labelFrame(_ r: Rect) -> NSRect {
-        let w = max(80, r.width)
-        return NSRect(x: r.center.x - w / 2, y: r.maxY + 4, width: w, height: 20)
+        let w = max(100, r.width)
+        return NSRect(x: r.center.x - w / 2, y: r.maxY + 4, width: w, height: 26)
     }
 
     private func outset(_ r: NSRect) -> NSRect { r.insetBy(dx: -ringStyle.borderWidth, dy: -ringStyle.borderWidth) }
