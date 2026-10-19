@@ -34,6 +34,7 @@ final class WindowLifecycle {
     /// Slots of windows that went fullscreen, so each comes back where it was.
     private var fullScreenSlots: [String: StripDisplays.Slot] = [:]
     private var closeFocus = CloseFocus()
+    private var focusRequest = FocusRequest()
     private var framesBeingRead: Set<String> = []
     private var framesChangedAgain: Set<String> = []
     private var snapping: Set<String> = []
@@ -266,6 +267,10 @@ final class WindowLifecycle {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.focusMoved(true) }
         }
+        windows.onFocusRequested.append { [unowned self] id in
+            guard let pid = windows.pid(of: id) else { return }
+            focusRequest.asked(id, app: pid, at: ProcessInfo.processInfo.systemUptime)
+        }
         tracker.onFocused = { [unowned self] element, pid in focused(element, pid: pid) }
         tracker.focusListeners.append { [unowned self] _ in focusMoved(true) }
     }
@@ -297,13 +302,29 @@ final class WindowLifecycle {
         // focused-window change when that window already was its focused one, so the strip
         // follows here, as it does for focus moved with the keyboard.
         windows.readFocused(of: app.processIdentifier) { [weak self] read in
-            guard let self, read.isCurrent, windows.activations == activation, let id = read.id else { return }
+            guard let self, read.isCurrent, windows.activations == activation, let id = read.id,
+                  !refocusesAsked(id, pid: app.processIdentifier) else { return }
             displays.windowFocused(id)
         }
     }
 
+    /// True when an app overrode the focus tinywm just asked for by making another of its windows
+    /// key, as a browser with windows on two displays does. The asked window is focused once more;
+    /// if the app wins again, focus follows it.
+    private func refocusesAsked(_ id: String, pid: pid_t) -> Bool {
+        guard let back = focusRequest.overridden(
+            by: id, app: pid, now: ProcessInfo.processInfo.systemUptime,
+            secondsSinceInput: FocusKeeper.since([.leftMouseDown, .rightMouseDown, .keyDown])),
+            windows.element(of: back) != nil else { return false }
+        Log.note("focus", "\(Log.name(id)) took focus from \(Log.name(back)), which tinywm just focused; focusing it again")
+        windows.focus(back)
+        focusRequest.clear()
+        return true
+    }
+
     private func focused(_ element: AXUIElement, pid: pid_t) {
         guard let id = windows.knownID(for: element) else { return windows.noteFocusMoved() }
+        if refocusesAsked(id, pid: pid) { return }
         windows.noteFocused(id)
         let closingWindow = closeFocus.closing?.window
         if let engine = displays.engine(holding: id),

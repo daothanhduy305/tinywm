@@ -229,6 +229,11 @@ In the overview, the focus keys (letters and arrows, with or without the meta ke
 selection, Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels.
 Each picture has its app name and window title under it.
 
+An app with windows on several displays, such as a browser, may make another of its windows key
+right after tinywm focuses one. Within a second and with no click or key press since, tinywm
+focuses the window it asked for once more, so focus stays on the display you went to.
+`StripEngine/FocusRequest.swift` decides this.
+
 ## Dragging windows
 
 Hold the meta key and press the left button anywhere on a managed window. The click does not
