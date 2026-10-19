@@ -142,6 +142,9 @@ public enum AX {
         public var isTileable: Bool
         /// False for a window that does not tile, since only a tileable window is asked.
         public var isDockable: Bool
+        public var role: String? = nil
+        public var subrole: String? = nil
+        public var isMinimized = false
     }
 
     /// Looks at a window in two or three requests to its app.
@@ -156,7 +159,8 @@ public enum AX {
         let tileable = v[0] as? String == kAXWindowRole && v[1] as? String == kAXStandardWindowSubrole
             && v[2] as? Bool != true && frame.map { $0.width >= 80 && $0.height >= 40 } == true && !fullScreen
         return Inspection(title: v[5] as? String, frame: frame, isFullScreen: fullScreen, isTileable: tileable,
-                          isDockable: tileable && isDockable(e, fullScreenButton: v[6], zoomButton: v[7]))
+                          isDockable: tileable && isDockable(e, fullScreenButton: v[6], zoomButton: v[7]),
+                          role: v[0] as? String, subrole: v[1] as? String, isMinimized: v[2] as? Bool == true)
     }
 
     /// A tileable window the app lets us resize, unless its zoom button is disabled.

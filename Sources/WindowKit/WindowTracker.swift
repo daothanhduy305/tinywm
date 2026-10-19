@@ -144,12 +144,22 @@ public final class WindowTracker {
         }
     }
 
-    /// Re-reads an app's windows. New ones are admitted; known ones are re-reported, which lets
-    /// the engine restore a window that was hidden.
-    public func rescan(pid: pid_t) {
+    /// Re-reads an app's windows on its queue. New ones are admitted; known ones are re-reported,
+    /// which lets the engine restore a window that was hidden, unless only new ones are wanted.
+    public func rescan(pid: pid_t) { rescan(pid: pid, from: .listed) }
+
+    private func rescan(pid: pid_t, from source: Source) {
         guard observers[pid] != nil else { return }
-        let axApp = AXUIElementCreateApplication(pid)
-        for w in AX.attribute(axApp, kAXWindowsAttribute, as: [AXUIElement].self) ?? [] { admit(w, pid: pid) }
+        queue(for: pid).async { [weak self] in
+            let listed = (AX.attribute(AXUIElementCreateApplication(pid), kAXWindowsAttribute, as: [AXUIElement].self) ?? [])
+                .map(AXRef.init(element:))
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                guard let self else { return }
+                for ref in listed where source != .windowServer || !self.registered.contains(ref) {
+                    self.admit(ref.element, pid: pid, from: source)
+                }
+            } }
+        }
     }
 
     /// Brings each app's window list in line with what is managed. Some apps hide a window on
@@ -222,9 +232,14 @@ public final class WindowTracker {
                 if !registered.contains(ref) { admit(ref.element, pid: pid) }
             }
         }
+        let answered = Set(result.lists.map(\.0))
+        rejected = rejected.filter { ref in
+            var pid: pid_t = 0
+            AXUIElementGetPid(ref.element, &pid)
+            return observers[pid] != nil && (seen.contains(ref) || !answered.contains(pid))
+        }
         // Windows on other Spaces are left out of the lists, not gone.
         guard !result.fullScreenShows else { missing = []; return }
-        let answered = Set(result.lists.map(\.0))
         var listed: Set<CGWindowID>?
         for ref in registered where !seen.contains(ref) {
             var pid: pid_t = 0
@@ -276,7 +291,29 @@ public final class WindowTracker {
         vanished = vanishedNow
         shown = shownNow
         for pid in hiddenPIDs { rescan(pid: pid) }
+        if !paused { findUnannounced() }
     }
+
+    /// Some apps never report a new window, so it would wait for a focus change or the sweep.
+    /// The window server shows it at once: a window of a watched app that is shown but unknown
+    /// has its app's windows read again. Each window number is tried once while it is shown.
+    private func findUnannounced() {
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        let known = Set(numbers.values)
+        var onScreen: Set<CGWindowID> = []
+        var pids: Set<pid_t> = []
+        for window in info where (window[kCGWindowLayer as String] as? Int) == 0 {
+            guard let number = window[kCGWindowNumber as String] as? CGWindowID,
+                  let pid = window[kCGWindowOwnerPID as String] as? pid_t else { continue }
+            onScreen.insert(number)
+            guard !known.contains(number), observers[pid] != nil, tried.insert(number).inserted else { continue }
+            pids.insert(pid)
+        }
+        tried.formIntersection(onScreen)
+        for pid in pids { rescan(pid: pid, from: .windowServer) }
+    }
+    /// Shown window numbers that were unknown and have had their app's windows read once.
+    private var tried: Set<CGWindowID> = []
     private var windowServerWatch: Timer?
     /// Each accepted window's number in the window server.
     private var numbers: [AXRef: CGWindowID] = [:]
@@ -352,9 +389,10 @@ public final class WindowTracker {
         guard observers[pid] != nil else { return }
         switch notification {
         case kAXWindowCreatedNotification:
-            admit(element, pid: pid)
+            Log.note("tracker", "process \(pid) created a window")
+            admit(element, pid: pid, from: .created)
         case kAXFocusedWindowChangedNotification:
-            admit(element, pid: pid)
+            admit(element, pid: pid, from: .focused)
             onFocused(element, pid)
             for l in focusListeners { l(element) }
         case kAXWindowMiniaturizedNotification:
@@ -388,29 +426,64 @@ public final class WindowTracker {
     ///
     /// A new window is looked at on its app's queue: each question waits for the app, and an app
     /// that is still starting answers slowly. A window already accepted is only reported again.
-    private func admit(_ window: AXUIElement, pid: pid_t) {
+    ///
+    /// `retries` are the delays left before the window is looked at again, when it is not yet a
+    /// standard window. Nil starts them afresh for a window that was just reported.
+    private func admit(_ window: AXUIElement, pid: pid_t, from source: Source = .listed, retries: [Double]? = nil) {
         guard observers[pid] != nil else { return }
         let ref = AXRef(element: window)
         if registered.contains(ref) { return onAdded(window, pid, nil) }
         guard probing.insert(ref).inserted else { return }
         queue(for: pid).async { [weak self] in
             let seen = AX.inspect(ref.element)
-            let probe = seen.isTileable ? WindowProbe(isDockable: seen.isDockable, frame: seen.frame, title: seen.title) : nil
-            DispatchQueue.main.async { MainActor.assumeIsolated { self?.accept(ref, pid: pid, probe) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                self?.accept(ref, pid: pid, seen, from: source, retries: retries)
+            } }
         }
     }
 
-    private func accept(_ ref: AXRef, pid: pid_t, _ probe: WindowProbe?) {
+    private func accept(_ ref: AXRef, pid: pid_t, _ seen: AX.Inspection, from source: Source, retries: [Double]?) {
         probing.remove(ref)
-        guard let probe, let observer = observers[pid], registered.insert(ref).inserted else { return }
+        guard let observer = observers[pid], !registered.contains(ref) else { return }
+        guard seen.isTileable else { return lookAgain(ref, pid: pid, seen, from: source, retries: retries) }
+        registered.insert(ref)
+        rejected.remove(ref)
+        if source != .listed { Log.note("tracker", "process \(pid) window \"\(seen.title ?? "")\" accepted, found by \(source)") }
         subscribe([kAXUIElementDestroyedNotification, kAXWindowMiniaturizedNotification,
                    kAXWindowDeminiaturizedNotification, kAXWindowMovedNotification,
                    kAXWindowResizedNotification, kAXTitleChangedNotification],
                   on: ref.element, observer: observer, pid: pid)
         numbers[ref] = WindowNumbers.exactWindowID(of: ref.element)
-        onAdded(ref.element, pid, probe)
-        if !probe.isDockable { recheckDockable(ref, pid: pid, attempts: [1, 3]) }
+        onAdded(ref.element, pid, WindowProbe(isDockable: seen.isDockable, frame: seen.frame, title: seen.title))
+        if !seen.isDockable { recheckDockable(ref, pid: pid, attempts: [0.25, 0.5, 1, 3]) }
     }
+
+    /// Right after it opens, a window often has no subrole or size yet. A window just reported is
+    /// looked at again a few times over a second, instead of waiting for the next sweep.
+    private func lookAgain(_ ref: AXRef, pid: pid_t, _ seen: AX.Inspection, from source: Source, retries: [Double]?) {
+        guard source != .listed, retries != nil || !rejected.contains(ref) else { return }
+        let why = "\(seen.role ?? "no role") \(seen.subrole ?? "no subrole") \(Log.rect(seen.frame))"
+            + (seen.isMinimized ? " minimized" : "") + (seen.isFullScreen ? " fullscreen" : "")
+        let retries = retries ?? [0.05, 0.15, 0.3, 0.6, 1.2]
+        guard let delay = retries.first else {
+            rejected.insert(ref)
+            Log.note("tracker", "process \(pid) window \"\(seen.title ?? "")\" is not a standard window: \(why)")
+            return
+        }
+        if retries.count == 5 { Log.note("tracker", "process \(pid) window \"\(seen.title ?? "")\" is not a standard window yet: \(why); looking again") }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            let box = ref
+            MainActor.assumeIsolated {
+                self.admit(box.element, pid: pid, from: source, retries: Array(retries.dropFirst()))
+            }
+        }
+    }
+
+    /// How a window came to be looked at. Only windows just reported are looked at again.
+    private enum Source: String { case listed, created, focused, windowServer = "the window server" }
+    /// Windows looked at again until the retries ran out, so a focus change does not start them over.
+    /// The sweep still looks at them, and drops the ones that are gone.
+    private var rejected: Set<AXRef> = []
 
     /// Windows being looked at on their app's queue, so a second report does not start another look.
     private var probing: Set<AXRef> = []
