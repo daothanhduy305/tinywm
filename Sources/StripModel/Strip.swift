@@ -56,9 +56,11 @@ public struct StripMetrics: Equatable, Sendable {
     public var gap: Double
     /// The narrowest width in points each window's app accepts, by window ID.
     public var minimums: [String: Double]
+    /// The widest width in points each window's app accepts, by window ID.
+    public var maximums: [String: Double]
 
-    public init(viewport: Rect, gap: Double, minimums: [String: Double] = [:]) {
-        self.viewport = viewport; self.gap = gap; self.minimums = minimums
+    public init(viewport: Rect, gap: Double, minimums: [String: Double] = [:], maximums: [String: Double] = [:]) {
+        self.viewport = viewport; self.gap = gap; self.minimums = minimums; self.maximums = maximums
     }
 
     /// Width in points of a column with share `fraction`. Two 0.5 columns plus three gaps fill the screen.
@@ -66,10 +68,11 @@ public struct StripMetrics: Equatable, Sendable {
         max(1, fraction * (viewport.width - gap) - gap)
     }
 
-    /// Width in points of `column`: its share, widened to the minimum of its widest-minded window,
-    /// but never past the screen.
+    /// Width in points of `column`: its share, narrowed to the maximum of its narrowest-minded
+    /// window, then widened to the minimum of its widest-minded one, but never past the screen.
     public func width(of column: Column) -> Double {
-        let share = columnWidth(column.width)
+        var share = columnWidth(column.width)
+        if let maximum = column.windows.compactMap({ maximums[$0] }).min() { share = min(share, maximum) }
         guard let minimum = column.windows.compactMap({ minimums[$0] }).max() else { return share }
         return max(share, min(minimum, viewport.width - 2 * gap))
     }

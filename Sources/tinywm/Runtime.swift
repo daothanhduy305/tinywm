@@ -10,6 +10,7 @@ enum Defaults {
     static let disabledDisplays = "disabledDisplays"
     static let livePictures = "liveWindowPictures"
     static let minimumWidths = "minimumWidths"
+    static let maximumWidths = "maximumWidths"
     static let appWidths = "appWidths"
 }
 
@@ -112,8 +113,12 @@ final class Runtime {
             windows.focus(id)
         }
         displays.appOf = { [unowned self] id in windows.bundleID(of: id) }
-        displays.minimums = MinimumWidths(UserDefaults.standard.dictionary(forKey: Defaults.minimumWidths) as? [String: Double] ?? [:])
-        displays.onMinimumsChanged = { UserDefaults.standard.set($0.widths, forKey: Defaults.minimumWidths) }
+        displays.limits = WidthLimits(UserDefaults.standard.dictionary(forKey: Defaults.minimumWidths) as? [String: Double] ?? [:],
+                                      maximums: UserDefaults.standard.dictionary(forKey: Defaults.maximumWidths) as? [String: Double] ?? [:])
+        displays.onLimitsChanged = {
+            UserDefaults.standard.set($0.minimums, forKey: Defaults.minimumWidths)
+            UserDefaults.standard.set($0.maximums, forKey: Defaults.maximumWidths)
+        }
         displays.widths = UserDefaults.standard.dictionary(forKey: Defaults.appWidths) as? [String: Double] ?? [:]
         displays.onWidthsChanged = { UserDefaults.standard.set($0, forKey: Defaults.appWidths) }
         release.beforeRelease = { [unowned self] in persistence.saveNow(wait: true) }

@@ -10,6 +10,8 @@ public struct StripSettings: Codable, Equatable, Sendable {
     public var scrollMode: ScrollMode = .fit
     /// Whether columns widen to the narrowest width each app was seen to take.
     public var learnMinimumWidths = true
+    /// Whether columns narrow to the widest width each app was seen to take.
+    public var learnMaximumWidths = true
     /// Whether a column that would reach another display hides behind a card instead of narrowing.
     public var peekCovers = false
     public init() {}
@@ -35,9 +37,11 @@ public final class StripEngine {
     public private(set) var peeks: [String: Rect] = [:]
     /// The narrowest width in points a window's app accepts, if one has been learned.
     public var minimumWidth: (String) -> Double? = { _ in nil }
+    /// The widest width in points a window's app accepts, if one has been learned.
+    public var maximumWidth: (String) -> Double? = { _ in nil }
     /// The width a new window takes when its app had a column before; nil means the default.
     public var rememberedWidth: (String) -> Double? = { _ in nil }
-    /// Called when a tiled window keeps a wider frame than it was asked to take.
+    /// Called when a tiled window keeps a wider or narrower frame than it was asked to take.
     public var onRefusedWidth: ((_ id: String, _ asked: Rect, _ took: Rect) -> Void)?
 
     private let windows: WindowSystem
@@ -108,12 +112,18 @@ public final class StripEngine {
 
     /// Built afresh on each read from every window on every workspace, so an operation that
     /// needs it more than once reads it into a local first.
-    public var metrics: StripMetrics {
-        var minimums: [String: Double] = [:]
+    public var metrics: StripMetrics { metrics(of: workspaces) }
+
+    /// Metrics for a layout not applied yet, so a window it adds already counts its app's widths.
+    private func metrics(of workspaces: Workspaces) -> StripMetrics {
+        var minimums: [String: Double] = [:], maximums: [String: Double] = [:]
         for strip in workspaces.strips {
-            for id in strip.allWindows { minimums[id] = minimumWidth(id) }
+            for id in strip.allWindows {
+                minimums[id] = minimumWidth(id)
+                maximums[id] = maximumWidth(id)
+            }
         }
-        return StripMetrics(viewport: viewport, gap: settings.gap, minimums: minimums)
+        return StripMetrics(viewport: viewport, gap: settings.gap, minimums: minimums, maximums: maximums)
     }
     public var hideaway: Hideaway { Hideaway(screen: viewport, others: neighbours) }
 
@@ -288,7 +298,7 @@ public final class StripEngine {
             next.switchTo(w)
             next.current.focus(window: focused)
         }
-        let m = metrics
+        let m = metrics(of: next)
         for i in next.strips.indices {
             let reach = max(0, m.columnOffsets(next.strips[i]).total - viewport.width)
             next.strips[i].scroll = max(0, min(reach, next.strips[i].scroll))
@@ -603,19 +613,29 @@ public final class StripEngine {
         next.normalize()
         logChange(caller, from: workspaces, to: next)
         if let scroll {
-            next.current = scroll(next.current, metrics, settings.scrollMode)
+            next.current = scroll(next.current, metrics(of: next), settings.scrollMode)
         } else {
             // Any other change forgets the remembered view once focus leaves that column.
             let focusedNow = next.current.focusedColumn.map { next.current.columns[$0].id }
             if focusedNow != focusedBefore || next.current.viewBeforeGrow?.column != focusedNow {
                 next.current.viewBeforeGrow = nil
             }
-            next.current.scroll = scrollToFocus(next.current, metrics, mode: settings.scrollMode)
+            next.current.scroll = scrollToFocus(next.current, metrics(of: next), mode: settings.scrollMode)
         }
         let refocus = raise && next.current.focusedWindow != windows.focusedWindow
         workspaces = next
         apply()
         if refocus, let target = strip.focusedWindow { windows.focus(target) }
+    }
+
+    /// Refits each strip's scroll after column widths changed outside a layout change, as when
+    /// an app's width limit is learned, so a narrowed column leaves no empty space past the strip's end.
+    public func widthsChanged() {
+        let m = metrics
+        for i in workspaces.strips.indices {
+            workspaces.strips[i].scroll = scrollToFocus(workspaces.strips[i], m, mode: settings.scrollMode)
+        }
+        apply()
     }
 
     /// Writes frames that changed since the last write. Windows on other workspaces wait
@@ -733,12 +753,12 @@ public final class StripEngine {
         for o in observers { o(self) }
     }
 
-    /// Reports a tiled window that took a wider frame than asked, with the frame a second read
+    /// Reports a tiled window that took a wider or narrower frame than asked, with the frame a second read
     /// finds a moment later, since an app still busy with the change can report its old size.
     /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
     /// Nor does a trimmed one, which the app may refuse though it takes its column's width.
     private func checkWidth(_ id: String, asked: Rect, took: Rect?) {
-        guard let onRefusedWidth, let took, took.width > asked.width + 2,
+        guard let onRefusedWidth, let took, abs(took.width - asked.width) > 2,
               asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2, !isTrimmed(id) else { return }
         let confirm: @MainActor () -> Void = { [weak self] in
             guard let self else { return }

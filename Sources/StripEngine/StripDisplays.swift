@@ -23,12 +23,12 @@ public final class StripDisplays {
     public private(set) var engines: [String: StripEngine] = [:]
     public private(set) var disabled: Set<String>
     public var settings = StripSettings()
-    /// The narrowest width each app accepts, shared by every display.
-    public var minimums = MinimumWidths()
+    /// The narrowest and widest width each app accepts, shared by every display.
+    public var limits = WidthLimits()
     /// The bundle ID of a window's app.
     public var appOf: (String) -> String? = { _ in nil }
     /// Called after a learned width changed, so it can be saved.
-    public var onMinimumsChanged: ((MinimumWidths) -> Void)?
+    public var onLimitsChanged: ((WidthLimits) -> Void)?
     /// The width each app's last closed column had, by bundle ID, so its next window opens at it.
     public var widths: [String: Double] = [:]
     /// Called after a remembered width changed, so it can be saved.
@@ -121,14 +121,19 @@ public final class StripDisplays {
         e.label = Self.short(d.id)
         e.neighbours = others
         e.minimumWidth = { [unowned self] id in
-            settings.learnMinimumWidths ? app(of: id).flatMap(minimums.width(for:)) : nil
+            settings.learnMinimumWidths ? app(of: id).flatMap(limits.minimum(for:)) : nil
+        }
+        e.maximumWidth = { [unowned self] id in
+            settings.learnMaximumWidths ? app(of: id).flatMap(limits.maximum(for:)) : nil
         }
         e.rememberedWidth = { [unowned self] id in app(of: id).flatMap { widths[$0] } }
         e.onRefusedWidth = { [unowned self, unowned e] id, asked, took in
-            guard settings.learnMinimumWidths, let app = app(of: id),
-                  minimums.refused(app: app, asked: asked.width, took: took.width, screenWidth: e.viewport.width) else { return }
-            Log.note("minimum", "\(Log.name(id)) took \(Int(took.width)) points when asked for \(Int(asked.width)); \(app) columns widen to it")
-            minimumsChanged()
+            guard let app = app(of: id),
+                  limits.refused(app: app, asked: asked.width, took: took.width, screenWidth: e.viewport.width,
+                                 minimums: settings.learnMinimumWidths, maximums: settings.learnMaximumWidths) else { return }
+            let way = took.width > asked.width ? "widen" : "narrow"
+            Log.note("width", "\(Log.name(id)) took \(Int(took.width)) points when asked for \(Int(asked.width)); \(app) columns \(way) to it")
+            limitsChanged()
         }
         engines[d.id] = e
         configure(e, d)
@@ -262,13 +267,14 @@ public final class StripDisplays {
         return true
     }
 
-    /// A tiled window seen narrower than its app's learned width proves the app allows it.
+    /// A tiled window seen narrower than its app's learned minimum, or wider than its learned
+    /// maximum, proves the app allows it.
     public func windowSeen(_ id: String, width: Double) {
-        guard settings.learnMinimumWidths, let e = engine(holding: id), e.frame(of: id) != nil, !e.isTrimmed(id),
+        guard let e = engine(holding: id), e.frame(of: id) != nil, !e.isTrimmed(id),
               let app = app(of: id),
-              minimums.seen(app: app, width: width) else { return }
-        Log.note("minimum", "\(Log.name(id)) is \(Int(width)) points wide; \(app) columns narrow to it")
-        minimumsChanged()
+              limits.seen(app: app, width: width, minimums: settings.learnMinimumWidths, maximums: settings.learnMaximumWidths) else { return }
+        Log.note("width", "\(Log.name(id)) is \(Int(width)) points wide; \(app) columns fit it")
+        limitsChanged()
     }
 
     private func app(of id: String) -> String? {
@@ -278,9 +284,9 @@ public final class StripDisplays {
         return app
     }
 
-    private func minimumsChanged() {
-        onMinimumsChanged?(minimums)
-        for e in engines.values { e.apply() }
+    private func limitsChanged() {
+        onLimitsChanged?(limits)
+        for e in engines.values { e.widthsChanged() }
     }
 
     public func windowRemoved(_ id: String, refocus: Bool = true) {

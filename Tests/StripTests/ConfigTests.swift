@@ -65,6 +65,14 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("peek-cover = maybe").issues.count == 1)
     }
 
+    @Test func learnMaximumWidthsDefaultsOnAndParses() {
+        #expect(StripConfig().learnMaximumWidths)
+        #expect(StripConfig.parse("learn-maximum-widths = off").config.applied(to: StripSettings()).learnMaximumWidths == false)
+        let bad = StripConfig.parse("learn-maximum-widths = sometimes")
+        #expect(bad.issues.count == 1)
+        #expect(bad.config.learnMaximumWidths)
+    }
+
     @Test func learnMinimumWidthsDefaultsOnAndParses() {
         #expect(StripConfig().learnMinimumWidths)
         #expect(StripConfig.parse("learn-minimum-widths = off").config.learnMinimumWidths == false)

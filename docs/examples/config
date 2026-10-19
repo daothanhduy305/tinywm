@@ -23,6 +23,7 @@ swipe-fingers = 4
 # focus-crosses-displays = off
 # restore-layout = on
 learn-minimum-widths = off
+# learn-maximum-widths = on
 peek-cover = on
 
 # bind focus-left = h
