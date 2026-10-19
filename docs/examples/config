@@ -23,6 +23,7 @@ swipe-fingers = 4
 # focus-crosses-displays = off
 # restore-layout = on
 learn-minimum-widths = off
+peek-cover = on
 
 # bind focus-left = h
 # bind focus-left-arrow = left
@@ -86,7 +87,7 @@ bind display-move-down = shift+command+s
 bind display-move-up = shift+command+w
 bind display-move-right = shift+command+d
 bind overview = shift+command+tab
-# bind close-window = q
+bind close-window = shift+command+q
 
 # Rules. Match an app by bundle ID or app name (case-insensitive, exact), optionally with a
 # window title substring after a colon in quotes. Several patterns per line, comma-separated.
