@@ -511,6 +511,31 @@ final class CountingWindows: WindowSystem {
         #expect(Set(p.landedIDs) == ["a", "b", "c"])
     }
 
+    @Test func aColumnHiddenPastTheFarEdgeSlidesPastTheNearOne() {
+        // The left display: the right edge is blocked, so columns past it hide past the left edge.
+        let (e, w, p, clock) = make()
+        e.neighbours = [Rect(x: 1000, y: 0, width: 1000, height: 600)]
+        e.focusColumn(0)
+        #expect(p.begun.last?.moves["c"]?.from.x == 500)
+        #expect(p.begun.last?.moves["c"]?.to.x == 998)
+        clock.advance(by: 0.034)
+        #expect(w.writes["c"]?.last?.x == -498)
+        e.focusColumn(2)
+        #expect(p.begun.last?.moves["c"]?.from.x == 998)
+        #expect(p.begun.last?.moves["c"]?.to.x == 500)
+    }
+
+    @Test func aColumnHiddenPastTheFarLeftEdgeSlidesPastTheNearOne() {
+        // The right display: the left edge is blocked, so columns past it hide past the right edge.
+        let (e, w, p, clock) = make()
+        e.neighbours = [Rect(x: -1000, y: 0, width: 1000, height: 600)]
+        clock.advance(by: 1)
+        #expect(w.writes["a"]?.last?.x == 998)
+        e.focusColumn(0)
+        #expect(p.begun.last?.moves["a"]?.from.x == -498)
+        #expect(p.begun.last?.moves["a"]?.to.x == 0)
+    }
+
     @Test func retileWritesEveryWindowAgainAtOnce() {
         let (e, w, p, _) = make()
         let begun = p.begun.count

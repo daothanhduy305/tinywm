@@ -56,6 +56,9 @@ public final class StripEngine {
     /// Where each window behind a peek card sits on the strip. Its picture moves from and to
     /// there, by the card, not from where the hidden window really is.
     private var peekStrip: [String: Rect] = [:]
+    /// Hidden windows a neighbouring display pushed past the far edge, with their real frame and
+    /// the frame on the near edge their picture moves from and to, so it slides with the strip.
+    private var slideFrames: [String: (real: Rect, slide: Rect)] = [:]
     private var nextID = 0
 
     public init(windows: WindowSystem, viewport: Rect, settings: StripSettings = StripSettings()) {
@@ -619,7 +622,13 @@ public final class StripEngine {
     public func apply() {
         var frames = stripFrames(strip, metrics, trim: !settings.peekCovers, hideaway: hideaway)
         peeks = settings.peekCovers ? blockedPeeks(strip, metrics, hideaway: hideaway) : [:]
-        let unclamped = peeks.isEmpty ? [:] : stripFrames(strip, metrics, clamp: false)
+        let unclamped = stripFrames(strip, metrics, clamp: false)
+        let plain = Hideaway(screen: viewport)
+        var slides: [String: Rect] = [:]
+        for (id, r) in unclamped where r.maxX <= viewport.x || r.x >= viewport.maxX {
+            let edge = plain.sliver(r, pastRight: r.x >= viewport.maxX, sliver: 2)
+            if let real = frames[id], !real.isApproximately(edge) { slides[id] = edge }
+        }
         let peekStripBefore = peekStrip
         peekStrip = unclamped.filter { peeks[$0.key] != nil }
         var parkedNow: Set<String> = []
@@ -664,12 +673,18 @@ public final class StripEngine {
                 }
             } else if isParked(id, before: true) {
                 // Arrive from the edge the new workspace comes from.
-                let enter = Rect(x: target.x, y: target.y + (delta == 0 ? height : delta * height),
-                                 width: target.width, height: target.height)
-                moves[id] = (enter, target, nil)
+                let to = slides[id] ?? target
+                let enter = Rect(x: to.x, y: to.y + (delta == 0 ? height : delta * height),
+                                 width: to.width, height: to.height)
+                moves[id] = (enter, to, slides[id] == nil ? nil : target)
             } else {
                 // A window going behind a card slides to the card, then is written out of sight.
-                moves[id] = (peekStripBefore[id] ?? before, peekStrip[id] ?? target, peekStrip[id] == nil ? nil : target)
+                // A window hidden past the far edge slides past the near one, then is written there.
+                let slid = slideFrames[id].flatMap { $0.real.isApproximately(before) ? $0.slide : nil }
+                let from = peekStripBefore[id] ?? slid ?? before
+                let to = peekStrip[id] ?? slides[id] ?? target
+                if from.isApproximately(to) { direct[id] = target; continue }
+                moves[id] = (from, to, to.isApproximately(target) ? nil : target)
             }
         }
         // A window staying behind a card keeps its hidden frame, but its picture follows the strip.
@@ -677,6 +692,8 @@ public final class StripEngine {
             if let from = peekStripBefore[id], !from.isApproximately(to) { moves[id] = (from, to, frames[id]) }
         }
         targetFrames = frames
+        slideFrames = [:]
+        for (id, slide) in slides { if let real = frames[id] { slideFrames[id] = (real, slide) } }
         for (id, r) in direct {
             Log.note("frame", "\(label) \(Log.name(id)) -> \(Log.rect(r)) at once\(parkedNow.contains(id) ? " (parked)" : "")")
             windows.setFrame(id, r) { [weak self] took in self?.checkWidth(id, asked: r, took: took) }
@@ -687,7 +704,7 @@ public final class StripEngine {
         }
 
         var still: [String: Rect] = [:]
-        for id in strip.allWindows where moves[id] == nil { still[id] = peekStrip[id] ?? frames[id] }
+        for id in strip.allWindows where moves[id] == nil { still[id] = peekStrip[id] ?? slides[id] ?? frames[id] }
         let finals = moves.mapValues { $0.then ?? $0.to }
         if !moves.isEmpty, let presenter,
            let token = presenter.begin(moves: moves.mapValues { (from: $0.from, to: $0.to) }, still: still,
