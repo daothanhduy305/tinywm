@@ -54,8 +54,9 @@ public final class StripEngine {
     /// Where each parked floating window was on screen, so it returns there with its own size.
     private var floatHomes: [String: Rect] = [:]
     /// Where each window behind a peek card sits on the strip. Its picture moves from and to
-    /// there, by the card, not from where the hidden window really is.
-    private var peekStrip: [String: Rect] = [:]
+    /// there, by the card, not from where the hidden window really is, and the card shows the
+    /// part of its picture that would be on screen there.
+    public private(set) var peekStrip: [String: Rect] = [:]
     /// Hidden windows a neighbouring display pushed past the far edge, with their real frame and
     /// the frame on the near edge their picture moves from and to, so it slides with the strip.
     private var slideFrames: [String: (real: Rect, slide: Rect)] = [:]

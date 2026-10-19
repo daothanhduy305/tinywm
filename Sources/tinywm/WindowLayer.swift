@@ -58,7 +58,9 @@ final class WindowLayer: CALayer {
     /// Shows the window content of a captured surface at the size the window had in it.
     /// With `growingTo`, a picture smaller than that size stretches to it, so a growing window
     /// shows its old content until a picture at the new size arrives, never an empty strip.
-    func setPicture(_ s: WindowSurface?, growingTo target: CGSize? = nil) {
+    /// `at` puts the picture's top-left corner there instead of the layer's, so a layer smaller
+    /// than the window shows just the part of it that point leaves inside.
+    func setPicture(_ s: WindowSurface?, growingTo target: CGSize? = nil, at origin: CGPoint = .zero) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         if let s, s.scale > 0 {
@@ -68,7 +70,7 @@ final class WindowLayer: CALayer {
             picture.contents = s.surface
             picture.frame = CGRect(x: -s.content.minX / s.scale * fx, y: -s.content.minY / s.scale * fy,
                                    width: s.pixelSize.width / s.scale * fx, height: s.pixelSize.height / s.scale * fy)
-            crop.frame = CGRect(origin: .zero, size: shown)
+            crop.frame = CGRect(origin: origin, size: shown)
             crop.opacity = 1
             pictureSize = size
         } else {

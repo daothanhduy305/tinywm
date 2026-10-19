@@ -468,7 +468,10 @@ final class PictureMotion: StripPresenter {
     /// after a motion begins. A card then covers just the on-screen part of its window's picture
     /// with the same spring: it fades in as the window slides behind it, and fades out as the
     /// window comes out, so the window and its card never seem to swap.
+    /// A window with a picture needs no card here: its picture sits at its place on the strip and
+    /// the overlay clips it to the screen, which is what the `PeekCards` panel shows too.
     func showCards(_ peeks: [String: Rect]) {
+        let peeks = peeks.filter { snapshots.surface(of: $0.key) == nil }
         let moving = cardMoves
         cardMoves = [:]
         func onScreen(_ r: NSRect) -> NSRect {

@@ -219,8 +219,10 @@ final class StubbornWindows: WindowSystem {
         // The picture slides to the card's spot on the strip, not to where the window hides.
         let card = Rect(x: 840, y: 0, width: 840, height: 600)
         #expect(presenter.begun.last?.moves["b"]?.to == card)
+        #expect(e.peekStrip == ["b": card])
         e.focus(.right)
         #expect(e.peeks.isEmpty)
+        #expect(e.peekStrip.isEmpty)
         #expect(presenter.begun.last?.moves["b"]?.from == card)
         #expect(w.frames["b"] == Rect(x: 360, y: 0, width: 840, height: 600))
     }

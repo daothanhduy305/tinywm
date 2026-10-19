@@ -342,7 +342,7 @@ final class Runtime {
             windows.holdsNudges = coveringOverlays > 0
             tracker.paused = coveringOverlays > 0
         }
-        let cards = PeekCards(covers: self.pictures.covers)
+        let cards = PeekCards(pictures: self.pictures)
         cards.onClick = { [unowned self] wid in
             guard let e = displays.engine(holding: wid), let column = e.strip.column(of: wid) else { return }
             e.focusColumn(column)
@@ -378,7 +378,7 @@ final class Runtime {
         }
         engine.observers.append { [unowned self] e in if e.moved { overlays[id]?.minimap.show(e) } }
         engine.observers.append { [unowned self] e in
-            cards.show(e.peeks)
+            cards.show(e.peeks, windows: e.peekStrip)
             overlays[id]?.pictures.showCards(e.peeks)
         }
         engine.observers.append { [unowned self] e in

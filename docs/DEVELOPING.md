@@ -111,7 +111,7 @@ swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
 restore-layout = on # save the layout and restore it at start
 learn-minimum-widths = on       # off: never widen columns for apps that refuse narrow widths
-peek-cover = off                # on: a column beside another display hides behind a card, not narrowed
+peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
 bind move-left = shift+n
@@ -292,10 +292,16 @@ macOS cannot hide a single window, so columns off the screen wait just past its 
 thin sliver showing. A column partly on screen would spill onto a display next to it, so it is
 narrowed to the part on screen. With less than 100 points showing, it hides instead.
 `stripFrames` places them. A narrowed window teaches nothing about its app's minimum width.
-With `peek-cover = on` the column hides and a dark card with the app's icon and the
-window's title stands in for its part on screen. Clicking the card focuses the window.
-`blockedPeeks` gives the cards' frames and `PeekCards` draws them.
-During motion the overlay draws the same card over the pictures and under the focus ring, so
+With `peek-cover = on` the column hides and a card stands in for its part on screen. The card
+shows the window's picture as it would sit on the strip, so a column cut at the left edge
+shows its right part. The picture is retaken every second while the card shows. Without a
+picture, as with live pictures off, the card is dark with the app's icon and the window's
+title. Clicking the card focuses the window.
+`blockedPeeks` gives the cards' frames, `StripEngine.peekStrip` the windows' frames on the
+strip, and `PeekCards` draws them.
+During motion a window with a picture needs no card: its picture moves to its place on the
+strip and the overlay cuts it at the screen edge. For a dark card, the overlay draws the same
+card over the pictures and under the focus ring, so
 the ring passes over it. The window's picture moves to and from the card's spot. The card
 springs with it over the picture's part on screen, fading in as the window slides behind it and
 out as it comes back. The card's panel shows again under the pictures as they fade.
