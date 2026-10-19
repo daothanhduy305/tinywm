@@ -5,15 +5,17 @@ import StripModel
 import WindowCore
 import WindowKit
 
-/// A niri-style overview: the display's workspaces zoom out into stacked rows of live window
+/// A niri-style overview of one display: its workspaces zoom out into stacked rows of live window
 /// pictures, one selection moves among them, and choosing a window zooms into its workspace.
-/// The real windows do not move while it is open.
+/// The real windows do not move while it is open. `Overviews` opens one on every display.
 @MainActor
 final class Overview {
     private enum Phase { case closed, open, closing }
 
     /// Switches to the window's workspace and gives it focus.
     var activate: (String) -> Void = { _ in }
+    /// A window was clicked or confirmed, or nil to cancel. The owner closes every overview.
+    var chose: (String?) -> Void = { _ in }
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     var ringStyle = FocusHighlight.Style()
@@ -43,11 +45,16 @@ final class Overview {
     /// Each window's real frame when the overview opened, which is also its picture's size.
     private var real: [String: Rect] = [:]
     private var selected: String?
+    /// The selection the overview opened with or the keys moved to; it comes back when the pointer leaves.
+    private var home: String?
     private var previous: String?
     private var pan = 0.0
     private var token = 0
 
     var isOpen: Bool { phase != .closed }
+    var isShowing: Bool { phase == .open }
+    /// The windows whose pictures are shown.
+    var ids: Set<String> { Set(layers.keys) }
     var keys: OverviewKeys {
         get { view.keys }
         set { view.keys = newValue }
@@ -84,9 +91,16 @@ final class Overview {
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
             select(hit.id)
         }
+        view.onExit = { [weak self] in
+            guard let self, phase == .open else { return }
+            if let home { select(home) } else {
+                selected = nil
+                ring.isHidden = true
+            }
+        }
         view.onClick = { [weak self] p in
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
-            close(selecting: hit.id)
+            chose(hit.id)
         }
         view.onScroll = { [weak self] delta in
             guard let self, phase == .open, let layout else { return }
@@ -96,33 +110,28 @@ final class Overview {
         snapshots.onUpdate.append { [weak self] id in self?.pictureArrived(id) }
     }
 
-    /// Opens on `engine`'s display, or closes onto the highlighted window.
-    func toggle(_ engine: StripEngine, on screen: NSScreen?) {
-        switch phase {
-        case .closed: open(engine, on: screen)
-        case .open: close(selecting: selected)
-        case .closing: break
-        }
-    }
-
     // MARK: Opening
 
-    private func open(_ engine: StripEngine, on screen: NSScreen?) {
-        guard pictures.available, let screen else { return }
+    /// Opens on `engine`'s display. Only the active one takes keys and starts with a selection;
+    /// the others show one once the pointer is over a window. False when there is nothing to show.
+    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool) -> Bool {
+        guard phase == .closed, pictures.available, let screen else { return false }
         let ws = engine.workspaces
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
         floats = engine.floatFrames()
         let probe = overviewLayout(ws, m, screen: size, floats: floats)
-        guard let first = probe.windows.first?.id else { return }
+        guard let first = probe.windows.first?.id else { return false }
 
         self.engine = engine
         self.screen = screen
         viewport = engine.viewport
         metrics = m
         previous = windows.focusedWindow
-        selected = ws.current.focusedWindow.flatMap { probe.window($0) != nil ? $0 : nil } ?? first
-        pan = probe.pan(toReveal: selected!, current: 0)
+        let focus = ws.current.focusedWindow.flatMap { probe.window($0) != nil ? $0 : nil } ?? first
+        selected = active ? focus : nil
+        home = selected
+        pan = probe.pan(toReveal: focus, current: 0)
         layout = overviewLayout(ws, m, screen: size, pan: pan, floats: floats)
         real = overviewRealFrames(ws, m, floats: floats)
         phase = .open
@@ -149,16 +158,18 @@ final class Overview {
         }
         styleRing()
         ring.removeAllAnimations()
-        ring.frame = outset(NSRect(real[selected!]!))
+        ring.frame = outset(NSRect(real[focus]!))
+        ring.isHidden = !active
         dim.opacity = 0
         CATransaction.commit()
         CATransaction.flush()
 
-        snapshots.beginLive(Set(layers.keys), rate: rate)
         panel.alphaValue = PictureMotion.coveringAlpha
         panel.orderFrontRegardless()
-        panel.makeKey()
-        panel.makeFirstResponder(view)
+        if active {
+            panel.makeKey()
+            panel.makeFirstResponder(view)
+        }
 
         relayout(animated: true, fromModel: true)
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -171,6 +182,7 @@ final class Overview {
             label.add(fade, forKey: "fade")
             label.opacity = 1
         }
+        return true
     }
 
     // MARK: Keys and selection
@@ -185,14 +197,26 @@ final class Overview {
         case .down: next = overviewMove(layout, from: selected, .down)
         case .next: next = overviewStep(layout, from: selected, by: 1)
         case .previous: next = overviewStep(layout, from: selected, by: -1)
-        case .confirm: return close(selecting: selected)
-        case .cancel: return close(selecting: nil)
+        case .confirm: return chose(selected)
+        case .cancel: return chose(nil)
         }
-        if let next { select(next) }
+        if let next {
+            select(next)
+            home = next
+        }
     }
 
     private func select(_ id: String) {
         guard id != selected, let layout else { return }
+        if ring.isHidden, let w = layout.window(id) {
+            // The first selection on a display that was not active: the ring appears in place.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            ring.removeAllAnimations()
+            ring.frame = outset(NSRect(w.rect))
+            ring.isHidden = false
+            CATransaction.commit()
+        }
         selected = id
         pan = layout.pan(toReveal: id, current: pan)
         relayout(animated: true)
@@ -200,8 +224,9 @@ final class Overview {
 
     // MARK: Closing
 
-    /// Zooms into `id`'s workspace, or back to the unchanged layout for nil.
-    private func close(selecting id: String?) {
+    /// Zooms into `id`'s workspace, or back to the unchanged layout for nil. With `refocus`, nil
+    /// gives focus back to the window that had it before.
+    func close(selecting id: String?, refocus: Bool) {
         guard phase == .open, let engine else { return }
         phase = .closing
         token += 1
@@ -212,7 +237,7 @@ final class Overview {
             activate(id)
             targets = overviewRealFrames(engine.workspaces, engine.metrics, floats: engine.floatFrames())
             ringTarget = targets[id]
-        } else if let previous {
+        } else if refocus, let previous {
             windows.focus(previous)
         }
 
@@ -258,7 +283,6 @@ final class Overview {
                 self.removeLayers()
                 self.engine = nil
                 self.layout = nil
-                self.snapshots.endLive(after: 1.0)
                 self.phase = .closed
             }
         })
@@ -394,8 +418,9 @@ final class Overview {
     /// Shows the captured desktop, which is what is really on screen, or the desktop picture's
     /// file when there is no capture, so the backdrop is ready on the first frame.
     private func refreshBackdrop() {
-        // The captured desktop is what is really on screen; the picture's file can differ.
-        if let captured = snapshots.wallpaper() {
+        // The captured desktop is what is really on screen; the picture's file can differ. Only
+        // the main display is captured.
+        if screen == NSScreen.screens.first, let captured = snapshots.wallpaper() {
             backdrop.contents = captured
             return
         }
@@ -421,5 +446,66 @@ final class Overview {
             backdrop.frame = root.bounds
         }
         CATransaction.commit()
+    }
+}
+
+/// The overview on every display at once. Keys steer the active display's overview; a click on
+/// any display picks that window, and every overview closes.
+@MainActor
+final class Overviews {
+    var activate: (String) -> Void = { _ in }
+    var ringStyle = FocusHighlight.Style()
+    var keys = OverviewKeys()
+
+    private let pictures: WindowPictures
+    private let windows: AXWindows
+    private var byDisplay: [String: Overview] = [:]
+    private var active: Overview?
+
+    var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
+
+    init(pictures: WindowPictures, windows: AXWindows) {
+        self.pictures = pictures
+        self.windows = windows
+    }
+
+    /// Opens on every display, or closes onto the active display's highlighted window.
+    func toggle(_ engine: StripEngine, displays: StripDisplays) {
+        if isOpen {
+            if let active, active.isShowing { active.handle(.confirm) }
+            return
+        }
+        byDisplay = byDisplay.filter { displays.engines[$0.key] != nil }
+        active = nil
+        var opened: [Overview] = []
+        // The active display goes first. When it has no windows, the next one to open takes the keys.
+        for (id, e) in displays.engines.sorted(by: { $0.value === engine && $1.value !== engine }) {
+            let o = byDisplay[id] ?? make(id)
+            o.activate = activate
+            o.ringStyle = ringStyle
+            o.keys = keys
+            guard o.open(e, on: Screens.screen(id: id), active: active == nil) else { continue }
+            if active == nil { active = o }
+            opened.append(o)
+        }
+        guard !opened.isEmpty else { return }
+        pictures.snapshots.beginLive(opened.reduce(into: Set()) { $0.formUnion($1.ids) }, rate: opened[0].rate)
+    }
+
+    func handle(_ command: OverviewCommand) { active?.handle(command) }
+
+    private func make(_ id: String) -> Overview {
+        let o = Overview(pictures: pictures, windows: windows)
+        o.chose = { [unowned self, unowned o] window in chose(window, on: o) }
+        byDisplay[id] = o
+        return o
+    }
+
+    private func chose(_ window: String?, on picked: Overview) {
+        guard picked.isShowing else { return }
+        // Only the picked display moves focus; the rest zoom back unchanged.
+        picked.close(selecting: window, refocus: true)
+        for o in byDisplay.values where o !== picked && o.isShowing { o.close(selecting: nil, refocus: false) }
+        pictures.snapshots.endLive(after: 1.0)
     }
 }

@@ -30,7 +30,7 @@ final class Runtime {
     /// Pictures or, in cover mode, covers for every overlay.
     private let pictures: WindowPictures
     private let highlight: FocusHighlight
-    private let overview: Overview
+    private let overview: Overviews
     private let displays: StripDisplays
     private let release: WindowRelease
     private let arrivals: WindowArrivals
@@ -74,7 +74,7 @@ final class Runtime {
         // Fetch the real desktop picture early, so the first motion already has it.
         _ = snapshots.wallpaper()
         highlight = FocusHighlight(windows: windows)
-        overview = Overview(pictures: pictures, windows: windows)
+        overview = Overviews(pictures: pictures, windows: windows)
         let hooks = DisplayHooks()
         let saved = UserDefaults.standard.stringArray(forKey: Defaults.disabledDisplays) ?? []
         displays = StripDisplays(windows: windows, disabled: Set(saved),

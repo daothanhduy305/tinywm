@@ -15,16 +15,19 @@ final class OverviewView: NSView {
     var keys = OverviewKeys()
     var onKey: (Key) -> Void = { _ in }
     var onHover: (CGPoint) -> Void = { _ in }
+    var onExit: () -> Void = {}
     var onClick: (CGPoint) -> Void = { _ in }
     var onScroll: (CGFloat) -> Void = { _ in }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    // A click on a display whose overview does not have the keys still picks a window.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for a in trackingAreas { removeTrackingArea(a) }
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeAlways, .inVisibleRect], owner: self))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
     }
 
     override func keyDown(with event: NSEvent) {
@@ -34,6 +37,7 @@ final class OverviewView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) { onHover(convert(event.locationInWindow, from: nil)) }
+    override func mouseExited(with event: NSEvent) { onExit() }
     override func mouseDown(with event: NSEvent) { onClick(convert(event.locationInWindow, from: nil)) }
 
     override func scrollWheel(with event: NSEvent) {

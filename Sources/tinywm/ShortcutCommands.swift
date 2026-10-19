@@ -16,13 +16,13 @@ final class ShortcutCommands {
 
     private let windows: AXWindows
     private let displays: StripDisplays
-    private let overview: Overview
+    private let overview: Overviews
     private let dragger: WindowDragger
     private let lifecycle: WindowLifecycle
     private let focusReturn: FocusReturn
     private let registry = ShortcutRegistry.shared
 
-    init(windows: AXWindows, displays: StripDisplays, overview: Overview, dragger: WindowDragger,
+    init(windows: AXWindows, displays: StripDisplays, overview: Overviews, dragger: WindowDragger,
          lifecycle: WindowLifecycle, metaKey: MetaKey) {
         self.windows = windows
         self.displays = displays
@@ -48,7 +48,7 @@ final class ShortcutCommands {
                 case "overview":
                     run = { [unowned self] in
                         guard !dragger.isActive, let engine = activeEngine else { return }
-                        overview.toggle(engine, on: displays.id(of: engine).flatMap { Screens.screen(id: $0) })
+                        overview.toggle(engine, displays: displays)
                     }
                 case "close-window":
                     run = { [unowned self] in closeFocusedWindow() }

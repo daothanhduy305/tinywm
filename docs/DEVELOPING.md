@@ -225,8 +225,13 @@ keys both work out of the box.
 | Meta + Q | Close the window | `close-window` |
 | Meta + left drag | Move the window with the mouse | none |
 
-In the overview, the focus keys (letters and arrows, with or without the meta key) move the
-selection, Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels.
+The overview opens on every display with windows. In the active display's overview, the focus
+keys (letters and arrows, with or without the meta key) move the selection, Tab and ⇧Tab step
+through windows, Return or Meta + Esc confirms, and Esc cancels. When the active display has no
+windows, the next display's overview takes the keys. Pointing at a window on any display
+highlights it, and a click focuses it and makes its display the active one. When the pointer
+leaves a display, its highlight goes back to the window the keys had chosen, or away on the
+other displays.
 Each picture has its app name and window title under it.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
