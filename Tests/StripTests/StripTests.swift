@@ -525,6 +525,19 @@ final class CountingWindows: WindowSystem {
         #expect(p.begun.last?.moves["c"]?.to.x == 500)
     }
 
+    @Test func aColumnBarelyReachingTheBlockedEdgeSlidesPastIt() {
+        // c would show 50 points beside the right display, so it hides past the left edge.
+        let (e, w, p, clock) = make()
+        e.neighbours = [Rect(x: 1000, y: 0, width: 1000, height: 600)]
+        e.settings.nudge = 0.05
+        e.focusColumn(1)
+        e.narrower()
+        e.focusColumn(0)
+        #expect(p.begun.last?.moves["c"]?.to.x == 998)
+        clock.advance(by: 0.034)
+        #expect(w.writes["c"]?.last?.x == -498)
+    }
+
     @Test func aColumnHiddenPastTheFarLeftEdgeSlidesPastTheNearOne() {
         // The right display: the left edge is blocked, so columns past it hide past the right edge.
         let (e, w, p, clock) = make()

@@ -646,9 +646,11 @@ public final class StripEngine {
         let unclamped = stripFrames(strip, metrics, clamp: false)
         let plain = Hideaway(screen: viewport)
         var slides: [String: Rect] = [:]
-        for (id, r) in unclamped where r.maxX <= viewport.x || r.x >= viewport.maxX {
-            let edge = plain.sliver(r, pastRight: r.x >= viewport.maxX, sliver: 2)
-            if let real = frames[id], !real.isApproximately(edge) { slides[id] = edge }
+        // Any window hidden to a sliver counts, including a column that barely reaches the screen.
+        for (id, r) in unclamped {
+            guard let real = frames[id], min(real.maxX, viewport.maxX) - max(real.x, viewport.x) <= 2.5 else { continue }
+            let edge = plain.sliver(r, pastRight: r.x + r.width / 2 > viewport.x + viewport.width / 2, sliver: 2)
+            if !real.isApproximately(edge) { slides[id] = edge }
         }
         let peekStripBefore = peekStrip
         peekStrip = unclamped.filter { peeks[$0.key] != nil }
