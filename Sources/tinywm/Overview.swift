@@ -89,14 +89,11 @@ final class Overview {
         view.onKey = { [weak self] in self?.handle($0) }
         view.onHover = { [weak self] p in
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
-            select(hit.id)
+            select(hit.id, "hover at \(Int(p.x)),\(Int(p.y))")
         }
         view.onExit = { [weak self] in
             guard let self, phase == .open else { return }
-            if let home { select(home) } else {
-                selected = nil
-                ring.isHidden = true
-            }
+            if let home { select(home, "pointer left") }
         }
         view.onClick = { [weak self] p in
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
@@ -112,8 +109,8 @@ final class Overview {
 
     // MARK: Opening
 
-    /// Opens on `engine`'s display. Only the active one takes keys and starts with a selection;
-    /// the others show one once the pointer is over a window. False when there is nothing to show.
+    /// Opens on `engine`'s display with its focused window selected. Only the active one takes
+    /// keys. False when there is nothing to show.
     func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool) -> Bool {
         guard phase == .closed, pictures.available, let screen else { return false }
         let ws = engine.workspaces
@@ -129,8 +126,8 @@ final class Overview {
         metrics = m
         previous = windows.focusedWindow
         let focus = ws.current.focusedWindow.flatMap { probe.window($0) != nil ? $0 : nil } ?? first
-        selected = active ? focus : nil
-        home = selected
+        selected = focus
+        home = focus
         pan = probe.pan(toReveal: focus, current: 0)
         layout = overviewLayout(ws, m, screen: size, pan: pan, floats: floats)
         real = overviewRealFrames(ws, m, floats: floats)
@@ -159,7 +156,6 @@ final class Overview {
         styleRing()
         ring.removeAllAnimations()
         ring.frame = outset(NSRect(real[focus]!))
-        ring.isHidden = !active
         dim.opacity = 0
         CATransaction.commit()
         CATransaction.flush()
@@ -206,17 +202,9 @@ final class Overview {
         }
     }
 
-    private func select(_ id: String) {
+    private func select(_ id: String, _ why: String = "keys") {
         guard id != selected, let layout else { return }
-        if ring.isHidden, let w = layout.window(id) {
-            // The first selection on a display that was not active: the ring appears in place.
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            ring.removeAllAnimations()
-            ring.frame = outset(NSRect(w.rect))
-            ring.isHidden = false
-            CATransaction.commit()
-        }
+        Log.note("overview", "\(screen?.localizedName ?? "?") selects \(Log.name(id)) (\(why))")
         selected = id
         pan = layout.pan(toReveal: id, current: pan)
         relayout(animated: true)
@@ -232,7 +220,7 @@ final class Overview {
         token += 1
         let mine = token
         var targets = real
-        var ringTarget = (id ?? previous).flatMap { real[$0] }
+        var ringTarget = (id ?? (refocus ? previous : home)).flatMap { real[$0] }
         if let id {
             activate(id)
             targets = overviewRealFrames(engine.workspaces, engine.metrics, floats: engine.floatFrames())

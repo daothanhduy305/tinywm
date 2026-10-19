@@ -36,9 +36,20 @@ final class OverviewView: NSView {
         onKey(key)
     }
 
-    override func mouseMoved(with event: NSEvent) { onHover(convert(event.locationInWindow, from: nil)) }
+    // The key panel hears every move, even with the pointer on another display, and an event's
+    // location can be relative to another panel. So the pointer is read from the screen.
+    override func mouseMoved(with event: NSEvent) {
+        guard let p = pointer() else { return }
+        if bounds.contains(p) { onHover(p) } else { onExit() }
+    }
     override func mouseExited(with event: NSEvent) { onExit() }
-    override func mouseDown(with event: NSEvent) { onClick(convert(event.locationInWindow, from: nil)) }
+    override func mouseDown(with event: NSEvent) {
+        if let p = pointer(), bounds.contains(p) { onClick(p) }
+    }
+
+    private func pointer() -> CGPoint? {
+        window.map { convert($0.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil) }
+    }
 
     override func scrollWheel(with event: NSEvent) {
         let dx = event.scrollingDeltaX, dy = event.scrollingDeltaY
