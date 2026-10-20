@@ -3,64 +3,6 @@ import WindowCore
 @testable import StripEngine
 @testable import StripModel
 
-@Suite struct WidthLimitsTests {
-    @Test func aRefusalTeachesTheWidthTheWindowTook() {
-        var m = WidthLimits()
-        let learned = m.refused(app: "slack", asked: 400, took: 600, screenWidth: 1200)
-        #expect(learned)
-        #expect(m.minimum(for: "slack") == 600)
-    }
-
-    @Test func roundingAndNearlyFullScreenWindowsTeachNothing() {
-        var m = WidthLimits()
-        let rounding = m.refused(app: "a", asked: 400, took: 401, screenWidth: 1200)
-        #expect(!rounding)
-        let nearlyScreen = m.refused(app: "a", asked: 400, took: 1180, screenWidth: 1200)
-        #expect(!nearlyScreen)
-        #expect(m.minimum(for: "a") == nil)
-    }
-
-    @Test func aRefusalNeverLowersTheLearnedWidth() {
-        var m = WidthLimits(["slack": 600])
-        let lowered = m.refused(app: "slack", asked: 300, took: 500, screenWidth: 1200)
-        #expect(!lowered)
-        #expect(m.minimum(for: "slack") == 600)
-    }
-
-    @Test func aWindowSeenNarrowerLowersTheLearnedWidth() {
-        var m = WidthLimits(["slack": 600])
-        let wider = m.seen(app: "slack", width: 650)
-        #expect(!wider)
-        let unknown = m.seen(app: "other", width: 100)
-        #expect(!unknown)
-        let narrower = m.seen(app: "slack", width: 500)
-        #expect(narrower)
-        #expect(m.minimum(for: "slack") == 500)
-    }
-
-    @Test func aNarrowerRefusalTeachesAMaximumThatOnlyComesDown() {
-        var m = WidthLimits()
-        let rounding = m.refused(app: "settings", asked: 800, took: 799, screenWidth: 1200)
-        #expect(!rounding)
-        let learned = m.refused(app: "settings", asked: 800, took: 700, screenWidth: 1200)
-        #expect(learned)
-        #expect(m.maximum(for: "settings") == 700)
-        let raised = m.refused(app: "settings", asked: 1000, took: 750, screenWidth: 1200)
-        #expect(!raised)
-        #expect(m.maximum(for: "settings") == 700)
-        #expect(m.minimum(for: "settings") == nil)
-    }
-
-    @Test func aWindowSeenWiderRaisesTheLearnedMaximum() {
-        var m = WidthLimits(maximums: ["settings": 700])
-        let narrower = m.seen(app: "settings", width: 500)
-        #expect(!narrower)
-        let wider = m.seen(app: "settings", width: 800)
-        #expect(wider)
-        #expect(m.maximum(for: "settings") == 800)
-    }
-}
-
 @Suite struct ColumnMinimumTests {
     let m = StripMetrics(viewport: Rect(x: 0, y: 0, width: 1200, height: 600), gap: 0, minimums: ["s": 600, "huge": 5000])
 
@@ -82,7 +24,7 @@ import WindowCore
     }
 }
 
-/// Windows whose apps refuse widths below a minimum, as real apps do.
+/// Windows whose apps refuse widths below a minimum or above a maximum, as real apps do.
 @MainActor
 final class StubbornWindows: WindowSystem {
     var frames: [String: Rect] = [:]
@@ -108,7 +50,7 @@ final class StubbornWindows: WindowSystem {
 }
 
 @MainActor
-@Suite struct MinimumLearningTests {
+@Suite struct ColumnFitTests {
     let display = TiledDisplay(id: "A", frame: Rect(x: 0, y: 0, width: 1200, height: 600),
                                visible: Rect(x: 0, y: 0, width: 1200, height: 600))
     let apps = ["s": "slack", "s2": "slack"]
@@ -133,11 +75,7 @@ final class StubbornWindows: WindowSystem {
 
     @Test func aRefusedWidthWidensTheColumnSoItsNeighbourMovesAside() {
         let (d, w) = make()
-        var saved: WidthLimits?
-        d.onLimitsChanged = { saved = $0 }
         add(d, w, ["a", "s", "b"])
-        #expect(d.limits.minimum(for: "slack") == 600)
-        #expect(saved?.minimum(for: "slack") == 600)
         let s = w.frames["s"]!, b = w.frames["b"]!
         #expect(s.width == 600)
         #expect(b.x >= s.maxX)
@@ -145,15 +83,11 @@ final class StubbornWindows: WindowSystem {
 
     @Test func aRefusedWiderWidthNarrowsTheColumnSoItsNeighbourMovesIn() {
         let (d, w) = make()
-        w.maximums = ["t": 300, "t2": 300]
-        d.appOf = { id in ["t": "settings", "t2": "settings"][id] ?? "app.\(id)" }
+        w.maximums = ["t": 300]
         add(d, w, ["t", "b"])
-        #expect(d.limits.maximum(for: "settings") == 300)
         let t = w.frames["t"]!, b = w.frames["b"]!
         #expect(t.width == 300)
         #expect(b.x == t.maxX)
-        add(d, w, ["t2"])
-        #expect(w.asked["t2"]?.allSatisfy { $0 <= 300 } == true)
     }
 
     @Test func aNarrowedLastColumnLeavesNoEmptySpaceAtTheScreensEdge() {
@@ -172,34 +106,27 @@ final class StubbornWindows: WindowSystem {
         #expect(abs(w.frames["c"]!.maxX - w.frames["t"]!.x) < 0.01)
     }
 
-    @Test func aNewWindowOfAnAppWithAMaximumScrollsToTheScreensEdge() {
+    @Test func aNewShareOrScreenAsksTheWindowAgain() {
         let (d, w) = make()
-        d.limits = WidthLimits(maximums: ["app.t": 300])
-        w.maximums = ["t": 300]
-        add(d, w, ["a", "b", "c", "t"])
-        #expect(abs(d.engine(holding: "t")!.strip.scroll - 298.8) < 0.01)
-        #expect(abs(w.frames["t"]!.maxX - 1200) < 0.01)
-        #expect(w.asked["t"]?.allSatisfy { $0 == 300 } == true)
+        add(d, w, ["s"])
+        let e = d.engine(holding: "s")!
+        #expect(w.frames["s"]!.width == 600)
+        // The app now allows narrow widths: each new share is asked for, and taken.
+        w.minimums = [:]
+        e.cycleWidth()
+        e.cycleWidth()
+        #expect(abs(w.frames["s"]!.width - 800) < 1)
+        e.cycleWidth()
+        #expect(abs(w.frames["s"]!.width - 400) < 1)
+        w.minimums = ["s": 600]
+        e.viewport = Rect(x: 0, y: 0, width: 900, height: 600)
+        #expect(w.frames["s"]!.width == 600)
+        w.minimums = [:]
+        e.viewport = Rect(x: 0, y: 0, width: 1500, height: 600)
+        #expect(abs(w.frames["s"]!.width - 500) < 1)
     }
 
-    @Test func maximumsAreLearnedWithMinimumsTurnedOff() {
-        let (d, w) = make()
-        d.settings.learnMinimumWidths = false
-        w.maximums = ["t": 300]
-        add(d, w, ["t", "s"])
-        #expect(d.limits.maximum(for: "app.t") == 300)
-        #expect(d.limits.minimums.isEmpty)
-        #expect(w.frames["t"]!.width == 300)
-    }
-
-    @Test func aNewWindowOfAKnownAppIsAskedForItsMinimumAtOnce() {
-        let (d, w) = make()
-        d.limits = WidthLimits(["slack": 600])
-        add(d, w, ["a", "s2"])
-        #expect(w.asked["s2"]?.allSatisfy { $0 >= 600 } == true)
-    }
-
-    @Test func anAppStillBusyWithTheChangeTeachesNothing() {
+    @Test func anAppStillBusyWithTheChangeChangesNothing() {
         let (d, w) = make()
         // The first report after the write still shows the old 900-point width, which looks
         // like a refusal of the 400 asked; the read a moment later shows the write took.
@@ -209,17 +136,7 @@ final class StubbornWindows: WindowSystem {
         d.windowAdded("a", frame: w.frames["a"])
         #expect(w.staleOnce.isEmpty)
         #expect(w.frames["a"]!.width < 900)
-        #expect(d.limits.minimums.isEmpty)
-    }
-
-    @Test func aTiledWindowSeenNarrowerNarrowsItsAppsColumns() {
-        let (d, w) = make()
-        add(d, w, ["a", "s", "b"])
-        w.minimums["s"] = 500
-        w.frames["s"]!.width = 500
-        d.windowSeen("s", width: 500)
-        #expect(d.limits.minimum(for: "slack") == 500)
-        #expect(w.frames["b"]!.x == w.frames["s"]!.maxX)
+        #expect(d.engine(holding: "a")!.metrics.minimums.isEmpty)
     }
 
     @Test func anAppsNextWindowOpensAtItsLastClosedWidth() {
@@ -238,27 +155,15 @@ final class StubbornWindows: WindowSystem {
         #expect(e.strip.columns[e.strip.column(of: "a")!].width == d.settings.defaultWidth)
     }
 
-    @Test func turnedOffNothingIsLearnedOrUsed() {
-        let (d, w) = make()
-        d.settings.learnMinimumWidths = false
-        add(d, w, ["a", "s"])
-        #expect(d.limits.minimums.isEmpty)
-        d.limits = WidthLimits(["slack": 600])
-        add(d, w, ["s2"])
-        #expect(w.asked["s2"]?.allSatisfy { $0 < 600 } == true)
-        d.windowSeen("s", width: 100)
-        #expect(d.limits.minimum(for: "slack") == 600)
-    }
-
-    @Test func aFrameOffTheScreenTeachesNothing() {
+    @Test func aFrameOffTheScreenFitsNothing() {
         let (d, w) = make()
         w.growOffLeft = 21
         add(d, w, ["a", "b", "c", "e", "f"])
         #expect(w.frames["a"]!.x < 0)
-        #expect(d.limits.minimums.isEmpty)
+        #expect(d.engine(holding: "a")!.metrics.minimums.isEmpty)
     }
 
-    @Test func aWindowTrimmedBesideAnotherDisplayTeachesNothing() {
+    @Test func aWindowTrimmedBesideAnotherDisplayFitsNothing() {
         let w = StubbornWindows()
         w.minimums = ["s": 600]
         let d = StripDisplays(windows: w, configure: { _, _ in }, discard: { _ in })
@@ -273,10 +178,7 @@ final class StubbornWindows: WindowSystem {
         // s is trimmed to the 360 points left of display B; it refuses that, wanting 600.
         #expect(e.isTrimmed("s"))
         #expect(w.asked["s"]?.last == 360)
-        #expect(d.limits.minimums.isEmpty)
-        d.limits = WidthLimits(["slack": 600])
-        d.windowSeen("s", width: 360)
-        #expect(d.limits.minimum(for: "slack") == 600)
+        #expect(e.metrics.minimums.isEmpty)
     }
 
     @Test func withPeekCoversABlockedWindowHidesAndTheEngineReportsItsCard() {
@@ -304,12 +206,5 @@ final class StubbornWindows: WindowSystem {
         #expect(e.peekStrip.isEmpty)
         #expect(presenter.begun.last?.moves["b"]?.from == card)
         #expect(w.frames["b"] == Rect(x: 360, y: 0, width: 840, height: 600))
-    }
-
-    @Test func aWindowOffTheStripLowersNothing() {
-        let (d, _) = make()
-        d.limits = WidthLimits(["slack": 600])
-        d.windowSeen("s", width: 300)
-        #expect(d.limits.minimum(for: "slack") == 600)
     }
 }

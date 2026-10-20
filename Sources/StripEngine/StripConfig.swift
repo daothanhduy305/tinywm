@@ -21,10 +21,6 @@ public struct StripConfig: Equatable, Sendable {
     public var focusCrossesDisplays = false
     /// Whether the layout is saved and brought back when tinywm starts.
     public var restoreLayout = true
-    /// Whether columns widen for apps that refuse narrow widths.
-    public var learnMinimumWidths = true
-    /// Whether columns narrow for apps that refuse wide widths.
-    public var learnMaximumWidths = true
     /// Whether a column that would reach another display hides behind a card instead of narrowing.
     public var peekCover = false
     /// Bound actions only; an unbound action has no entry.
@@ -46,8 +42,6 @@ public struct StripConfig: Equatable, Sendable {
         s.gap = gap
         s.defaultWidth = defaultWidth
         s.widthPresets = widthPresets
-        s.learnMinimumWidths = learnMinimumWidths
-        s.learnMaximumWidths = learnMaximumWidths
         s.peekCovers = peekCover
         return s
     }
@@ -235,10 +229,9 @@ public struct StripConfig: Equatable, Sendable {
             config.swipeFingers = n
         case "restore-layout":
             config.restoreLayout = try onOff(value, for: name)
-        case "learn-minimum-widths":
-            config.learnMinimumWidths = try onOff(value, for: name)
-        case "learn-maximum-widths":
-            config.learnMaximumWidths = try onOff(value, for: name)
+        case "learn-minimum-widths", "learn-maximum-widths":
+            // No longer used: a column fits a window that refuses its width. Still accepted so old configs load.
+            _ = try onOff(value, for: name)
         case "peek-cover":
             config.peekCover = try onOff(value, for: name)
         default:
@@ -343,8 +336,6 @@ public struct StripConfig: Equatable, Sendable {
             "swipe-fingers = \(d.swipeFingers)",
             "focus-crosses-displays = off",
             "restore-layout = on",
-            "learn-minimum-widths = on",
-            "learn-maximum-widths = on",
             "peek-cover = off",
         ]
     }

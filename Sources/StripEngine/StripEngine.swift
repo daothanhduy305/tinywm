@@ -8,10 +8,6 @@ public struct StripSettings: Codable, Equatable, Sendable {
     public var widthPresets: [Double] = [0.333, 0.5, 0.667]
     public var nudge: Double = 0.1
     public var scrollMode: ScrollMode = .fit
-    /// Whether columns widen to the narrowest width each app was seen to take.
-    public var learnMinimumWidths = true
-    /// Whether columns narrow to the widest width each app was seen to take.
-    public var learnMaximumWidths = true
     /// Whether a column that would reach another display hides behind a card instead of narrowing.
     public var peekCovers = false
     public init() {}
@@ -35,14 +31,11 @@ public final class StripEngine {
     public private(set) var moved = false
     /// With `peekCovers`, where a card stands in for each hidden window's part on screen.
     public private(set) var peeks: [String: Rect] = [:]
-    /// The narrowest width in points a window's app accepts, if one has been learned.
-    public var minimumWidth: (String) -> Double? = { _ in nil }
-    /// The widest width in points a window's app accepts, if one has been learned.
-    public var maximumWidth: (String) -> Double? = { _ in nil }
     /// The width a new window takes when its app had a column before; nil means the default.
     public var rememberedWidth: (String) -> Double? = { _ in nil }
-    /// Called when a tiled window keeps a wider or narrower frame than it was asked to take.
-    public var onRefusedWidth: ((_ id: String, _ asked: Rect, _ took: Rect) -> Void)?
+    /// The width each window took when its column asked for another, with the width asked.
+    /// Its column takes that width until its share or the screen changes.
+    private var refusals: [String: (asked: Double, took: Double)] = [:]
 
     private let windows: WindowSystem
     /// The frame each window should have now: the layout's target, set before it is written, so a
@@ -114,16 +107,19 @@ public final class StripEngine {
     /// needs it more than once reads it into a local first.
     public var metrics: StripMetrics { metrics(of: workspaces) }
 
-    /// Metrics for a layout not applied yet, so a window it adds already counts its app's widths.
+    /// Metrics for a layout not applied yet, so a column it resizes asks its new width again.
     private func metrics(of workspaces: Workspaces) -> StripMetrics {
-        var minimums: [String: Double] = [:], maximums: [String: Double] = [:]
+        var m = StripMetrics(viewport: viewport, gap: settings.gap)
         for strip in workspaces.strips {
-            for id in strip.allWindows {
-                minimums[id] = minimumWidth(id)
-                maximums[id] = maximumWidth(id)
+            for column in strip.columns {
+                let share = m.columnWidth(column.width)
+                for id in column.windows {
+                    guard let r = refusals[id], abs(r.asked - share) < 0.5 else { continue }
+                    if r.took > r.asked { m.minimums[id] = r.took } else { m.maximums[id] = r.took }
+                }
             }
         }
-        return StripMetrics(viewport: viewport, gap: settings.gap, minimums: minimums, maximums: maximums)
+        return m
     }
     public var hideaway: Hideaway { Hideaway(screen: viewport, others: neighbours) }
 
@@ -629,7 +625,7 @@ public final class StripEngine {
     }
 
     /// Refits each strip's scroll after column widths changed outside a layout change, as when
-    /// an app's width limit is learned, so a narrowed column leaves no empty space past the strip's end.
+    /// a window refused its column's width, so a narrowed column leaves no empty space past the strip's end.
     public func widthsChanged() {
         let m = metrics
         for i in workspaces.strips.indices {
@@ -641,6 +637,14 @@ public final class StripEngine {
     /// Writes frames that changed since the last write. Windows on other workspaces wait
     /// just past the screen's bottom-right corner, since macOS cannot hide single windows.
     public func apply() {
+        // A fit lasts only while its column asks the width it was made for, so a window
+        // that refused one share is asked afresh when its column comes back to it.
+        let share = StripMetrics(viewport: viewport, gap: settings.gap)
+        refusals = refusals.filter { id, r in
+            workspaces.strips.contains { s in
+                s.column(of: id).map { abs(share.columnWidth(s.columns[$0].width) - r.asked) < 0.5 } ?? false
+            }
+        }
         var frames = stripFrames(strip, metrics, trim: !settings.peekCovers, hideaway: hideaway)
         peeks = settings.peekCovers ? blockedPeeks(strip, metrics, hideaway: hideaway) : [:]
         let unclamped = stripFrames(strip, metrics, clamp: false)
@@ -760,7 +764,7 @@ public final class StripEngine {
     /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
     /// Nor does a trimmed one, which the app may refuse though it takes its column's width.
     private func checkWidth(_ id: String, asked: Rect, took: Rect?) {
-        guard let onRefusedWidth, let took, abs(took.width - asked.width) > 2,
+        guard let took, abs(took.width - asked.width) > 2,
               asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2, !isTrimmed(id) else { return }
         let confirm: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
@@ -768,10 +772,21 @@ public final class StripEngine {
                 guard let self, let again,
                       workspaces.strips.contains(where: { $0.column(of: id) != nil }),
                       let wanted = targetFrames[id], abs(wanted.width - asked.width) < 0.5 else { return }
-                onRefusedWidth(id, asked, again)
+                refused(id, asked: asked.width, took: again.width)
             }
         }
         if let clock { clock.after(0.3, confirm) } else { confirm() }
+    }
+
+    /// Fits the column of a window that took `took` points when asked for its column's share.
+    /// A width asked for some other reason, such as a fit already made, proves nothing. Nor does
+    /// a window that comes back nearly as wide as the screen: it was zoomed, not refusing a width.
+    private func refused(_ id: String, asked: Double, took: Double) {
+        guard abs(took - asked) > 2, took < viewport.width * 0.95,
+              let c = strip.column(of: id), abs(metrics.columnWidth(strip.columns[c].width) - asked) < 0.5 else { return }
+        refusals[id] = (asked, took)
+        Log.note("width", "\(label) \(Log.name(id)) took \(Int(took)) points when asked for \(Int(asked)); its column fits it")
+        widthsChanged()
     }
 
     private func logChange(_ caller: String, from before: Workspaces, to after: Workspaces) {

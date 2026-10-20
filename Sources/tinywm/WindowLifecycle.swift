@@ -381,8 +381,6 @@ final class WindowLifecycle {
             displays.windowRemoved(id, refocus: false)
             return
         }
-        // During a drag the strip must not move under the pointer; snapBack looks again at mouse-up.
-        if NSEvent.pressedMouseButtons == 0 { displays.windowSeen(id, width: now.width) }
         if let engine = displays.engine(holding: id) {
             if let asked = engine.frame(of: id), abs(now.x - asked.x) < 2, abs(now.y - asked.y) < 2 {
                 if userResized(id, now) { snapBack(id) }
@@ -427,7 +425,6 @@ final class WindowLifecycle {
 
     private func settle(_ id: String, at now: Rect) {
         guard !windows.isFullScreen(id) else { return frameChanged(id, now) }
-        displays.windowSeen(id, width: now.width)
         guard let engine = displays.engine(holding: id), let asked = engine.frame(of: id),
               displays.engine(owning: now) != nil,
               abs(now.x - asked.x) >= 2 || abs(now.y - asked.y) >= 2 || userResized(id, now) else { return }
