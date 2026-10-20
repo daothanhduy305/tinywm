@@ -353,14 +353,15 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
 
     /// The wallpaper sits at the desktop level. We capture the display with every window above
     /// that level left out, so no app windows or icons appear. Capturing only the Dock's wallpaper
-    /// window misses dynamic and aerial wallpapers, which another process draws into it.
+    /// window misses dynamic and aerial wallpapers, which another process draws into it. Hidden
+    /// windows are left out too: an overlay ordered in before the capture runs would show in it.
     private func refreshWallpaper(_ displayID: CGDirectDisplayID) {
         guard !wallpaperBusy.contains(displayID), hasAccess() else { return }
         wallpaperBusy.insert(displayID)
         wallpaperFetchedAt[displayID] = Date()
         Task {
             defer { wallpaperBusy.remove(displayID) }
-            guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
+            guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false),
                   let display = content.displays.first(where: { $0.displayID == displayID })
             else { return }
             let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
