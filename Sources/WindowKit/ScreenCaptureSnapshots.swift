@@ -64,9 +64,13 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
     /// CGImages made on request from the latest frame, for callers that need one.
     private var images: [String: CGImage] = [:]
     private let context = CIContext()
-    private var wallpaperImage: CGImage?
-    private var wallpaperFetchedAt = Date.distantPast
-    private var wallpaperBusy = false
+    /// Each display's captured desktop, when it was taken, and the captures under way.
+    private var wallpapers: [CGDirectDisplayID: CGImage] = [:]
+    private var wallpaperFetchedAt: [CGDirectDisplayID: Date] = [:]
+    private var wallpaperBusy: Set<CGDirectDisplayID> = []
+    /// Watches the folder System Settings writes to when the wallpaper changes.
+    private var wallpaperWatch: DispatchSourceFileSystemObject?
+    private var wallpaperChangeWork: DispatchWorkItem?
     private var askedForAccess = false
     private var access: (granted: Bool, checkedAt: CFTimeInterval)?
     public var onUpdate: [(String) -> Void] = []
@@ -82,8 +86,8 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
             images = [:]
             takenAt = [:]
             requestedAt = [:]
-            wallpaperImage = nil
-            wallpaperFetchedAt = .distantPast
+            wallpapers = [:]
+            wallpaperFetchedAt = [:]
         }
     }
 
@@ -109,7 +113,8 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
         self.windows = windows
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.wallpaperFetchedAt = .distantPast } }
+        ) { [weak self] _ in MainActor.assumeIsolated { self?.wallpaperFetchedAt = [:] } }
+        watchWallpaperSetting()
     }
 
     /// Checks Screen Recording permission, prompting once per launch. False when denied.
@@ -155,10 +160,10 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
         }
     }
 
-    public func wallpaper() -> CGImage? {
+    public func wallpaper(of display: CGDirectDisplayID) -> CGImage? {
         if inert { return nil }
-        if Date().timeIntervalSince(wallpaperFetchedAt) > 60 { refreshWallpaper() }
-        return wallpaperImage
+        if Date().timeIntervalSince(wallpaperFetchedAt[display] ?? .distantPast) > 60 { refreshWallpaper(display) }
+        return wallpapers[display]
     }
 
     /// Keeps these windows' pictures fresh at the current rate. An empty set stops it.
@@ -320,30 +325,57 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
 
     // MARK: Wallpaper
 
-    /// The wallpaper is a Dock-owned window at the desktop level; we capture only that window
-    /// so no app windows or icons appear in it.
-    private func refreshWallpaper() {
-        guard !wallpaperBusy, hasAccess() else { return }
-        wallpaperBusy = true
-        wallpaperFetchedAt = Date()
+    private func watchWallpaperSetting() {
+        let store = FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: "Library/Application Support/com.apple.wallpaper/Store").path
+        let fd = Darwin.open(store, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
+        source.setEventHandler { [weak self] in MainActor.assumeIsolated { self?.wallpaperChanged() } }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        wallpaperWatch = source
+    }
+
+    /// The desktop fades to a new wallpaper, so each display is captured again once that is over.
+    private func wallpaperChanged() {
+        wallpaperChangeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.wallpaperFetchedAt = [:]
+                for display in self.wallpapers.keys { _ = self.wallpaper(of: display) }
+            }
+        }
+        wallpaperChangeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+    }
+
+    /// The wallpaper sits at the desktop level. We capture the display with every window above
+    /// that level left out, so no app windows or icons appear. Capturing only the Dock's wallpaper
+    /// window misses dynamic and aerial wallpapers, which another process draws into it.
+    private func refreshWallpaper(_ displayID: CGDirectDisplayID) {
+        guard !wallpaperBusy.contains(displayID), hasAccess() else { return }
+        wallpaperBusy.insert(displayID)
+        wallpaperFetchedAt[displayID] = Date()
         Task {
-            defer { wallpaperBusy = false }
+            defer { wallpaperBusy.remove(displayID) }
             guard let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true),
-                  let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first
+                  let display = content.displays.first(where: { $0.displayID == displayID })
             else { return }
             let desktopLevel = Int(CGWindowLevelForKey(.desktopWindow))
-            let candidates = content.windows.filter {
-                $0.windowLayer <= desktopLevel && $0.frame.intersects(display.frame)
+            let above = content.windows.filter { $0.windowLayer > desktopLevel }
+            let screen = NSScreen.screens.first {
+                ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
             }
-            guard !candidates.isEmpty else { return }
-            let scale = NSScreen.main?.backingScaleFactor ?? 2
+            let scale = screen?.backingScaleFactor ?? 2
             let config = SCStreamConfiguration()
             config.width = Int(CGFloat(display.width) * scale); config.height = Int(CGFloat(display.height) * scale)
             config.showsCursor = false
-            let filter = SCContentFilter(display: display, including: candidates)
+            let filter = SCContentFilter(display: display, excludingWindows: above)
             guard let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
             else { return }
-            wallpaperImage = image
+            wallpapers[displayID] = image
             for callback in onUpdate { callback(Self.wallpaperID) }
         }
     }

@@ -354,6 +354,10 @@ final class Overview {
     }
 
     private func pictureArrived(_ id: String) {
+        if id == ScreenCaptureSnapshots.wallpaperID {
+            if phase != .closed { refreshBackdrop() }
+            return
+        }
         guard phase != .closed, !pictures.coverMode, let layer = layers[id] else { return }
         layer.setPicture(snapshots.surface(of: id))
     }
@@ -406,13 +410,12 @@ final class Overview {
     /// Shows the captured desktop, which is what is really on screen, or the desktop picture's
     /// file when there is no capture, so the backdrop is ready on the first frame.
     private func refreshBackdrop() {
-        // The captured desktop is what is really on screen; the picture's file can differ. Only
-        // the main display is captured.
-        if screen == NSScreen.screens.first, let captured = snapshots.wallpaper() {
+        // The captured desktop is what is really on screen; the picture's file can differ.
+        guard let screen else { return }
+        if let id = Screens.displayID(of: screen), let captured = snapshots.wallpaper(of: id) {
             backdrop.contents = captured
             return
         }
-        guard let screen else { return }
         if let url = NSWorkspace.shared.desktopImageURL(for: screen), let image = NSImage(contentsOf: url),
            let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
             backdrop.contents = cg

@@ -363,6 +363,10 @@ final class PictureMotion: StripPresenter {
     /// New frames of a resizing window go straight onto its layer, so its new layout shows while
     /// it is still moving. Once a frame matches the final size, the landing can finish.
     private func pictureArrived(_ id: String) {
+        if id == ScreenCaptureSnapshots.wallpaperID {
+            if active { refreshBackdrop() }
+            return
+        }
         guard active, !pictures.coverMode, let layer = layers[id] else { return }
         let surface = snapshots.surface(of: id)
         // A shrinking window's new picture is smaller than its frame until the motion ends; the
@@ -449,12 +453,12 @@ final class PictureMotion: StripPresenter {
     private func refreshBackdrop() {
         // The captured desktop is what is really on screen. The desktop picture's file can differ,
         // for example with dynamic or aerial wallpapers, so it is only a fallback until a capture exists.
-        if let captured = snapshots.wallpaper() {
+        guard let screen = screen() else { return }
+        if let id = Screens.displayID(of: screen), let captured = snapshots.wallpaper(of: id) {
             backdrop.contents = captured
             backdropURL = nil
             return
         }
-        guard let screen = screen() else { return }
         let url = NSWorkspace.shared.desktopImageURL(for: screen)
         guard url != backdropURL || backdrop.contents == nil else { return }
         backdropURL = url

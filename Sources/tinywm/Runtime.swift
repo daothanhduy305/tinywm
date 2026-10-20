@@ -75,7 +75,9 @@ final class Runtime {
         // Set before anything asks for a picture, so cards never record the screen.
         pictures.coverMode = !UserDefaults.standard.bool(forKey: Defaults.livePictures)
         // Fetch the real desktop picture early, so the first motion already has it.
-        _ = snapshots.wallpaper()
+        for screen in NSScreen.screens {
+            if let id = Screens.displayID(of: screen) { _ = snapshots.wallpaper(of: id) }
+        }
         highlight = FocusHighlight(windows: windows)
         overview = Overviews(pictures: pictures, windows: windows)
         let hooks = DisplayHooks()

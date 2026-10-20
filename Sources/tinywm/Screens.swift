@@ -23,9 +23,13 @@ enum Screens {
         }
     }
 
+    static func displayID(of screen: NSScreen) -> CGDirectDisplayID? {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+    }
+
     static func uuid(of screen: NSScreen) -> String? {
-        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-              let cf = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue(),
+        guard let number = displayID(of: screen),
+              let cf = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue(),
               let string = CFUUIDCreateString(nil, cf) else { return nil }
         return string as String
     }

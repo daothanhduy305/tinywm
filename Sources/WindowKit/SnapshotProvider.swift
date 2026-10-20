@@ -9,8 +9,8 @@ public protocol SnapshotProvider: AnyObject {
     func snapshot(of windowID: String) -> CGImage?
     /// Keeps these windows' pictures fresh until the next call. An empty set stops refreshing.
     func track(_ windowIDs: Set<String>)
-    /// The desktop picture of the main display.
-    func wallpaper() -> CGImage?
+    /// The desktop picture of a display.
+    func wallpaper(of display: CGDirectDisplayID) -> CGImage?
     /// Called on the main actor whenever any tracked window's picture changes.
     var onUpdate: [(String) -> Void] { get set }
     /// Sets how often tracked windows' pictures refresh, in frames per second.
