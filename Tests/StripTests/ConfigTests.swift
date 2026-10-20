@@ -65,6 +65,12 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("peek-cover = maybe").issues.count == 1)
     }
 
+    @Test func centerFocusDefaultsOffAndParses() {
+        #expect(StripConfig().applied(to: StripSettings()).scrollMode == .fit)
+        #expect(StripConfig.parse("center-focus = on").config.applied(to: StripSettings()).scrollMode == .center)
+        #expect(StripConfig.parse("center-focus = maybe").issues.count == 1)
+    }
+
     @Test func oldWidthLearningSettingsStillLoad() {
         #expect(StripConfig.parse("learn-minimum-widths = off\nlearn-maximum-widths = on").issues.isEmpty)
     }

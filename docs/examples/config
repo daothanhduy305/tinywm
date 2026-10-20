@@ -23,6 +23,7 @@ swipe-fingers = 4
 # focus-crosses-displays = off
 # restore-layout = on
 peek-cover = on
+# center-focus = off
 
 # bind focus-left = h
 # bind focus-left-arrow = left

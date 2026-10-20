@@ -111,6 +111,7 @@ swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
 restore-layout = on # save the layout and restore it at start
 peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
+center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
 bind move-left = shift+n

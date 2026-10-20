@@ -23,6 +23,8 @@ public struct StripConfig: Equatable, Sendable {
     public var restoreLayout = true
     /// Whether a column that would reach another display hides behind a card instead of narrowing.
     public var peekCover = false
+    /// Whether scrolling to a column centres it, as far as the strip's ends allow.
+    public var centerFocus = false
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
@@ -43,6 +45,7 @@ public struct StripConfig: Equatable, Sendable {
         s.defaultWidth = defaultWidth
         s.widthPresets = widthPresets
         s.peekCovers = peekCover
+        s.scrollMode = centerFocus ? .center : .fit
         return s
     }
 
@@ -234,6 +237,8 @@ public struct StripConfig: Equatable, Sendable {
             _ = try onOff(value, for: name)
         case "peek-cover":
             config.peekCover = try onOff(value, for: name)
+        case "center-focus":
+            config.centerFocus = try onOff(value, for: name)
         default:
             throw Failure(message: "unknown setting '\(name)'")
         }
@@ -337,6 +342,7 @@ public struct StripConfig: Equatable, Sendable {
             "focus-crosses-displays = off",
             "restore-layout = on",
             "peek-cover = off",
+            "center-focus = off",
         ]
     }
 
