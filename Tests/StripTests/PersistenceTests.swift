@@ -69,6 +69,19 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
         #expect(merged.displays["B"] == old.displays["B"])
         #expect(merged.displays["A"]?.strips[1].columns[0].windows == [desc(9)])
     }
+
+    @Test func mergingKeepsSetupsThatAreNotCurrent() throws {
+        let old = SavedLayout(setups: ["A": ["A": saved([[desc(1)]])], "A,B": ["A": saved([[desc(2)]])]])
+        let merged = old.merged(with: [:], setups: ["A": ["A": saved([[desc(9)]])]])
+        #expect(merged.setups?["A,B"] == old.setups?["A,B"])
+        #expect(merged.setups?["A"]?["A"]?.strips[1].columns[0].windows == [desc(9)])
+        #expect(SavedLayout.decoded(from: try merged.encoded()) == merged)
+    }
+
+    @Test func aFileFromBeforeSetupsStillDecodes() {
+        let json = #"{"version": 1, "displays": {}}"#
+        #expect(SavedLayout.decoded(from: Data(json.utf8)) == SavedLayout())
+    }
 }
 
 @Suite struct LayoutMatchingTests {

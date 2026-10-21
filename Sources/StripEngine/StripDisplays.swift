@@ -60,10 +60,20 @@ public final class StripDisplays {
     /// Brings the engines in line with the attached displays. Windows of a display that went away
     /// move to the first remaining one, which is the primary display. That display's layout is
     /// kept, and its windows go back to it when it returns.
+    ///
+    /// Each display setup keeps its own layout: when the set of attached displays changes, the
+    /// layout of the setup being left is kept, and a setup seen before gets its layout back.
     public func update(_ displays: [TiledDisplay]) {
         Log.note("display", "update: " + displays.map { "\(Self.short($0.id)) \(Log.rect($0.visible))" }.joined(separator: ", ")
             + (disabled.isEmpty ? "" : "; disabled " + disabled.map(Self.short).joined(separator: ", ")))
+        let oldKey = setupKey
         infos = displays
+        var snapshot: [String: Workspaces]?
+        if !oldKey.isEmpty, setupKey != oldKey {
+            setups[oldKey] = engines.mapValues(\.workspaces)
+            snapshot = setups[setupKey]
+            if snapshot != nil { Log.note("display", "setup \(setupKey) seen before; restoring its layout") }
+        }
         var orphans: [StripEngine.Released] = []
         for id in engines.keys where !displays.contains(where: { $0.id == id }) || disabled.contains(id) {
             if !disabled.contains(id), let e = engines[id] { retired[id] = e.workspaces }
@@ -73,14 +83,50 @@ public final class StripDisplays {
         for d in displays where !disabled.contains(d.id) {
             let returning = engines[d.id] == nil
             ensureEngine(d)
-            if returning, let saved = retired.removeValue(forKey: d.id) {
+            if returning, let saved = retired.removeValue(forKey: d.id), snapshot == nil {
                 Log.note("display", "\(Self.short(d.id)) came back; restoring its layout\n" + saved.summary)
                 bringBack(saved, to: d.id)
             }
         }
+        if let snapshot { orphans = rearrange(snapshot, orphans: orphans) }
         guard let home = displays.first(where: { !disabled.contains($0.id) }), let target = engines[home.id] else { return }
         for o in orphans where o.floating { Log.note("display", "floating \(Log.name(o.id)) is released, no display adopts it") }
         for o in orphans where !o.floating { target.adopt(o.id, width: o.width, focus: false) }
+    }
+
+    /// The attached displays, as one key, so each display setup can keep its own layout.
+    public var setupKey: String { infos.map(\.id).sorted().joined(separator: ",") }
+
+    /// Each display setup's layout as it was when that setup was left, by `setupKey`.
+    public private(set) var setups: [String: [String: Workspaces]] = [:]
+
+    /// Gives a setup a layout, as one matched from the saved file at startup.
+    public func seed(_ key: String, _ layout: [String: Workspaces]) { setups[key] = layout }
+
+    /// Lays every display out as `snapshot` had it; `windowRemoved` already took closed windows
+    /// out. Returns the windows the snapshot does not place, for the primary display to adopt;
+    /// windows of a restored display that the snapshot does not name stay on that display.
+    private func rearrange(_ snapshot: [String: Workspaces], orphans: [StripEngine.Released]) -> [StripEngine.Released] {
+        let layouts = snapshot.filter { engines[$0.key] != nil }
+        var claimed = Set<String>()
+        for layout in layouts.values { for s in layout.strips { claimed.formUnion(s.allWindows + s.floating) } }
+        var stay: [String: [StripEngine.Released]] = [:]
+        for (id, e) in engines {
+            if layouts[id] != nil {
+                stay[id] = e.releaseAll().filter { !claimed.contains($0.id) }
+            } else {
+                for s in e.workspaces.strips { for w in s.allWindows + s.floating where claimed.contains(w) { e.windowRemoved(w, refocus: false) } }
+            }
+        }
+        for (id, layout) in layouts {
+            guard let e = engines[id] else { continue }
+            Log.note("display", "\(Self.short(id)) takes its layout for this setup\n" + layout.summary)
+            e.restore(layout)
+            for r in stay[id] ?? [] {
+                if r.floating { e.windowAdded(r.id, floating: true, takesFocus: false) } else { e.adopt(r.id, width: r.width, focus: false) }
+            }
+        }
+        return orphans.filter { !claimed.contains($0.id) }
     }
 
     /// Reads the displays again and writes every window's frame on each of them.
@@ -264,6 +310,7 @@ public final class StripDisplays {
         apps[id] = nil
         engine(holding: id)?.windowRemoved(id, refocus: refocus)
         for d in retired.keys { retired[d]?.remove(id) }
+        for k in setups.keys { for d in setups[k]!.keys { setups[k]![d]!.remove(id) } }
     }
 
     public func windowReplaced(_ old: String, by new: String) {

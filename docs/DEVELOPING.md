@@ -336,6 +336,17 @@ the same pid and app, then bundle ID with the exact title, then bundle ID with a
 Each display's workspaces are rebuilt and normalised, written once without motion, and windows
 that no slot claimed join the usual way. Displays that are unplugged or switched off keep their
 saved layout in the file. With `restore-layout = off` the file is neither read nor written.
+
+Each display setup keeps its own layout. A setup is the set of attached displays, by UUID; their
+arrangement and resolution do not count, and turning tiling off for one is not a new setup. When
+the setup changes, `StripDisplays.update` keeps the layout of the setup being left. If the new
+setup was seen before, every display gets that setup's layout back, without the windows that closed
+since. Windows the layout does not name stay on their display, or join the first display if theirs
+went away. In a setup not seen before, windows of a display
+that went away move to the first display and go back when it returns. The file keeps these layouts
+under `setups`, keyed by the sorted UUIDs joined with commas. At startup the current setup's layout
+is restored, else each display's own; the other setups are matched against the same windows so a
+later switch finds them.
 The matching and rebuilding live in `StripModel/LayoutRestore.swift` and are covered by
 `PersistenceTests`.
 

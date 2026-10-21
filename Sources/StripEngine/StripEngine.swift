@@ -300,6 +300,8 @@ public final class StripEngine {
             next.strips[i].scroll = max(0, min(reach, next.strips[i].scroll))
         }
         workspaces = next
+        // A layout kept from an earlier engine has its column IDs; new columns must not reuse them.
+        for s in next.strips { for c in s.columns { if c.id.hasPrefix("c"), let n = Int(c.id.dropFirst()) { nextID = max(nextID, n) } } }
         Log.note("engine", "\(label) restored layout\n" + next.summary)
         apply()
     }

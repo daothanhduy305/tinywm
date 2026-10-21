@@ -256,6 +256,51 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(d.engines["B"]?.strip.columns.map(\.windows) == [["y"]])
     }
 
+    @Test func eachDisplaySetupGetsItsOwnLayoutBack() {
+        let (d, _) = make()
+        d.update([a, b])
+        d.windowAdded("x", frame: rect(100, 100, 300, 300))
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.windowAdded("z", frame: rect(1100, 100, 300, 300))
+        let both = d.engines.mapValues { $0.strip.columns.map(\.windows) }
+        d.update([a])
+        // Rearranged while B is away: z moves to the top workspace.
+        let e = d.engines["A"]!
+        e.windowRemoved("z")
+        e.windowAdded("z", workspace: 1)
+        let alone = e.workspaces
+        d.update([a, b])
+        #expect(d.engines.mapValues { $0.strip.columns.map(\.windows) } == both)
+        d.update([a])
+        #expect(d.engines["A"]?.workspaces.strips.map { $0.columns.map(\.windows) } == alone.strips.map { $0.columns.map(\.windows) })
+    }
+
+    @Test func aWindowOpenedInAnotherSetupStaysOnItsDisplay() {
+        let (d, _) = make()
+        d.update([a, b])
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.update([a])
+        d.update([a, b])
+        d.update([a])
+        d.windowAdded("n", frame: rect(100, 100, 300, 300))
+        d.update([a, b])
+        #expect(d.engines["B"]?.strip.allWindows == ["y"])
+        #expect(d.engines["A"]?.strip.allWindows == ["n"])
+    }
+
+    @Test func aWindowClosedInAnotherSetupStaysGone() {
+        let (d, _) = make()
+        d.update([a])
+        d.windowAdded("x", frame: rect(100, 100, 300, 300))
+        d.windowAdded("y", frame: rect(100, 100, 300, 300))
+        d.update([a, b])
+        d.update([a])
+        d.windowRemoved("y")
+        d.update([a, b])
+        d.update([a])
+        #expect(d.engines["A"]?.strip.allWindows == ["x"])
+    }
+
     @Test func aNewFloatingWindowStaysWhereItOpened() {
         let (d, w) = make()
         d.update([a, b])

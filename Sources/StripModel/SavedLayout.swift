@@ -64,14 +64,20 @@ public struct SavedLayout: Codable, Equatable, Sendable {
 
     public var version = SavedLayout.currentVersion
     public var displays: [String: SavedWorkspaces] = [:]
+    /// Each display setup's layout, by its sorted display UUIDs joined with commas. Nil in files
+    /// from before setups were kept.
+    public var setups: [String: [String: SavedWorkspaces]]?
 
-    public init(displays: [String: SavedWorkspaces] = [:]) { self.displays = displays }
+    public init(displays: [String: SavedWorkspaces] = [:], setups: [String: [String: SavedWorkspaces]]? = nil) {
+        self.displays = displays; self.setups = setups
+    }
 
-    /// Replaces the given displays and keeps the rest, so a display that is unplugged or switched
-    /// off still has its layout when it returns.
-    public func merged(with current: [String: SavedWorkspaces]) -> SavedLayout {
+    /// Replaces the given displays and setups and keeps the rest, so a display that is unplugged
+    /// or switched off, and a setup not in use, still has its layout when it returns.
+    public func merged(with current: [String: SavedWorkspaces], setups: [String: [String: SavedWorkspaces]] = [:]) -> SavedLayout {
         var out = self
         for (id, w) in current { out.displays[id] = w }
+        if !setups.isEmpty { out.setups = (out.setups ?? [:]).merging(setups) { $1 } }
         return out
     }
 
