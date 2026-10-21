@@ -151,12 +151,16 @@ public enum AX {
     public static func inspect(_ e: AXUIElement) -> Inspection {
         guard let v = attributes(e, [kAXRoleAttribute, kAXSubroleAttribute, kAXMinimizedAttribute, kAXPositionAttribute,
                                      kAXSizeAttribute, kAXTitleAttribute, kAXFullScreenButtonAttribute, kAXZoomButtonAttribute,
-                                     fullScreenAttribute])
+                                     fullScreenAttribute, kAXMinimizeButtonAttribute])
         else { return Inspection(title: nil, frame: nil, isFullScreen: false, isTileable: false, isDockable: false) }
         let frame = frame(position: v[3], size: v[4])
         let fullScreen = isFullScreen(flag: v[8], frame: frame)
+        // Chromium reports its undocked developer tools as a dialog. A dialog that can be
+        // minimized is a window; alerts and prompts cannot be.
+        let subrole = v[1] as? String
+        let window = subrole == kAXStandardWindowSubrole || subrole == kAXDialogSubrole && isEnabled(button: v[9])
         // Tiny windows are helpers, such as the window that hosts a title bar's buttons.
-        let tileable = v[0] as? String == kAXWindowRole && v[1] as? String == kAXStandardWindowSubrole
+        let tileable = v[0] as? String == kAXWindowRole && window
             && v[2] as? Bool != true && frame.map { $0.width >= 80 && $0.height >= 40 } == true && !fullScreen
         return Inspection(title: v[5] as? String, frame: frame, isFullScreen: fullScreen, isTileable: tileable,
                           isDockable: tileable && isDockable(e, fullScreenButton: v[6], zoomButton: v[7]),
@@ -177,8 +181,12 @@ public enum AX {
         else { return false }
         if fullScreenButton != nil { return true }
         guard let zoom = zoomButton else { return true }
-        guard CFGetTypeID(zoom) == AXUIElementGetTypeID() else { return false }
-        return attribute(zoom as! AXUIElement, kAXEnabledAttribute, as: Bool.self) ?? false
+        return isEnabled(button: zoom)
+    }
+
+    private static func isEnabled(button: AnyObject?) -> Bool {
+        guard let button, CFGetTypeID(button) == AXUIElementGetTypeID() else { return false }
+        return attribute(button as! AXUIElement, kAXEnabledAttribute, as: Bool.self) ?? false
     }
 }
 
