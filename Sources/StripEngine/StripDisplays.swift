@@ -360,6 +360,11 @@ public final class StripDisplays {
         return target
     }
 
+    /// The display lying in `direction` from `engine`'s, by the displays' arrangement.
+    public func display(toward direction: Direction, from engine: StripEngine?) -> String? {
+        neighbour(of: engine, toward: direction)
+    }
+
     /// The start of a display UUID, enough to tell displays apart in the log.
     static func short(_ id: String) -> String { String(id.prefix(8)) }
 

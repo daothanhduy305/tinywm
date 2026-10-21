@@ -16,6 +16,8 @@ final class Overview {
     var activate: (String) -> Void = { _ in }
     /// A window was clicked or confirmed, or nil to cancel. The owner closes every overview.
     var chose: (String?) -> Void = { _ in }
+    /// An arrow key found no window that way on this display.
+    var atEdge: (Direction) -> Void = { _ in }
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     var ringStyle = FocusHighlight.Style()
@@ -37,7 +39,7 @@ final class Overview {
     private var labels: [String: CATextLayer] = [:]
 
     private var phase = Phase.closed
-    private var engine: StripEngine?
+    private(set) var engine: StripEngine?
     private var screen: NSScreen?
     private var viewport = Rect(x: 0, y: 0, width: 1, height: 1)
     private var metrics = StripMetrics(viewport: Rect(x: 0, y: 0, width: 1, height: 1), gap: 0)
@@ -162,10 +164,7 @@ final class Overview {
 
         panel.alphaValue = PictureMotion.coveringAlpha
         panel.orderFrontRegardless()
-        if active {
-            panel.makeKey()
-            panel.makeFirstResponder(view)
-        }
+        if active { takeKeys() } else { ring.opacity = Self.idleRing }
 
         relayout(animated: true, fromModel: true)
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -187,10 +186,10 @@ final class Overview {
         guard phase == .open, let layout, let selected else { return }
         let next: String?
         switch key {
-        case .left: next = overviewMove(layout, from: selected, .left)
-        case .right: next = overviewMove(layout, from: selected, .right)
-        case .up: next = overviewMove(layout, from: selected, .up)
-        case .down: next = overviewMove(layout, from: selected, .down)
+        case .left: next = move(layout, selected, .left)
+        case .right: next = move(layout, selected, .right)
+        case .up: next = move(layout, selected, .up)
+        case .down: next = move(layout, selected, .down)
         case .next: next = overviewStep(layout, from: selected, by: 1)
         case .previous: next = overviewStep(layout, from: selected, by: -1)
         case .confirm: return chose(selected)
@@ -201,6 +200,29 @@ final class Overview {
             home = next
         }
     }
+
+    /// The window that way, or nil after handing the keys on at an edge.
+    private func move(_ layout: OverviewLayout, _ from: String, _ d: Direction) -> String? {
+        let next = overviewMove(layout, from: from, d)
+        if next == nil { atEdge(d) }
+        return next
+    }
+
+    /// Makes this overview the one the keys steer. Arriving moving `d`, the selection jumps to
+    /// the window at the edge the keys came in by.
+    func takeKeys(entering d: Direction? = nil) {
+        panel.makeKey()
+        panel.makeFirstResponder(view)
+        ring.opacity = 1
+        if let d, phase == .open, let layout, let selected, let next = overviewEntry(layout, from: selected, d) {
+            select(next)
+            home = next
+        }
+    }
+
+    /// The ring on a display the keys do not steer is faint, so the bright one shows where they act.
+    static let idleRing: Float = 0.35
+    func releaseKeys() { ring.opacity = Self.idleRing }
 
     private func select(_ id: String, _ why: String = "keys") {
         guard id != selected, let layout else { return }
@@ -465,6 +487,7 @@ final class Overviews {
     private let windows: AXWindows
     private var byDisplay: [String: Overview] = [:]
     private var active: Overview?
+    private var displays: StripDisplays?
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
 
@@ -479,6 +502,7 @@ final class Overviews {
             if let active, active.isShowing { active.handle(.confirm) }
             return
         }
+        self.displays = displays
         byDisplay = byDisplay.filter { displays.engines[$0.key] != nil }
         active = nil
         var opened: [Overview] = []
@@ -505,8 +529,19 @@ final class Overviews {
     private func make(_ id: String) -> Overview {
         let o = Overview(pictures: pictures, windows: windows)
         o.chose = { [unowned self, unowned o] window in chose(window, on: o) }
+        o.atEdge = { [unowned self, unowned o] d in cross(d, from: o) }
         byDisplay[id] = o
         return o
+    }
+
+    /// At an edge, the keys move on to the display lying that way, if its overview is showing.
+    private func cross(_ d: Direction, from o: Overview) {
+        guard o === active, let id = displays?.display(toward: d, from: o.engine),
+              let target = byDisplay[id], target.isShowing else { return }
+        Log.note("overview", "keys move \(d) to \(id.prefix(8))")
+        o.releaseKeys()
+        active = target
+        target.takeKeys(entering: d)
     }
 
     private func chose(_ window: String?, on picked: Overview) {

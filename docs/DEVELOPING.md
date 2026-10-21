@@ -230,7 +230,9 @@ keys both work out of the box.
 The overview opens on every display with windows, each with its focused window highlighted. In
 the active display's overview, the focus keys (letters and arrows, with or without the meta key)
 move the selection, Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc
-cancels. When the active display has no
+cancels. At an edge, the arrow and focus keys move on to the display lying that way, landing on
+its window at the edge they came in by. The display the keys steer has the bright ring; the
+others' rings are faint. When the active display has no
 windows, the next display's overview takes the keys. Pointing at a window on any display
 highlights it, and a click focuses it and makes its display the active one. When the pointer
 leaves a display, its highlight goes back to its focused window, or to the one the keys chose.

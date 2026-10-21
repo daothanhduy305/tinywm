@@ -161,6 +161,13 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(overviewMove(l, from: "b", .up) == "a")
     }
 
+    @Test func arrivingFromAnotherDisplayLandsOnTheNearEdge() {
+        #expect(overviewEntry(layout, from: "c", .right) == "a")
+        #expect(["b", "c"].contains(overviewEntry(layout, from: "a", .left)!))
+        #expect(overviewEntry(layout, from: "d", .down) == "a")
+        #expect(overviewEntry(layout, from: "a", .up) == "d")
+    }
+
     @Test func stepFollowsReadingOrder() {
         #expect(overviewStep(layout, from: "a", by: 1) == "b")
         #expect(overviewStep(layout, from: "c", by: 1) == "d")

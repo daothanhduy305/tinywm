@@ -175,6 +175,22 @@ public func overviewMove(_ layout: OverviewLayout, from id: String, _ d: Directi
     }
 }
 
+/// Where the selection lands when the keys arrive from another display moving `d`, starting
+/// from the selected `id`: the near end of its row for left and right, the near row for up and down.
+public func overviewEntry(_ layout: OverviewLayout, from id: String, _ d: Direction) -> String? {
+    guard let w = layout.window(id), let row = layout.rows.first(where: { $0.workspace == w.workspace }) else { return nil }
+    switch d {
+    case .left, .right:
+        let columns = row.windows.map(\.column)
+        guard let edge = d == .right ? columns.min() : columns.max() else { return nil }
+        return nearest(row.windows.filter { $0.column == edge }) { abs($0.rect.center.y - w.rect.center.y) }
+    case .up, .down:
+        let rows = layout.rows.filter { !$0.windows.isEmpty }
+        guard let r = d == .down ? rows.first : rows.last else { return nil }
+        return nearest(d == .down ? r.windows : r.windows.reversed()) { abs($0.rect.center.x - w.rect.center.x) }
+    }
+}
+
 /// The window after (positive) or before (negative) `id` in reading order: rows top to bottom,
 /// columns left to right, stacks top to bottom.
 public func overviewStep(_ layout: OverviewLayout, from id: String, by delta: Int) -> String? {

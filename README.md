@@ -82,7 +82,7 @@ Hold **right ⌘** (the "meta" key) and press:
 | T | Float or tile the window |
 | V | Focus the floating windows, then the strip again |
 | 1 – 9 | Jump to a column |
-| Esc | Overview: pick a window with the arrows or Tab, then Return; Esc closes it |
+| Esc | Overview: pick a window with the arrows or Tab (the arrows cross to the next display at an edge), then Return; Esc closes it |
 | Q | Close the window |
 
 **Drag with the mouse.** Hold the meta key and drag any window, anywhere inside it. The other
