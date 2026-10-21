@@ -178,7 +178,9 @@ public final class WindowTracker {
             registered.remove(ref)
             missing.remove(ref)
             shown.remove(ref)
-            onRemoved(ref.element, true)
+            // Closed, not hidden: an app such as Shottr shows the same window again for its next
+            // capture, which must open on the active display, not where the last one was.
+            onRemoved(ref.element, false)
         }
     }
 
@@ -390,12 +392,30 @@ public final class WindowTracker {
 
     /// Adds notifications on the app's queue, after the requests already waiting there. Each one
     /// waits for the app, so a slow app holds up neither the main thread nor a window being placed.
+    ///
+    /// An app that is still starting can refuse them, and would then never report focus moving
+    /// between its windows. Refused ones are asked for again a few times.
     private func subscribe(_ names: [String], on element: AXUIElement, observer: AXObserver, pid: pid_t) {
         let pending = PendingNotifications(observer: observer, element: element,
                                            context: Unmanaged.passUnretained(self).toOpaque())
-        queue(for: pid).async {
+        Self.add(names, pending, on: queue(for: pid), pid: pid, retries: [0.5, 1, 2, 4])
+    }
+
+    private nonisolated static func add(_ names: [String], _ pending: PendingNotifications, on queue: DispatchQueue,
+                                        pid: pid_t, retries: [Double]) {
+        queue.async {
+            var refused: [String] = []
             for name in names {
-                AXObserverAddNotification(pending.observer, pending.element, name as CFString, pending.context)
+                let result = AXObserverAddNotification(pending.observer, pending.element, name as CFString, pending.context)
+                // A window that is already gone stays refused.
+                if result != .success, result != .notificationAlreadyRegistered, result != .invalidUIElement {
+                    refused.append(name)
+                    if retries.isEmpty { Log.note("tracker", "process \(pid) refused \(name): error \(result.rawValue)") }
+                }
+            }
+            guard !refused.isEmpty, let delay = retries.first else { return }
+            queue.asyncAfter(deadline: .now() + delay) {
+                add(refused, pending, on: queue, pid: pid, retries: Array(retries.dropFirst()))
             }
         }
     }
