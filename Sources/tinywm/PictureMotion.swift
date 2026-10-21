@@ -345,6 +345,11 @@ final class PictureMotion: StripPresenter {
         advance()
     }
 
+    /// A window written without motion may still show its old picture, taken before it moved.
+    func wrote(_ id: String) {
+        if !pictures.coverMode { snapshots.resize([id]) }
+    }
+
     // MARK: Landing
 
     private func settled(_ motion: Int) {

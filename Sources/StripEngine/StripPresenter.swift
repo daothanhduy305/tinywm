@@ -19,6 +19,8 @@ public protocol StripPresenter: AnyObject {
     func landed(_ id: String, token: Int)
     /// Called after every write for motion `token` has been issued, with the windows involved.
     func writesIssued(_ ids: Set<String>, token: Int)
+    /// Called when a window written without motion reached its frame, as on startup or a retile.
+    func wrote(_ id: String)
     /// Draws the strip at `frames` right now, without animation, while fingers drag it.
     /// Returns false when pictures are unavailable.
     func preview(frames: [String: Rect], focused: String?) -> Bool
@@ -32,4 +34,5 @@ public protocol StripPresenter: AnyObject {
 
 public extension StripPresenter {
     func arrange(frames: [String: Rect]) -> Bool { preview(frames: frames, focused: nil) }
+    func wrote(_ id: String) {}
 }

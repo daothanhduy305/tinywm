@@ -663,8 +663,11 @@ public final class StripEngine {
             for id in other.floating where !parked.contains(id) {
                 if let home = windows.frameOf(id) ?? targetFrames[id] { floatHomes[id] = home }
             }
+            // A tiled window is parked at its column's size, so its picture has the right shape
+            // even before its workspace is first shown, as after a restart.
+            let tiled = stripFrames(other, metrics, clamp: false)
             for id in other.allWindows + other.floating {
-                let size = targetFrames[id] ?? floatHomes[id] ?? Rect(x: 0, y: 0, width: 800, height: 600)
+                let size = tiled[id] ?? targetFrames[id] ?? floatHomes[id] ?? Rect(x: 0, y: 0, width: 800, height: 600)
                 let origin = hideaway.parkOrigin(size: Size(width: size.width, height: size.height))
                 frames[id] = Rect(x: origin.x, y: origin.y, width: size.width, height: size.height)
                 parkedNow.insert(id)
@@ -723,7 +726,10 @@ public final class StripEngine {
         for (id, slide) in slides { if let real = frames[id] { slideFrames[id] = (real, slide) } }
         for (id, r) in direct {
             Log.note("frame", "\(label) \(Log.name(id)) -> \(Log.rect(r)) at once\(parkedNow.contains(id) ? " (parked)" : "")")
-            windows.setFrame(id, r) { [weak self] took in self?.checkWidth(id, asked: r, took: took) }
+            windows.setFrame(id, r) { [weak self, weak presenter] took in
+                presenter?.wrote(id)
+                self?.checkWidth(id, asked: r, took: took)
+            }
         }
         for (id, m) in moves {
             Log.note("frame", "\(label) \(Log.name(id)) \(Log.rect(m.from)) -> \(Log.rect(m.to))"
@@ -752,7 +758,10 @@ public final class StripEngine {
             if let clock, presenter.writeDelay > 0 { clock.after(presenter.writeDelay, write) } else { write() }
         } else {
             for (id, r) in finals {
-                windows.setFrame(id, r) { [weak self] took in self?.checkWidth(id, asked: r, took: took) }
+                windows.setFrame(id, r) { [weak self, weak presenter] took in
+                    presenter?.wrote(id)
+                    self?.checkWidth(id, asked: r, took: took)
+                }
             }
         }
         moved = !moves.isEmpty || !direct.isEmpty

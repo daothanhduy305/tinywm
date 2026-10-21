@@ -478,6 +478,8 @@ final class FakePresenter: StripPresenter {
     func preview(frames: [String: Rect], focused: String?) -> Bool { previews.append(frames); return accept }
     func endPreview() { endedPreviews += 1 }
     func writesIssued(_ ids: Set<String>, token: Int) { issued = ids }
+    var wroteIDs: [String] = []
+    func wrote(_ id: String) { wroteIDs.append(id) }
 }
 
 @MainActor
@@ -505,6 +507,35 @@ final class CountingWindows: WindowSystem {
         clock.advance(by: 1)
         w.writes = [:]
         return (e, w, p, clock)
+    }
+
+    @Test func windowsWrittenWithoutMotionAreReportedSoTheirPicturesAreRetaken() {
+        let (e, _, p, clock) = make()
+        #expect(Set(p.wroteIDs) == ["a", "b", "c"])
+        p.wroteIDs = []
+        e.focusColumn(0)
+        clock.advance(by: 1)
+        #expect(p.wroteIDs.isEmpty)
+        #expect(!p.landedIDs.isEmpty)
+        e.retile()
+        #expect(Set(p.wroteIDs) == ["a", "b", "c"])
+    }
+
+    @Test func aRestoredWindowOnAHiddenWorkspaceIsParkedAtItsColumnSize() {
+        let w = CountingWindows()
+        var s = StripSettings(); s.defaultWidth = 0.5; s.gap = 0
+        let e = StripEngine(windows: w, viewport: screen, settings: s)
+        var ws = Workspaces()
+        ws.current.insert("a", width: 0.5, columnID: "ca", focus: true)
+        ws.normalize()
+        let shown = ws.active
+        ws.switchBy(1)
+        ws.current.insert("b", width: 0.4, columnID: "cb", focus: true)
+        ws.normalize()
+        ws.switchTo(shown)
+        e.restore(ws)
+        #expect(w.writes["b"]?.last?.width == screen.width * 0.4)
+        #expect(w.writes["b"]?.last?.height == screen.height)
     }
 
     @Test func picturesGoUpFirstThenEachRealWindowIsWrittenOnce() {
