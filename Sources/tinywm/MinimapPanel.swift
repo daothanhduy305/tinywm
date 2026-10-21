@@ -48,7 +48,7 @@ final class MinimapPanel {
         panel.setFrame(NSRect(x: f.midX - size.width / 2, y: f.minY + 24, width: size.width, height: size.height), display: false)
 
         // The outline glides only while the minimap is already showing; a fresh one starts in place.
-        let visible = panel.isVisible && panel.alphaValue > 0
+        let visible = isShowing
         view.update(rows: rows, scale: scale, rowHeight: h, spacing: rowSpacing, padding: padding, icon: icon,
                     name: name, animate: visible)
         panel.alphaValue = 1
@@ -61,6 +61,8 @@ final class MinimapPanel {
     }
 
     func close() { hideWork?.cancel(); panel.orderOut(nil) }
+
+    var isShowing: Bool { panel.isVisible && panel.alphaValue > 0 }
 
     private func hide() {
         NSAnimationContext.runAnimationGroup({ ctx in

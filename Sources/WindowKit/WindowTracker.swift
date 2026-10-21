@@ -148,17 +148,37 @@ public final class WindowTracker {
     /// which lets the engine restore a window that was hidden, unless only new ones are wanted.
     public func rescan(pid: pid_t) { rescan(pid: pid, from: .listed) }
 
-    private func rescan(pid: pid_t, from source: Source) {
+    /// `hidden` are windows the window server just stopped showing. Many apps hide a window on
+    /// close instead of destroying it; one its app no longer lists is removed at once, instead of
+    /// waiting for the sweep.
+    private func rescan(pid: pid_t, from source: Source, hidden: [AXRef] = []) {
         guard observers[pid] != nil else { return }
         queue(for: pid).async { [weak self] in
-            let listed = (AX.attribute(AXUIElementCreateApplication(pid), kAXWindowsAttribute, as: [AXUIElement].self) ?? [])
-                .map(AXRef.init(element:))
+            let attribute = AX.attribute(AXUIElementCreateApplication(pid), kAXWindowsAttribute, as: [AXUIElement].self)
+            let listed = (attribute ?? []).map(AXRef.init(element:))
+            // Windows on other Spaces are left out of the list, not gone.
+            let closable = attribute != nil && !hidden.isEmpty && !AX.fullScreenWindowShows()
             DispatchQueue.main.async { MainActor.assumeIsolated {
                 guard let self else { return }
                 for ref in listed where source != .windowServer || !self.registered.contains(ref) {
                     self.admit(ref.element, pid: pid, from: source)
                 }
+                guard closable, NSRunningApplication(processIdentifier: pid)?.isHidden == false else { return }
+                self.dropClosed(hidden.filter { !listed.contains($0) })
             } }
+        }
+    }
+
+    /// Removes hidden windows their app no longer lists, unless they were shown again meanwhile.
+    private func dropClosed(_ refs: [AXRef]) {
+        let gone = refs.filter { registered.contains($0) }
+        let states = WindowNumbers.states(gone.compactMap { numbers[$0] })
+        for ref in gone where numbers[ref].flatMap({ states[$0] }) != true {
+            numbers[ref] = nil
+            registered.remove(ref)
+            missing.remove(ref)
+            shown.remove(ref)
+            onRemoved(ref.element, true)
         }
     }
 
@@ -269,7 +289,7 @@ public final class WindowTracker {
         let states = WindowNumbers.states(Array(numbers.values))
         var vanishedNow: Set<AXRef> = []
         var shownNow: Set<AXRef> = []
-        var hiddenPIDs: Set<pid_t> = []
+        var hidden: [pid_t: [AXRef]] = [:]
         for (ref, number) in numbers {
             switch states[number] {
             case nil:
@@ -285,12 +305,12 @@ public final class WindowTracker {
                 var pid: pid_t = 0
                 AXUIElementGetPid(ref.element, &pid)
                 onHidden(ref.element)
-                hiddenPIDs.insert(pid)
+                hidden[pid, default: []].append(ref)
             }
         }
         vanished = vanishedNow
         shown = shownNow
-        for pid in hiddenPIDs { rescan(pid: pid) }
+        for (pid, refs) in hidden { rescan(pid: pid, from: .listed, hidden: refs) }
         if !paused { findUnannounced() }
     }
 

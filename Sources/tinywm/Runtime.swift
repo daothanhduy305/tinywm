@@ -380,7 +380,12 @@ final class Runtime {
         engine.observers.append { [unowned self] e in
             snapshots.prime(Set(e.workspaces.strips.flatMap(\.allWindows)))
         }
-        engine.observers.append { [unowned self] e in if e.moved, !overviewPicking { overlays[id]?.minimap.show(e) } }
+        // A showing minimap also follows changes that move nothing, such as a window closing.
+        engine.observers.append { [unowned self] e in
+            guard let minimap = overlays[id]?.minimap, e.moved || minimap.isShowing, !overviewPicking else { return }
+            minimap.show(e)
+        }
+        engine.observers.append { [unowned self] e in overview.changed(e) }
         engine.observers.append { [unowned self] e in
             cards.show(e.peeks, windows: e.peekStrip)
             overlays[id]?.pictures.showCards(e.peeks)

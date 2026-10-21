@@ -210,6 +210,12 @@ final class Overview {
         relayout(animated: true)
     }
 
+    /// Redraws when `engine`'s strip changes while open, so a window that closes leaves.
+    func changed(_ engine: StripEngine) {
+        guard phase == .open, engine === self.engine else { return }
+        relayout(animated: true)
+    }
+
     // MARK: Closing
 
     /// Zooms into `id`'s workspace, or back to the unchanged layout for nil. With `refocus`, nil
@@ -287,6 +293,13 @@ final class Overview {
         layout = next
         CATransaction.begin()
         if !animated { CATransaction.setDisableActions(true) }
+        // A window that closed while the overview is open loses its picture.
+        for id in Set(layers.keys).subtracting(next.windows.map(\.id)) {
+            layers.removeValue(forKey: id)?.removeFromSuperlayer()
+            labels.removeValue(forKey: id)?.removeFromSuperlayer()
+        }
+        if let s = selected, next.window(s) == nil { selected = home.flatMap { next.window($0) != nil ? $0 : nil } ?? next.windows.first?.id }
+        if let h = home, next.window(h) == nil { home = selected }
         for w in next.windows {
             guard let layer = layers[w.id] else { continue }
             let centre = CGPoint(x: w.rect.center.x, y: w.rect.center.y)
@@ -484,6 +497,10 @@ final class Overviews {
     }
 
     func handle(_ command: OverviewCommand) { active?.handle(command) }
+
+    func changed(_ engine: StripEngine) {
+        for o in byDisplay.values { o.changed(engine) }
+    }
 
     private func make(_ id: String) -> Overview {
         let o = Overview(pictures: pictures, windows: windows)
