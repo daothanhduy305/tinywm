@@ -77,9 +77,21 @@ final class ConfigFile {
         }
     }
 
+    /// Adds commented lines for the defaults the file does not list yet, such as new settings and
+    /// bindings. Writes through a symlink, so a config kept in a dotfiles folder stays there.
+    func addMissingDefaults() {
+        let url = Self.url.resolvingSymlinksInPath()
+        guard let text = try? String(contentsOf: url, encoding: .utf8),
+              let updated = StripConfig.addingMissingDefaults(to: text) else { return }
+        do { try updated.write(to: url, atomically: true, encoding: .utf8) } catch {
+            Log.note("config", "could not add new defaults to \(url.path): \(error)")
+        }
+    }
+
     /// Creates the file from the template if needed and opens it in the default text editor.
     func edit() {
         createIfMissing()
+        addMissingDefaults()
         // The file has no extension, so ask `open` for the default text editor.
         let open = Process()
         open.executableURL = URL(fileURLWithPath: "/usr/bin/open")

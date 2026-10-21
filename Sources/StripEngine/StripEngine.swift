@@ -552,7 +552,7 @@ public final class StripEngine {
         let id = newColumnID()
         change { $0.popOut(columnID: id) }
     }
-    public func cycleWidth() { resize { $0.cycleWidth(settings.widthPresets) } }
+    public func cycleWidth(backward: Bool = false) { resize { $0.cycleWidth(settings.widthPresets, backward: backward) } }
     public func toggleFullWidth() { resize { $0.toggleFullWidth() } }
     public func wider() { resize { $0.nudgeWidth(by: settings.nudge) } }
     public func narrower() { resize { $0.nudgeWidth(by: -settings.nudge) } }

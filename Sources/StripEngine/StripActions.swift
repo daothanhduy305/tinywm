@@ -41,6 +41,7 @@ public enum StripActions {
         add("workspace-move-up-page", "Move window to workspace above", "pageup", shift: true)
         for n in 1...9 { add("focus-column-\(n)", "Focus column \(n)", "\(n)") }
         add("width-cycle", "Cycle width", "r")
+        add("width-cycle-back", "Cycle width backward", "e")
         add("width-full", "Full width", "f")
         add("center", "Center column", "c")
         add("wider", "Wider", "equal", repeats: true)

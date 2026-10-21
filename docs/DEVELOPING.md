@@ -97,7 +97,9 @@ them across rebuilds, create a code-signing certificate once:
 tinywm reads `~/.config/tinywm/config` (or `$XDG_CONFIG_HOME/tinywm/config`). The file is
 optional: without it, or for any line you leave out, the defaults below apply. Choose **Edit
 Config…** in the status menu to create it from a commented template and open it. The file
-reloads by itself when you save it, or on **Reload Config**. A line that cannot be read is
+reloads by itself when you save it, or on **Reload Config**. When a newer tinywm brings a setting
+or binding the file does not mention, at launch or on **Edit Config…** it adds it at the end,
+commented, showing the default. A line that cannot be read is
 skipped, and **Config Errors** in the menu lists it with its line number.
 
 ```
@@ -209,7 +211,7 @@ keys both work out of the box.
 | Meta + ⌥ + ↓ / ↑, or Page Down / Page Up | Workspace below / above | `workspace-down-arrow`, `workspace-down-page` and so on |
 | Meta + ⇧ + ⌥ + ↓ / ↑, or ⇧ + Page Down / Page Up | Move the window to that workspace | `workspace-move-down-arrow`, `workspace-move-down-page` and so on |
 | Meta + 1 to 9 | Focus a column | `focus-column-1` to `focus-column-9` |
-| Meta + R | Cycle the column width | `width-cycle` |
+| Meta + R / E | Cycle the column width wider / narrower | `width-cycle` `width-cycle-back` |
 | Meta + F | Full width | `width-full` |
 | Meta + C | Center the column | `center` |
 | Meta + = / - | Wider / narrower | `wider` `narrower` |

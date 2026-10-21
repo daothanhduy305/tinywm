@@ -75,7 +75,7 @@ Hold **right ⌘** (the "meta" key) and press:
 | U / I, ⌥↓ / ⌥↑ or Page Down / Page Up | Workspace below / above (⇧ takes the window along) |
 | . / , | Next / previous display (⇧ takes the window along) |
 | W A S D | The display above, left, below or right (⇧ takes the window along) |
-| R | Cycle width: ⅓, ½, ⅔ |
+| R / E | Cycle width: ⅓, ½, ⅔, forward / back |
 | F / C | Full width / centre the window |
 | = / − | Wider / narrower |
 | [ / ] | Stack the window into its neighbour · ⇧] pops it out |
@@ -113,7 +113,7 @@ open-on  = Mail -> workspace 2  # an app always opens on a chosen display or wor
 There is more: `meta = control-option` picks ⌃⌥ as the meta key, `gap` sets the space between
 windows, `width-presets` sets the widths R cycles through, `swipe-fingers = 4` switches swipes
 to four fingers, and `unbind` removes a default key. The config file that tinywm creates lists
-every option with a short explanation.
+every option with a short explanation, and adds new ones, commented, when tinywm gains them.
 
 ## Good to know
 

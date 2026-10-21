@@ -346,6 +346,24 @@ public struct StripConfig: Equatable, Sendable {
         ]
     }
 
+    /// The file with every default line it never mentions added at the end, commented, so settings
+    /// and bindings from a newer tinywm show up in an older file. Nil when nothing is missing.
+    public static func addingMissingDefaults(to text: String) -> String? {
+        let present = Set(text.split(whereSeparator: \.isNewline).map { key(of: $0.drop { $0 == "#" || $0.isWhitespace }) })
+        let missing = defaultLines.filter { !present.contains(key(of: $0[...])) }
+        guard !missing.isEmpty else { return nil }
+        var out = text.isEmpty || text.hasSuffix("\n") ? text : text + "\n"
+        out += "\n# Added by tinywm: defaults this file did not list yet.\n"
+        for l in missing { out += "# \(l)\n" }
+        return out
+    }
+
+    /// `gap` for `gap = 8`, and `bind focus-left` for `bind focus-left = h` or `unbind focus-left`.
+    private static func key(of line: Substring) -> String {
+        let words = (line.split(separator: "=", maxSplits: 1).first ?? "").split(whereSeparator: \.isWhitespace)
+        return (words.first == "unbind" ? ["bind"] + words.dropFirst() : words).joined(separator: " ")
+    }
+
     /// A commented file listing every default. Remove the `#` from a line to change it.
     public static var template: String {
         let settings = settingLines, binds = defaultLines.dropFirst(settings.count)

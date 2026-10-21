@@ -161,6 +161,7 @@ final class ShortcutCommands {
         }
         for n in 1...9 { a["focus-column-\(n)"] = { $0.focusColumn(n - 1) } }
         a["width-cycle"] = { $0.cycleWidth() }
+        a["width-cycle-back"] = { $0.cycleWidth(backward: true) }
         a["width-full"] = { $0.toggleFullWidth() }
         a["center"] = { $0.center() }
         a["wider"] = { $0.wider() }

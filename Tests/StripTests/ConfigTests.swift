@@ -193,6 +193,17 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
     @Test func theTemplateListsEveryDefaultLine() {
         for line in StripConfig.defaultLines { #expect(StripConfig.template.contains("# \(line)\n")) }
     }
+
+    @Test func missingDefaultsAreAddedCommentedAndOnlyOnce() {
+        #expect(StripConfig.addingMissingDefaults(to: StripConfig.template) == nil)
+        let old = StripConfig.template.replacingOccurrences(of: "# bind width-cycle-back = e\n", with: "")
+            .replacingOccurrences(of: "# gap = 8\n", with: "gap   = 12 # wider\n")
+            .replacingOccurrences(of: "# bind center = c\n", with: "unbind  center\n")
+        let updated = StripConfig.addingMissingDefaults(to: old)
+        #expect(updated == old + "\n# Added by tinywm: defaults this file did not list yet.\n# bind width-cycle-back = e\n")
+        #expect(updated.map(StripConfig.addingMissingDefaults) == .some(nil))
+        #expect(StripConfig.parse(updated ?? "").config == StripConfig.parse(old).config)
+    }
 }
 
 /// A copy of the maintainer's own config, kept to prove it stays valid.
@@ -237,7 +248,7 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
             "workspace-move-up-arrow": key("up", shift: true, alt: true),
             "workspace-down-page": key("pagedown"), "workspace-up-page": key("pageup"),
             "workspace-move-down-page": key("pagedown", shift: true), "workspace-move-up-page": key("pageup", shift: true),
-            "width-cycle": key("r"), "width-full": key("f"), "center": key("c"),
+            "width-cycle": key("r"), "width-cycle-back": key("e"), "width-full": key("f"), "center": key("c"),
             "wider": key("="), "narrower": key("-"),
             "stack-right": key("]"), "stack-left": key("["), "pop-out": key("]", shift: true),
             "float": key("t"), "float-focus": key("v"),

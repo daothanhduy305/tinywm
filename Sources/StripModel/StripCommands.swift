@@ -134,11 +134,13 @@ extension Strip {
         focusedColumn = f + 1
     }
 
-    /// Steps the focused column through `presets`, starting from the first preset wider than now.
-    public mutating func cycleWidth(_ presets: [Double]) {
+    /// Steps the focused column through `presets`, to the next wider one, or the next narrower one when `backward`.
+    public mutating func cycleWidth(_ presets: [Double], backward: Bool = false) {
         guard let f = focusedColumn, !presets.isEmpty else { return }
         let current = columns[f].width
-        let next = presets.first { $0 > current + 0.01 } ?? presets[0]
+        let next = backward
+            ? presets.last { $0 < current - 0.01 } ?? presets[presets.count - 1]
+            : presets.first { $0 > current + 0.01 } ?? presets[0]
         columns[f].width = next
         columns[f].widthBeforeFull = nil
     }

@@ -65,6 +65,7 @@ bind workspace-up-arrow = up
 # bind focus-column-8 = 8
 # bind focus-column-9 = 9
 bind width-cycle = shift+command+r
+# bind width-cycle-back = e
 bind width-full = shift+command+f
 # bind center = c
 # bind wider = equal

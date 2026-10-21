@@ -128,6 +128,7 @@ final class Runtime {
         lifecycle.install()
 
         // The first read happens before displays exist, so their engines start with the configured layout.
+        configFile.addMissingDefaults()
         let first = configFile.load()
         config = first.config
         menu.showIssues(first.issues)
