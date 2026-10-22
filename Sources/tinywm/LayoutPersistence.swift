@@ -26,6 +26,8 @@ final class LayoutPersistence {
 
     private var held: [StripDisplays.Pending] = []
     private var holding = false
+    /// True while windows found at startup are held for the restore.
+    var isRestoring: Bool { holding }
     /// Saving waits for the restore, or the empty startup layout would overwrite the saved one.
     private var ready = false
     private var pendingSave: DispatchWorkItem?

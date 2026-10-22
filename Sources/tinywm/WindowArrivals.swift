@@ -33,11 +33,14 @@ final class WindowArrivals {
 
     /// Time after the mouse is released before waiting windows are placed, so the app finishes its drop.
     var settle = 0.15
+    /// False while the startup restore holds windows: they were open before tinywm started, so
+    /// none is a tab being dragged out, and waiting would keep them out of the restore.
+    var waitsForMouse: () -> Bool = { true }
 
     init(windows: AXWindows) { self.windows = windows }
 
     func arrived(_ id: String, element: AXUIElement) {
-        if NSEvent.pressedMouseButtons & 1 != 0 {
+        if waitsForMouse(), NSEvent.pressedMouseButtons & 1 != 0 {
             Log.note("place", "\(Log.name(id)) waits for the mouse button to come up")
             waiting[id] = AXRef(element: element)
             poll()

@@ -155,6 +155,7 @@ final class Runtime {
         configFile.watch()
         startSwipes()
         persistence.reading = { [unowned self] in tracker.isProbing || arrivals.isJudging }
+        arrivals.waitsForMouse = { [unowned self] in !persistence.isRestoring }
         persistence.beginRestore()
         // An app that hangs would otherwise hold each call for macOS's default of 6 seconds.
         // Set on the system-wide element, the limit applies to every element.
