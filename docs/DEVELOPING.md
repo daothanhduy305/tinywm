@@ -260,7 +260,10 @@ bright ring; the others' rings are faint. When the active display has no windows
 overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
 and makes its display the active one. When the pointer leaves a display, its highlight goes back to
 its focused window, or to the one the keys chose. Each picture has its app name and window title
-under it. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
+under it. Right-click a picture and choose Rename…, or press Meta + R, to name the selected
+window. The `width-cycle` key renames too, if it is bound elsewhere. Return saves, Esc cancels,
+and an empty name brings the title back. The label then shows the name, and the search matches the name, the app and
+the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
 ⌘Tab with either ⌘ key opens the overview like Meta + Esc, and the macOS app switcher no longer
 shows; ⌘Tab again confirms.
 
@@ -354,7 +357,9 @@ tinywm writes `~/Library/Application Support/tinywm/layout.json` about a second 
 changes and on quit. The file maps each display UUID to its workspaces: strips with columns
 (width, stacked windows, focused window), scroll, floating windows and the active workspace.
 Window IDs like `w3` change every run, so each window is stored as a descriptor: CGWindowID,
-bundle ID, title and pid.
+bundle ID, title, pid and the name given in the overview, if any. A name comes back with the window
+its slot is matched to. After tinywm restarts the CGWindowID always finds it. After the app
+relaunches the match goes by title, so a name can be lost, or land on a similar window of the same app.
 
 At startup `LayoutPersistence` holds the windows the first scan finds. After a short settle
 time, `SavedLayout.plan` matches them to saved slots, each slot used once: first CGWindowID with

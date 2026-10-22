@@ -300,6 +300,12 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(OverviewKeys.command(forAction: "focus-left") == .left)
         #expect(OverviewKeys.command(forAction: "focus-down-arrow") == .down)
         #expect(OverviewKeys.command(forAction: "overview") == .confirm)
+        #expect(OverviewKeys.command(forAction: "width-cycle") == .rename)
+        let ctrlOpt = OverviewKeys(meta: .controlOption)
+        #expect(ctrlOpt.isRename(keyCode: 15, flags: 0x40000 | 0x80000))
+        #expect(!ctrlOpt.isRename(keyCode: 15, flags: 0x40000 | 0x80000 | 0x20000))
+        #expect(!ctrlOpt.isRename(keyCode: 15, flags: 0))
+        #expect(OverviewKeys(meta: .rightCommand).isRename(keyCode: 15, flags: 0x100000 | 0x10))
         #expect(OverviewKeys.command(forAction: "move-left") == nil)
         #expect(OverviewKeys.command(forAction: "close-window") == nil)
     }

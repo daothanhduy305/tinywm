@@ -1,14 +1,16 @@
 import Foundation
 
-public enum OverviewCommand: Equatable, Sendable { case left, right, up, down, next, previous, confirm, cancel }
+public enum OverviewCommand: Equatable, Sendable { case left, right, up, down, next, previous, confirm, cancel, rename }
 
 /// What each key does while the overview is open, built from the resolved bindings.
 public struct OverviewKeys: Equatable, Sendable {
     private var plain: [Int: OverviewCommand] = [:]
+    private var meta = MetaModifier.rightCommand
 
     /// Plain keys: the arrows, Tab, Return and Esc. Letters type into the search bar instead, so
     /// the focus letters steer only with the meta key held.
-    public init(bindings: [String: MetaKeyBindings.Chord] = StripActions.defaultBindings) {
+    public init(bindings: [String: MetaKeyBindings.Chord] = StripActions.defaultBindings, meta: MetaModifier = .rightCommand) {
+        self.meta = meta
         let arrows = [(123, OverviewCommand.left), (124, .right), (126, .up), (125, .down)]
         for (code, command) in arrows { plain[code] = command }
         for (name, chord) in bindings where !chord.shift && !chord.option && !Self.typesText(chord.keyCode) {
@@ -26,6 +28,14 @@ public struct OverviewKeys: Equatable, Sendable {
         if keyCode == 48 { return shift ? .previous : .next }
         if shift { return nil }
         return plain[keyCode]
+    }
+
+    /// Whether a key that reached the overview is Meta + R, which renames the selected window
+    /// whatever `width-cycle` is bound to. `flags` are the event's raw flags.
+    public func isRename(keyCode: Int, flags: UInt64) -> Bool {
+        let shift: UInt64 = 0x20000, command: UInt64 = 0x100000
+        let extra = meta == .controlOption ? shift | command : shift
+        return keyCode == 15 && meta.isHeld(flags: flags) && flags & extra == 0
     }
 
     /// Whether a key types into the search bar: anything but the arrows, the function keys and
@@ -49,6 +59,8 @@ public struct OverviewKeys: Equatable, Sendable {
         case "focus-up", "focus-up-arrow": .up
         case "focus-down", "focus-down-arrow": .down
         case "overview": .confirm
+        // Meta + R, which cycles the width outside the overview.
+        case "width-cycle": .rename
         default: nil
         }
     }

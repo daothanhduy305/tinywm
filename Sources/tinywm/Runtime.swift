@@ -116,6 +116,11 @@ final class Runtime {
             displays.windowFocused(id)
             windows.focus(id)
         }
+        overview.name = { [unowned self] id in persistence.names[id] }
+        overview.renamed = { [unowned self] id, name in
+            persistence.names[id] = name
+            persistence.changed()
+        }
         displays.appOf = { [unowned self] id in windows.bundleID(of: id) }
         displays.widths = UserDefaults.standard.dictionary(forKey: Defaults.appWidths) as? [String: Double] ?? [:]
         displays.onWidthsChanged = { UserDefaults.standard.set($0, forKey: Defaults.appWidths) }
@@ -139,7 +144,7 @@ final class Runtime {
         scrollTap.shield.enabled = config.swipe
         scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
-        overview.keys = OverviewKeys(bindings: config.bindings)
+        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta)
         displays.settings = config.applied(to: displays.settings)
         displays.update(Screens.infos())
         menu.showDisplays(disabled: displays.disabled)
@@ -204,7 +209,7 @@ final class Runtime {
         scrollTap.shield.enabled = config.swipe
         scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
-        overview.keys = OverviewKeys(bindings: config.bindings)
+        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta)
         showShortcuts()
         lifecycle.applyRules()
     }

@@ -93,6 +93,8 @@ public struct LayoutPlan: Equatable, Sendable {
     public var workspaces: [String: Workspaces] = [:]
     /// Windows no saved slot claimed, in the order they were given.
     public var unplaced: [String] = []
+    /// The names given to placed windows, by window id.
+    public var names: [String: String] = [:]
 }
 
 extension SavedLayout {
@@ -119,11 +121,14 @@ extension SavedLayout {
     /// Rebuilds the layout of `displays` around the running windows. Saved slots with no window
     /// are dropped. Windows in `floating` stay floating even where they were tiled.
     public func plan(displays: [String], windows: [LiveWindow], floating: Set<String> = []) -> LayoutPlan {
-        let assigned = LayoutMatcher.assign(slots: slots(for: displays), windows: windows)
+        let slots = slots(for: displays)
+        let assigned = LayoutMatcher.assign(slots: slots, windows: windows)
         var byDisplay: [String: [LayoutSlot: String]] = [:]
         for (id, slot) in assigned { byDisplay[slot.display, default: [:]][slot] = id }
 
         var plan = LayoutPlan()
+        let named = Dictionary(slots.compactMap { s, d in d.name.map { (s, $0) } }, uniquingKeysWith: { a, _ in a })
+        for (id, slot) in assigned { plan.names[id] = named[slot] }
         plan.unplaced = windows.map(\.id).filter { assigned[$0] == nil }
         var serial = 0
         for d in displays {

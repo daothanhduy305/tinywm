@@ -24,6 +24,10 @@ final class Overview {
     var clearSearch: () -> Void = {}
     /// This display's search bar was clicked, so its overview should take the keys.
     var wantsKeys: () -> Void = {}
+    /// The name given to a window, if any.
+    var name: (String) -> String? = { _ in nil }
+    /// A window was given a name, or nil to clear it.
+    var renamed: (String, String?) -> Void = { _, _ in }
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     var ringStyle = FocusHighlight.Style()
@@ -48,6 +52,9 @@ final class Overview {
     private let searchBar = CALayer()
     private let searchField = SearchField()
     private let searchIcon = CALayer()
+    private let renameField = RenameField()
+    /// The window whose name is being edited.
+    private var renaming: String?
     /// Keeps the rows clear of the search bar at the top.
     private static let style = OverviewStyle(top: 46)
     /// The windows the query matches, or nil with no query.
@@ -126,6 +133,12 @@ final class Overview {
         panel.contentView = view
 
         view.onKey = { [weak self] in self?.handle($0) }
+        // Meta + R would otherwise type into the search bar when no shortcut takes it first.
+        panel.onKeyDown = { [weak self] e in
+            guard let self, keys.isRename(keyCode: Int(e.keyCode), flags: UInt64(e.modifierFlags.rawValue)) else { return false }
+            handle(.rename)
+            return true
+        }
         searchField.isHidden = true
         view.addSubview(searchField)
         searchField.wantsLayer = true
@@ -150,6 +163,18 @@ final class Overview {
         view.onClick = { [weak self] p in
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
             chose(hit.id)
+        }
+        renameField.isHidden = true
+        view.addSubview(renameField)
+        renameField.wantsLayer = true
+        renameField.layer?.zPosition = 100
+        renameField.onDone = { [weak self] in self?.finishRename($0) }
+        view.onRightClick = { [weak self] p in
+            guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
+            view.showMenu(at: p) { [weak self] in
+                guard let self, phase == .open, let w = layout?.window(hit.id) else { return }
+                startRename(w.id, at: w.rect)
+            }
         }
         view.onScroll = { [weak self] delta in
             guard let self, phase == .open, let layout else { return }
@@ -203,7 +228,6 @@ final class Overview {
             root.addSublayer(layer)
             layers[w.id] = layer
             let label = makeLabel(w.id, scale: screen.backingScaleFactor)
-            titles[w.id] = label.string as? String ?? ""
             label.frame = labelFrame(r)
             label.opacity = 0
             root.addSublayer(label)
@@ -250,6 +274,7 @@ final class Overview {
         case .previous: next = overviewStep(layout, from: selected, by: -1, matching: matching)
         case .confirm: return chose(selected)
         case .cancel: return matching == nil ? chose(nil) : clearSearch()
+        case .rename: return layout.window(selected).map { startRename($0.id, at: $0.rect) } ?? ()
         }
         if let next {
             select(next)
@@ -305,6 +330,31 @@ final class Overview {
         select(first, "search")
         home = first
         return true
+    }
+
+    /// Opens the name field over `id`'s label, taking the keys to this display.
+    private func startRename(_ id: String, at rect: Rect) {
+        wantsKeys()
+        renaming = id
+        renameField.stringValue = name(id) ?? windows.cachedTitle(of: id) ?? ""
+        renameField.frame = labelFrame(rect)
+        renameField.isHidden = false
+        panel.makeFirstResponder(renameField)
+        renameField.currentEditor()?.selectAll(nil)
+    }
+
+    /// Saves the typed name, where an empty one clears it, or drops it for nil.
+    private func finishRename(_ text: String?) {
+        guard let id = renaming else { return }
+        renaming = nil
+        renameField.isHidden = true
+        panel.makeFirstResponder(searchField)
+        guard let text, let label = labels[id] else { return }
+        renamed(id, text.isEmpty ? nil : text)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        label.string = labelText(id)
+        CATransaction.commit()
     }
 
     /// Puts the shared query in this display's field, unless it already holds it, so the caret stays put.
@@ -371,6 +421,7 @@ final class Overview {
         searchBar.add(out, forKey: "fade")
         searchBar.opacity = 0
         searchField.isHidden = true
+        finishRename(nil)
         // Faded pictures come back as they zoom into place.
         for (_, layer) in layers { layer.opacity = 1 }
         CATransaction.commit()
@@ -510,12 +561,21 @@ final class Overview {
         titles = [:]
     }
 
-    /// A pill reading "App — Title", or just the app when the window has no title.
-    private func makeLabel(_ id: String, scale: CGFloat) -> CATextLayer {
+    /// "App — Title", "App — Name" for a named window, or just the app when there is neither.
+    /// Also sets the text the search matches, which keeps a named window's title.
+    private func labelText(_ id: String) -> String {
         let app = windows.pid(of: id).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
         let title = windows.cachedTitle(of: id).flatMap { $0.isEmpty ? nil : $0 }
+        let given = name(id)
+        let text = [app, given ?? title].compactMap { $0 }.joined(separator: " — ")
+        titles[id] = given == nil ? text : [text, title].compactMap { $0 }.joined(separator: " — ")
+        return text
+    }
+
+    /// A pill with the window's label text.
+    private func makeLabel(_ id: String, scale: CGFloat) -> CATextLayer {
         let label = CATextLayer()
-        label.string = [app, title].compactMap { $0 }.joined(separator: " — ")
+        label.string = labelText(id)
         label.font = NSFont.systemFont(ofSize: 16, weight: .medium)
         label.fontSize = 16
         label.foregroundColor = NSColor.white.cgColor
@@ -579,6 +639,8 @@ final class Overview {
 @MainActor
 final class Overviews {
     var activate: (String) -> Void = { _ in }
+    var name: (String) -> String? = { _ in nil }
+    var renamed: (String, String?) -> Void = { _, _ in }
     var ringStyle = FocusHighlight.Style()
     var keys = OverviewKeys()
 
@@ -612,6 +674,7 @@ final class Overviews {
         for (id, e) in displays.engines.sorted(by: { $0.value === engine && $1.value !== engine }) {
             let o = byDisplay[id] ?? make(id)
             o.activate = activate
+            o.name = name
             o.ringStyle = ringStyle
             o.keys = keys
             guard o.open(e, on: Screens.screen(id: id), active: active == nil) else { continue }
@@ -642,6 +705,10 @@ final class Overviews {
             active?.releaseKeys()
             active = o
             o.takeKeys()
+        }
+        o.renamed = { [unowned self] id, name in
+            renamed(id, name)
+            search()
         }
         o.clearSearch = { [unowned self] in
             query = ""

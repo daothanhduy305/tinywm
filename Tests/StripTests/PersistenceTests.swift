@@ -146,6 +146,17 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
         #expect(w.strips.count == 3 && w.strips[0].isEmpty && w.strips[2].isEmpty)
     }
 
+    @Test func namesFollowTheirWindows() throws {
+        var named = desc(2, title: "zsh")
+        named.name = "build"
+        let file = layout(["A": saved([[desc(1)], [named]])])
+        let plan = file.plan(displays: ["A"], windows: [live("b", desc(2, title: "vim")), live("a", desc(1))])
+        #expect(plan.names == ["b": "build"])
+        // Files saved before names existed still load.
+        let old = #"{"windowNumber":1,"bundleID":"app.a","title":"t","pid":10}"#
+        #expect(try JSONDecoder().decode(WindowDescriptor.self, from: Data(old.utf8)).name == nil)
+    }
+
     @Test func unmatchedSlotsAreDroppedAndNewWindowsAreLeftToAppend() {
         let file = layout(["A": saved([[desc(1)], [desc(2)], [desc(3)]], focusedColumn: 2)])
         let plan = file.plan(displays: ["A"], windows: [live("n1", desc(50, "app.z")), live("a", desc(1)), live("n2", desc(51, "app.z")), live("c", desc(3))])

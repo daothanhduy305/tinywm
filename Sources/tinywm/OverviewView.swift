@@ -4,6 +4,14 @@ import StripEngine
 /// The overview's click-capturing panel. It becomes key without activating tinywm, so plain keys
 /// reach it and none reach the app in front.
 final class OverviewPanel: NSPanel {
+    /// Sees each key press first; true keeps it from the search bar.
+    var onKeyDown: (NSEvent) -> Bool = { _ in false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, onKeyDown(event) { return }
+        super.sendEvent(event)
+    }
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
@@ -17,6 +25,7 @@ final class OverviewView: NSView {
     var onHover: (CGPoint) -> Void = { _ in }
     var onExit: () -> Void = {}
     var onClick: (CGPoint) -> Void = { _ in }
+    var onRightClick: (CGPoint) -> Void = { _ in }
     var onScroll: (CGFloat) -> Void = { _ in }
 
     override var isFlipped: Bool { true }
@@ -46,6 +55,23 @@ final class OverviewView: NSView {
     override func mouseDown(with event: NSEvent) {
         if let p = pointer(), bounds.contains(p) { onClick(p) }
     }
+    override func rightMouseDown(with event: NSEvent) {
+        if let p = pointer(), bounds.contains(p) { onRightClick(p) }
+    }
+
+    private var renameAction: () -> Void = {}
+
+    /// A context menu at `p` whose one item calls `rename`.
+    func showMenu(at p: CGPoint, rename: @escaping () -> Void) {
+        renameAction = rename
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "Rename…", action: #selector(renameChosen), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+        menu.popUp(positioning: nil, at: p, in: self)
+    }
+
+    @objc private func renameChosen() { renameAction() }
 
     private func pointer() -> CGPoint? {
         window.map { convert($0.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil) }
@@ -61,7 +87,7 @@ final class OverviewView: NSView {
 
 /// The overview's search bar. Typing, the caret and editing keys such as ⌥⌫ and ⌘⌫ work as in
 /// any text field; the keys the overview acts on (arrows, Tab, Return, Esc) go to `onKey` instead.
-final class SearchField: NSTextField, NSTextFieldDelegate {
+class SearchField: NSTextField, NSTextFieldDelegate {
     var keys = OverviewKeys()
     var onKey: (OverviewCommand) -> Void = { _ in }
     var onChange: (String) -> Void = { _ in }
@@ -122,4 +148,32 @@ final class SearchField: NSTextField, NSTextFieldDelegate {
         onKey(key)
         return true
     }
+}
+
+/// Edits a window's name over its label. Return gives the text, and Esc or leaving the field gives nil.
+final class RenameField: SearchField {
+    var onDone: (String?) -> Void = { _ in }
+
+    override init() {
+        super.init()
+        font = NSFont.systemFont(ofSize: 16, weight: .medium)
+        alignment = .center
+        drawsBackground = true
+        backgroundColor = NSColor(white: 0.16, alpha: 1)
+        placeholderAttributedString = nil
+        placeholderString = "Name"
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        switch selector {
+        case #selector(NSResponder.insertNewline(_:)): onDone(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        case #selector(NSResponder.cancelOperation(_:)): onDone(nil)
+        default: return false
+        }
+        return true
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) { onDone(nil) }
 }

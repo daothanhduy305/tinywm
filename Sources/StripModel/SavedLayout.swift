@@ -8,9 +8,11 @@ public struct WindowDescriptor: Codable, Equatable, Sendable {
     public var bundleID: String?
     public var title: String
     public var pid: Int32
+    /// The name given to the window in the overview, if any.
+    public var name: String?
 
-    public init(windowNumber: UInt32?, bundleID: String?, title: String, pid: Int32) {
-        self.windowNumber = windowNumber; self.bundleID = bundleID; self.title = title; self.pid = pid
+    public init(windowNumber: UInt32?, bundleID: String?, title: String, pid: Int32, name: String? = nil) {
+        self.windowNumber = windowNumber; self.bundleID = bundleID; self.title = title; self.pid = pid; self.name = name
     }
 }
 

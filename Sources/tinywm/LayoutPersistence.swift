@@ -24,6 +24,9 @@ final class LayoutPersistence {
     /// The longest the restore waits for those reads.
     var readLimit = 10.0
 
+    /// Names given to windows in the overview, by window id. Ids are not reused within a run.
+    var names: [String: String] = [:]
+
     private var held: [StripDisplays.Pending] = []
     private var holding = false
     /// True while windows found at startup are held for the restore.
@@ -96,11 +99,13 @@ final class LayoutPersistence {
         if enabled(), let saved = load() {
             // The layout made for this display setup, else each display's last layout.
             let key = displays.setupKey
-            displays.restore(saved.setups?[key].map { SavedLayout(displays: $0) } ?? saved, pending: pending)
+            names = displays.restore(saved.setups?[key].map { SavedLayout(displays: $0) } ?? saved, pending: pending)
             // Other setups get their windows now, while every window found at startup is known.
             let live = pending.map(\.live), floating = Set(pending.filter(\.floating).map(\.live.id))
             for (k, s) in saved.setups ?? [:] where k != key {
-                displays.seed(k, SavedLayout(displays: s).plan(displays: Array(s.keys), windows: live, floating: floating).workspaces)
+                let plan = SavedLayout(displays: s).plan(displays: Array(s.keys), windows: live, floating: floating)
+                displays.seed(k, plan.workspaces)
+                names.merge(plan.names) { kept, _ in kept }
             }
         } else {
             for p in pending { displays.windowAdded(p.live.id, frame: p.frame, floating: p.floating, takesFocus: p.takesFocus) }
@@ -175,6 +180,6 @@ final class LayoutPersistence {
     private func descriptor(of id: String) -> WindowDescriptor? {
         guard windows.element(of: id) != nil, let pid = windows.pid(of: id) else { return nil }
         return WindowDescriptor(windowNumber: windows.number(of: id), bundleID: windows.bundleID(of: id),
-                                title: windows.cachedTitle(of: id) ?? "", pid: pid)
+                                title: windows.cachedTitle(of: id) ?? "", pid: pid, name: names[id])
     }
 }
