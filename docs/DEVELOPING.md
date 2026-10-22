@@ -224,7 +224,7 @@ keys both work out of the box.
 | Meta + arrows | The same | `focus-left-arrow` and so on |
 | Meta + ⇧ + H / J / K / L, or arrows | Move the column or window | `move-left` `move-left-arrow` and so on |
 | Meta + U / I | Workspace below / above | `workspace-down` `workspace-up` |
-| Meta + ⇧ + U / I | Move the window to the workspace below / above | `workspace-move-down` `workspace-move-up` |
+| Meta + ⇧ + U / I | Move the window to the workspace below / above, keeping its width | `workspace-move-down` `workspace-move-up` |
 | Meta + ⌥ + ↓ / ↑, or Page Down / Page Up | Workspace below / above | `workspace-down-arrow`, `workspace-down-page` and so on |
 | Meta + ⇧ + ⌥ + ↓ / ↑, or ⇧ + Page Down / Page Up | Move the window to that workspace | `workspace-move-down-arrow`, `workspace-move-down-page` and so on |
 | Meta + 1 to 9 | Focus a column | `focus-column-1` to `focus-column-9` |

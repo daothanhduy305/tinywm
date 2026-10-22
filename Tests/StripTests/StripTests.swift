@@ -328,6 +328,13 @@ final class FakeWindows: WindowSystem {
         #expect(ws.active == 1)
     }
 
+    @Test func movingAWindowKeepsItsColumnWidth() {
+        var ws = start(["a", "b"])
+        ws.current.columns[ws.current.focusedColumn!].width = 0.7
+        ws.moveFocused(by: 1, width: 0.5, columnID: "x")
+        #expect(ws.current.columns.map(\.width) == [0.7])
+    }
+
     @Test func movingAWindowDownCarriesFocusAlong() {
         var ws = start(["a", "b"])
         ws.moveFocused(by: 1, width: 0.5, columnID: "x")

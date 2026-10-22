@@ -37,6 +37,8 @@ public struct Workspaces: Codable, Equatable, Sendable {
         let target = active + delta
         guard target >= 0, target < strips.count else { return }
         Log.note("workspace", "move \(Log.name(window)) from workspace \(active) to \(target)")
+        // The window keeps the width its column had.
+        let width = current.column(of: window).map { current.columns[$0].width } ?? width
         strips[active].remove(window)
         strips[target].insert(window, width: width, columnID: columnID, focus: true)
         if strips[target].column(of: window) == nil {
