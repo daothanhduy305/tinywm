@@ -45,6 +45,9 @@ final class Overview {
     private let dim = CALayer()
     private let ring = CALayer()
     private var layers: [String: WindowLayer] = [:]
+    /// Holds each picture and casts its shadow, which the picture's own clipping would cut off.
+    /// Moves, zooms and fades in place of the picture.
+    private var holders: [String: CALayer] = [:]
     /// Each window's "App — Title" line, under its picture.
     private var labels: [String: CATextLayer] = [:]
     /// The text of each label, which the search matches.
@@ -221,12 +224,26 @@ final class Overview {
         removeLayers()
         for w in layout!.windows {
             guard let r = real[w.id] else { continue }
+            let holder = CALayer()
+            holder.bounds = CGRect(origin: .zero, size: CGSize(width: r.width, height: r.height))
+            holder.position = CGPoint(x: r.center.x, y: r.center.y)
+            // In window points: the holder is scaled down with the picture. The view is flipped, so a
+            // positive offset casts the shadow downwards.
+            holder.shadowColor = NSColor.black.cgColor
+            holder.shadowOpacity = 0.5
+            holder.shadowRadius = 40
+            holder.shadowOffset = CGSize(width: 0, height: 12)
+            holder.shadowPath = CGPath(roundedRect: holder.bounds, cornerWidth: 10, cornerHeight: 10, transform: nil)
             let layer = WindowLayer()
-            layer.bounds = CGRect(origin: .zero, size: CGSize(width: r.width, height: r.height))
-            layer.position = CGPoint(x: r.center.x, y: r.center.y)
+            layer.frame = holder.bounds
+            // A faint edge keeps a light window apart from a light desktop.
+            layer.borderWidth = 2
+            layer.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
             pictures.show(w.id, on: layer)
-            root.addSublayer(layer)
+            holder.addSublayer(layer)
+            root.addSublayer(holder)
             layers[w.id] = layer
+            holders[w.id] = holder
             let label = makeLabel(w.id, scale: screen.backingScaleFactor)
             label.frame = labelFrame(r)
             label.opacity = 0
@@ -320,7 +337,7 @@ final class Overview {
         guard phase == .open, let layout else { return false }
         matching = query.isEmpty ? nil : Set(titles.filter { OverviewKeys.matches($0.value, query: query) }.keys)
         showQuery(query)
-        for (id, layer) in layers {
+        for (id, layer) in holders {
             let opacity: Float = matching?.contains(id) ?? true ? 1 : 0.25
             layer.opacity = opacity
             labels[id]?.opacity = opacity
@@ -397,7 +414,7 @@ final class Overview {
 
         var longest: CFTimeInterval = 0
         CATransaction.begin()
-        for (wid, layer) in layers {
+        for (wid, layer) in holders {
             guard let t = targets[wid] ?? real[wid] else { continue }
             longest = max(longest, move(layer, to: CGPoint(x: t.center.x, y: t.center.y),
                                         scale: CGFloat(t.width) / layer.bounds.width))
@@ -423,7 +440,7 @@ final class Overview {
         searchField.isHidden = true
         finishRename(nil)
         // Faded pictures come back as they zoom into place.
-        for (_, layer) in layers { layer.opacity = 1 }
+        for (_, layer) in holders { layer.opacity = 1 }
         CATransaction.commit()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + longest) { [weak self] in
@@ -461,13 +478,14 @@ final class Overview {
         if !animated { CATransaction.setDisableActions(true) }
         // A window that closed while the overview is open loses its picture.
         for id in Set(layers.keys).subtracting(next.windows.map(\.id)) {
-            layers.removeValue(forKey: id)?.removeFromSuperlayer()
+            layers.removeValue(forKey: id)
+            holders.removeValue(forKey: id)?.removeFromSuperlayer()
             labels.removeValue(forKey: id)?.removeFromSuperlayer()
         }
         if let s = selected, next.window(s) == nil { selected = home.flatMap { next.window($0) != nil ? $0 : nil } ?? next.windows.first?.id }
         if let h = home, next.window(h) == nil { home = selected }
         for w in next.windows {
-            guard let layer = layers[w.id] else { continue }
+            guard let layer = holders[w.id] else { continue }
             let centre = CGPoint(x: w.rect.center.x, y: w.rect.center.y)
             let scale = CGFloat(w.rect.width) / layer.bounds.width
             if animated { _ = move(layer, to: centre, scale: scale, fromModel: fromModel) } else {
@@ -554,9 +572,10 @@ final class Overview {
     }
 
     private func removeLayers() {
-        for (_, layer) in layers { layer.removeFromSuperlayer() }
+        for (_, layer) in holders { layer.removeFromSuperlayer() }
         for (_, label) in labels { label.removeFromSuperlayer() }
         layers = [:]
+        holders = [:]
         labels = [:]
         titles = [:]
     }

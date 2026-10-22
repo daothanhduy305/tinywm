@@ -259,7 +259,8 @@ that way, landing on its window at the edge they came in by. The display the key
 bright ring; the others' rings are faint. When the active display has no windows, the next display's
 overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
 and makes its display the active one. When the pointer leaves a display, its highlight goes back to
-its focused window, or to the one the keys chose. Each picture has its app name and window title
+its focused window, or to the one the keys chose. Each picture casts a soft shadow and has a faint
+edge, so light windows stand out from the desktop. Each picture has its app name and window title
 under it. Right-click a picture and choose Rename…, or press Meta + R, to name the selected
 window. The `width-cycle` key renames too, if it is bound elsewhere. Return saves, Esc cancels,
 and an empty name brings the title back. The label then shows the name, and the search matches the name, the app and
