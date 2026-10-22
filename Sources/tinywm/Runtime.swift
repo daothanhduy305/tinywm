@@ -157,6 +157,7 @@ final class Runtime {
         metaKey.canDrag = { [unowned self] in !overview.isOpen }
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab
+        overview.floating = config.overviewFloating
         metaKey.start()
         configFile.watch()
         startSwipes()
@@ -198,6 +199,7 @@ final class Runtime {
         commands.reload()
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab
+        overview.floating = config.overviewFloating
         displays.settings = config.applied(to: displays.settings)
         for engine in displays.engines.values {
             let settings = config.applied(to: engine.settings)

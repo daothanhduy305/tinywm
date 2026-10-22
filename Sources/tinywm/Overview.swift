@@ -31,6 +31,7 @@ final class Overview {
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     var ringStyle = FocusHighlight.Style()
+    var floating = OverviewFloating.vertical
     var stiffness = Spring.stiffness
     /// Pictures refresh this often while the overview is open.
     var rate = 10.0
@@ -44,6 +45,8 @@ final class Overview {
     private let backdrop = CALayer()
     private let dim = CALayer()
     private let ring = CALayer()
+    /// A rounded plate behind the shelf of floating windows, like the Dock.
+    private let dock = CALayer()
     private var layers: [String: WindowLayer] = [:]
     /// Holds each picture and casts its shadow, which the picture's own clipping would cut off.
     /// Moves, zooms and fades in place of the picture.
@@ -60,6 +63,7 @@ final class Overview {
     private var renaming: String?
     /// Keeps the rows clear of the search bar at the top.
     private static let style = OverviewStyle(top: 46)
+    private var style: OverviewStyle { OverviewStyle(top: Self.style.top, floating: floating) }
     /// The windows the query matches, or nil with no query.
     private var matching: Set<String>?
 
@@ -114,6 +118,14 @@ final class Overview {
         root.addSublayer(backdrop)
         dim.backgroundColor = NSColor(white: 0, alpha: 0.45).cgColor
         root.addSublayer(dim)
+        dock.backgroundColor = NSColor(white: 0.2, alpha: 0.7).cgColor
+        dock.cornerRadius = 20
+        dock.cornerCurve = .continuous
+        dock.borderWidth = 1
+        dock.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+        dock.opacity = 0
+        dock.zPosition = 6
+        root.addSublayer(dock)
         ring.zPosition = 10
         root.addSublayer(ring)
         // A bright, bordered pill, so it reads as a place to type rather than a caption.
@@ -197,7 +209,7 @@ final class Overview {
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
         floats = engine.floatFrames()
-        let probe = overviewLayout(ws, m, screen: size, style: Self.style, floats: floats)
+        let probe = overviewLayout(ws, m, screen: size, style: style, floats: floats)
         guard let first = probe.windows.first?.id else { return false }
 
         self.engine = engine
@@ -209,7 +221,7 @@ final class Overview {
         selected = focus
         home = focus
         pan = probe.pan(toReveal: focus, current: 0)
-        layout = overviewLayout(ws, m, screen: size, pan: pan, style: Self.style, floats: floats)
+        layout = overviewLayout(ws, m, screen: size, pan: pan, style: style, floats: floats)
         real = overviewRealFrames(ws, m, floats: floats)
         phase = .open
         token += 1
@@ -222,6 +234,8 @@ final class Overview {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         removeLayers()
+        // A wide row can pan under a vertical shelf, so the shelf and its plate draw above the rows.
+        let shelved = Set(layout!.rows.last.flatMap { $0.workspace == -1 ? $0.windows.map(\.id) : nil } ?? [])
         for w in layout!.windows {
             guard let r = real[w.id] else { continue }
             let holder = CALayer()
@@ -245,6 +259,10 @@ final class Overview {
             layers[w.id] = layer
             holders[w.id] = holder
             let label = makeLabel(w.id, scale: screen.backingScaleFactor)
+            if shelved.contains(w.id) {
+                holder.zPosition = 7
+                label.zPosition = 8
+            }
             label.frame = labelFrame(r)
             label.opacity = 0
             root.addSublayer(label)
@@ -254,6 +272,7 @@ final class Overview {
         ring.removeAllAnimations()
         ring.frame = outset(NSRect(real[focus]!))
         dim.opacity = 0
+        dock.opacity = 0
         searchBar.opacity = 0
         CATransaction.commit()
         CATransaction.flush()
@@ -270,7 +289,7 @@ final class Overview {
         fade.duration = 0.25
         dim.add(fade, forKey: "dim")
         dim.opacity = 1
-        for (_, label) in labels {
+        for label in labels.values.map { $0 as CALayer } + [dock] {
             label.add(fade, forKey: "fade")
             label.opacity = 1
         }
@@ -431,7 +450,7 @@ final class Overview {
         out.fromValue = 1
         out.toValue = 0
         out.duration = 0.15
-        for (_, label) in labels {
+        for label in labels.values.map { $0 as CALayer } + [dock] {
             label.add(out, forKey: "fade")
             label.opacity = 0
         }
@@ -472,7 +491,7 @@ final class Overview {
     private func relayout(animated: Bool, fromModel: Bool = false) {
         guard let engine else { return }
         let size = Size(width: viewport.width, height: viewport.height)
-        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: Self.style, floats: floats)
+        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: style, floats: floats)
         layout = next
         CATransaction.begin()
         if !animated { CATransaction.setDisableActions(true) }
@@ -502,6 +521,12 @@ final class Overview {
                     label.add(spring("position", NSValue(point: from), NSValue(point: label.position)), forKey: "move")
                 }
             }
+        }
+        if let shelf = next.rows.first(where: { $0.workspace == -1 }) {
+            dock.isHidden = false
+            dock.frame = NSRect(shelf.rect)
+        } else {
+            dock.isHidden = true
         }
         if let selected, let w = next.window(selected) {
             let target = outset(NSRect(w.rect))
@@ -661,6 +686,7 @@ final class Overviews {
     var name: (String) -> String? = { _ in nil }
     var renamed: (String, String?) -> Void = { _, _ in }
     var ringStyle = FocusHighlight.Style()
+    var floating = OverviewFloating.vertical
     var keys = OverviewKeys()
 
     private let pictures: WindowPictures
@@ -695,6 +721,7 @@ final class Overviews {
             o.activate = activate
             o.name = name
             o.ringStyle = ringStyle
+            o.floating = floating
             o.keys = keys
             guard o.open(e, on: Screens.screen(id: id), active: active == nil) else { continue }
             if active == nil { active = o }

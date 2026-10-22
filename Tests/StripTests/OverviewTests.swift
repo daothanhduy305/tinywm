@@ -220,9 +220,11 @@ private func sample(active: Int = 1) -> Workspaces {
         return (ws, ["f": Rect(x: 200, y: 100, width: 300, height: 200), "g": Rect(x: 0, y: 0, width: 400, height: 300)])
     }
 
-    @Test func floatingWindowsShowAtTheirPlaceAboveTheStrip() {
+    private let off = OverviewStyle(floating: .off)
+
+    @Test func offShowsFloatingWindowsAtTheirPlaceAboveTheStrip() {
         let (ws, floats) = withFloats()
-        let layout = overviewLayout(ws, metrics, screen: display, floats: floats)
+        let layout = overviewLayout(ws, metrics, screen: display, style: off, floats: floats)
         let row = layout.rows.first { $0.workspace == 1 }!
         let f = layout.window("f")!
         #expect(row.windows.last?.id == "f")
@@ -232,15 +234,64 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(layout.window(at: f.rect.center)?.id == "f")
     }
 
-    @Test func aWorkspaceHoldingOnlyAFloatingWindowGetsARow() {
+    @Test func offGivesAWorkspaceHoldingOnlyAFloatingWindowARow() {
         let (ws, floats) = withFloats()
-        #expect(overviewLayout(ws, metrics, screen: display, floats: floats).rows.map(\.workspace) == [1, 2, 3])
-        #expect(overviewLayout(ws, metrics, screen: display).rows.map(\.workspace) == [1, 2])
+        #expect(overviewLayout(ws, metrics, screen: display, style: off, floats: floats).rows.map(\.workspace) == [1, 2, 3])
+        #expect(overviewLayout(ws, metrics, screen: display, style: off).rows.map(\.workspace) == [1, 2])
+    }
+
+    @Test func verticalShelfStacksEquallyWidePicturesOnTheRight() {
+        let (ws, floats) = withFloats()
+        let style = OverviewStyle()
+        #expect(style.floating == .vertical)
+        let layout = overviewLayout(ws, metrics, screen: display, floats: floats)
+        // Workspace 3 holds only "g", so it gets no row of its own.
+        #expect(layout.rows.map(\.workspace) == [1, 2, -1])
+        let shelf = layout.rows.last!
+        #expect(shelf.windows.map(\.id) == ["f", "g"])
+        #expect(layout.window("g")!.workspace == 3)
+        #expect(shelf.windows.allSatisfy { $0.rect.width == style.shelfSize })
+        #expect(abs(layout.window("f")!.rect.height - 200.0 / 300 * style.shelfSize) < 1e-9)
+        #expect(shelf.rect.maxX == display.width - style.shelfEdge)
+        // The rows keep clear of it and it stays put while they pan.
+        #expect(layout.rows.dropLast().allSatisfy { $0.rect.maxX <= shelf.rect.x - style.rowGap + 1e-9 })
+        #expect(overviewLayout(ws, metrics, screen: display, pan: 500, floats: floats).rows.last == shelf)
+        #expect(overviewMove(layout, from: "b", .right) == "f")
+        #expect(overviewMove(layout, from: "f", .down) == "g")
+        #expect(overviewMove(layout, from: "g", .down) == nil)
+        #expect(["b", "c"].contains(overviewMove(layout, from: "f", .left)))
+        #expect(overviewMove(layout, from: "d", .down) == nil)
+        #expect(overviewStep(layout, from: "d", by: 1) == "f")
+    }
+
+    @Test func horizontalShelfLinesUpEquallyTallPicturesAtTheBottom() {
+        let (ws, floats) = withFloats()
+        let style = OverviewStyle(floating: .horizontal)
+        let layout = overviewLayout(ws, metrics, screen: display, style: style, floats: floats)
+        #expect(layout.rows.map(\.workspace) == [1, 2, -1])
+        let shelf = layout.rows.last!
+        #expect(shelf.windows.allSatisfy { $0.rect.height == style.shelfSize })
+        #expect(shelf.rect.maxY == display.height - style.shelfEdge)
+        #expect(layout.rows[1].rect.maxY <= shelf.rect.y - style.rowGap + 1e-9)
+        #expect(overviewMove(layout, from: "d", .down) == "f")
+        #expect(overviewMove(layout, from: "f", .right) == "g")
+        #expect(overviewMove(layout, from: "g", .up) == "d")
+    }
+
+    @Test func aShelfTooLongForTheScreenShrinksToFit() {
+        var ws = sample()
+        ws.strips[1].floating = (0..<8).map { "f\($0)" }
+        let floats = Dictionary(uniqueKeysWithValues: ws.strips[1].floating.map { ($0, Rect(x: 0, y: 0, width: 400, height: 300)) })
+        for floating in [OverviewFloating.vertical, .horizontal] {
+            let shelf = overviewLayout(ws, metrics, screen: display, style: OverviewStyle(floating: floating), floats: floats).rows.last!
+            #expect(shelf.rect.y >= 0 && shelf.rect.maxY <= display.height + 1e-9)
+            #expect(shelf.rect.x >= 0 && shelf.rect.maxX <= display.width + 1e-9)
+        }
     }
 
     @Test func floatingWindowsAreReachedByKeysAndHaveRealFrames() {
         let (ws, floats) = withFloats()
-        let layout = overviewLayout(ws, metrics, screen: display, floats: floats)
+        let layout = overviewLayout(ws, metrics, screen: display, style: off, floats: floats)
         #expect(overviewMove(layout, from: "b", .right) == "f")
         #expect(overviewStep(layout, from: "c", by: 1) == "f")
         let real = overviewRealFrames(ws, metrics, floats: floats)

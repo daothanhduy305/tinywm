@@ -131,6 +131,7 @@ restore-layout = on # save the layout and restore it at start
 peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
+overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
 bind move-left = shift+n
@@ -260,7 +261,11 @@ bright ring; the others' rings are faint. When the active display has no windows
 overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
 and makes its display the active one. When the pointer leaves a display, its highlight goes back to
 its focused window, or to the one the keys chose. Each picture casts a soft shadow and has a faint
-edge, so light windows stand out from the desktop. Each picture has its app name and window title
+edge, so light windows stand out from the desktop. `overview-floating` puts floating windows on a
+shelf, a dock-like plate that stays put while the rows pan: `vertical` (the default) stacks them
+down the right side as pictures of the same width, `horizontal` lines them up along the bottom as
+pictures of the same height, and `off` shows them at their real place, above the strip. The arrow
+keys move right into a vertical shelf and left out of it, or down into a horizontal one. Each picture has its app name and window title
 under it. Right-click a picture and choose Rename…, or press Meta + R, to name the selected
 window. The `width-cycle` key renames too, if it is bound elsewhere. Return saves, Esc cancels,
 and an empty name brings the title back. The label then shows the name, and the search matches the name, the app and

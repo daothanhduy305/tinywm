@@ -1,4 +1,5 @@
 import Foundation
+import StripModel
 
 public struct ConfigIssue: Equatable, Sendable, CustomStringConvertible {
     /// The file's line, or 0 for an issue with the whole file.
@@ -27,6 +28,8 @@ public struct StripConfig: Equatable, Sendable {
     public var centerFocus = false
     /// Whether ⌘Tab opens the overview instead of the macOS app switcher.
     public var overviewOnCommandTab = false
+    /// Where the overview shows floating windows.
+    public var overviewFloating = OverviewFloating.vertical
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
@@ -243,6 +246,11 @@ public struct StripConfig: Equatable, Sendable {
             config.centerFocus = try onOff(value, for: name)
         case "overview-as-mission-control":
             config.overviewOnCommandTab = try onOff(value, for: name)
+        case "overview-floating":
+            guard let f = OverviewFloating(rawValue: value.lowercased()) else {
+                throw Failure(message: "overview-floating must be vertical, horizontal or off, not '\(value)'")
+            }
+            config.overviewFloating = f
         default:
             throw Failure(message: "unknown setting '\(name)'")
         }
@@ -333,21 +341,23 @@ public struct StripConfig: Equatable, Sendable {
         return lines
     }
 
+    /// A setting whose choices are not just on or off says them in a comment after its value.
     private static var settingLines: [String] {
         let d = StripConfig()
         return [
-            "meta = right-command",
-            "gap = \(format(d.gap))",
-            "default-width = \(format(d.defaultWidth))",
-            "width-presets = \(d.widthPresets.map(format).joined(separator: ", "))",
+            "meta = right-command # or control-option",
+            "gap = \(format(d.gap)) # points between windows, 0 to 200",
+            "default-width = \(format(d.defaultWidth)) # share of the screen, 0.05 to 1",
+            "width-presets = \(d.widthPresets.map(format).joined(separator: ", ")) # shares of the screen the width keys step through",
             "focus-border = on",
             "swipe = on",
-            "swipe-fingers = \(d.swipeFingers)",
+            "swipe-fingers = \(d.swipeFingers) # 3 or 4",
             "focus-crosses-displays = off",
             "restore-layout = on",
             "peek-cover = off",
             "center-focus = off",
             "overview-as-mission-control = off",
+            "overview-floating = \(d.overviewFloating.rawValue) # vertical, horizontal or off: where the overview shelves floating windows",
         ]
     }
 

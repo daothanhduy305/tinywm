@@ -2,6 +2,7 @@ import Foundation
 import WindowCore
 import Testing
 @testable import StripEngine
+import StripModel
 
 private typealias Chord = MetaKeyBindings.Chord
 private func key(_ name: String, shift: Bool = false, alt: Bool = false, control: Bool = false) -> Chord {
@@ -75,6 +76,13 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(!StripConfig().overviewOnCommandTab)
         #expect(StripConfig.parse("overview-as-mission-control = on").config.overviewOnCommandTab)
         #expect(StripConfig.parse("overview-as-mission-control = maybe").issues.count == 1)
+    }
+
+    @Test func overviewFloatingDefaultsToVerticalAndParses() {
+        #expect(StripConfig().overviewFloating == .vertical)
+        #expect(StripConfig.parse("overview-floating = horizontal").config.overviewFloating == .horizontal)
+        #expect(StripConfig.parse("overview-floating = off").config.overviewFloating == .off)
+        #expect(StripConfig.parse("overview-floating = top").issues.count == 1)
     }
 
     @Test func oldWidthLearningSettingsStillLoad() {
@@ -194,6 +202,14 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(all.issues.isEmpty)
         #expect(all.config == StripConfig())
         #expect(StripConfig.parse(StripConfig.template) == StripConfig.Parsed(config: StripConfig(), issues: []))
+    }
+
+    @Test func settingsWithChoicesBeyondOnOffSayThemInTheirDefaultLine() {
+        let settings = StripConfig.defaultLines.filter { !$0.hasPrefix("bind ") }
+        for line in settings where !line.hasSuffix("= on") && !line.hasSuffix("= off") {
+            #expect(line.contains(" # "), "\(line)")
+        }
+        #expect(settings.contains { $0.hasPrefix("overview-floating = vertical # vertical, horizontal or off") })
     }
 
     @Test func theTemplateListsEveryDefaultLine() {
