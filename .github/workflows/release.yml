@@ -1,0 +1,91 @@
+# On a tag like v0.2.0: test, build the self-signed app, publish a GitHub release and update the
+# Homebrew cask in daothanhduy305/homebrew-tinywm.
+#
+# Secrets: SIGNING_P12 (base64 of the exported "tinywm self-signed" .p12), SIGNING_P12_PASSWORD,
+# TAP_TOKEN (a token that can push to the tap repo).
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import signing identity
+        env:
+          P12: ${{ secrets.SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          KC_PASS="$(openssl rand -hex 16)"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/identity.p12"
+          security create-keychain -p "$KC_PASS" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KC_PASS" "$KC"
+          security import "$RUNNER_TEMP/identity.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PASS" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/identity.p12"
+
+      - run: swift test
+
+      - name: Build
+        run: scripts/release-free.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --generate-notes \
+            "build/release/tinywm-${GITHUB_REF_NAME#v}.zip" build/release/tinywm.zip
+
+      - uses: actions/checkout@v4
+        with:
+          repository: daothanhduy305/homebrew-tinywm
+          token: ${{ secrets.TAP_TOKEN }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA="$(shasum -a 256 "build/release/tinywm-$VERSION.zip" | cut -d' ' -f1)"
+          mkdir -p tap/Casks
+          cat > tap/Casks/tinywm.rb <<CASK
+          cask "tinywm" do
+            version "$VERSION"
+            sha256 "$SHA"
+
+            url "https://github.com/daothanhduy305/tinywm/releases/download/v#{version}/tinywm-#{version}.zip"
+            name "tinywm"
+            desc "Scrolling window manager in the style of niri"
+            homepage "https://github.com/daothanhduy305/tinywm"
+
+            depends_on macos: ">= :sonoma"
+            depends_on arch: :arm64
+
+            app "tinywm.app"
+
+            # The app is self-signed, not notarized, so Gatekeeper would block it.
+            postflight do
+              system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/tinywm.app"]
+            end
+
+            zap trash: [
+              "~/.config/tinywm",
+              "~/Library/Application Support/tinywm",
+              "~/Library/Preferences/dev.tinywm.plist",
+            ]
+          end
+          CASK
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/tinywm.rb
+          git commit -m "tinywm $VERSION"
+          git push

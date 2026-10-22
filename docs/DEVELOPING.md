@@ -92,6 +92,22 @@ them across rebuilds, create a code-signing certificate once:
    Type to Code Signing.
 3. Build with `TINYWM_SIGN_IDENTITY="tinywm dev" scripts/bundle-tinywm.sh --install`.
 
+## Releases
+
+Releases are free: signed with the self-signed identity from `scripts/make-signing-identity.sh`,
+not notarized. Every release must use the same identity, or users lose their Accessibility grant.
+
+Pushing a tag like `v0.2.0` runs `.github/workflows/release.yml`. It tests, builds with
+`scripts/release-free.sh`, publishes the GitHub release, and rewrites `Casks/tinywm.rb` in
+`daothanhduy305/homebrew-tinywm`. It needs these repository secrets:
+
+- `SIGNING_P12`: `base64 -i tinywm.p12`, the identity exported from Keychain Access.
+- `SIGNING_P12_PASSWORD`: the password chosen at export.
+- `TAP_TOKEN`: a token that can push to the tap repo.
+
+`scripts/release-free.sh 0.2.0` builds the same zip locally. `scripts/release.sh` is the notarized
+route and needs a paid Apple Developer ID.
+
 ## tinywm configuration
 
 tinywm reads `~/.config/tinywm/config` (or `$XDG_CONFIG_HOME/tinywm/config`). The file is

@@ -7,7 +7,7 @@
 <p align="center"><b>Your windows, on an endless strip.</b><br>
 A scrolling window manager for macOS. No more resizing, overlapping or hunting for windows.</p>
 
-<p align="center"><a href="https://github.com/bbodi/tinywm/releases/latest"><b>Download the latest release</b></a></p>
+<p align="center"><a href="https://github.com/daothanhduy305/tinywm/releases/latest"><b>Download the latest release</b></a></p>
 
 ---
 
@@ -38,15 +38,25 @@ Linux, and brings its way of working to macOS.
 
 tinywm needs macOS 14 Sonoma or later on a Mac with Apple silicon.
 
-1. Download `tinywm.zip` from the [latest release](https://github.com/bbodi/tinywm/releases/latest).
+With [Homebrew](https://brew.sh):
+```sh
+brew install --cask daothanhduy305/tinywm/tinywm
+```
+Update with `brew upgrade --cask tinywm`. Your permissions and settings stay.
+
+Or download it yourself:
+
+1. Download `tinywm.zip` from the [latest release](https://github.com/daothanhduy305/tinywm/releases/latest).
 2. Open the zip and drag **tinywm** into your **Applications** folder.
-3. Open **tinywm**. Apple has checked and notarized it, so it opens like any other app.
+3. Open **tinywm**. It is signed but not notarized by Apple, so macOS blocks it the first time.
+   Open System Settings → Privacy & Security and click **Open Anyway**. The Homebrew cask skips
+   this step by clearing the download's quarantine flag.
 
 To update, quit tinywm and replace the app with the new one. Your permissions and settings stay.
 
 **Build it yourself instead** (needs Xcode or the Command Line Tools):
 ```sh
-git clone https://github.com/bbodi/tinywm.git
+git clone https://github.com/daothanhduy305/tinywm.git
 cd tinywm
 scripts/bundle-tinywm.sh --install
 ```
