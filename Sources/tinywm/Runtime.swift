@@ -151,6 +151,7 @@ final class Runtime {
         metaKey.dragger = dragger
         metaKey.canDrag = { [unowned self] in !overview.isOpen }
         metaKey.setMode(config.meta)
+        metaKey.commandTab = config.overviewOnCommandTab
         metaKey.start()
         configFile.watch()
         startSwipes()
@@ -191,6 +192,7 @@ final class Runtime {
         menu.showIssues(parsed.issues)
         commands.reload()
         metaKey.setMode(config.meta)
+        metaKey.commandTab = config.overviewOnCommandTab
         displays.settings = config.applied(to: displays.settings)
         for engine in displays.engines.values {
             let settings = config.applied(to: engine.settings)

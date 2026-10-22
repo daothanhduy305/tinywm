@@ -24,6 +24,7 @@ swipe-fingers = 4
 # restore-layout = on
 peek-cover = on
 # center-focus = off
+# overview-as-mission-control = off
 
 # bind focus-left = h
 # bind focus-left-arrow = left

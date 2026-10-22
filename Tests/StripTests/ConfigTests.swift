@@ -71,6 +71,12 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("center-focus = maybe").issues.count == 1)
     }
 
+    @Test func overviewOnCommandTabDefaultsOffAndParses() {
+        #expect(!StripConfig().overviewOnCommandTab)
+        #expect(StripConfig.parse("overview-as-mission-control = on").config.overviewOnCommandTab)
+        #expect(StripConfig.parse("overview-as-mission-control = maybe").issues.count == 1)
+    }
+
     @Test func oldWidthLearningSettingsStillLoad() {
         #expect(StripConfig.parse("learn-minimum-widths = off\nlearn-maximum-widths = on").issues.isEmpty)
     }

@@ -130,6 +130,7 @@ swipe-fingers = 3   # 3 or 4
 restore-layout = on # save the layout and restore it at start
 peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends
+overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
 bind move-left = shift+n
@@ -259,7 +260,9 @@ bright ring; the others' rings are faint. When the active display has no windows
 overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
 and makes its display the active one. When the pointer leaves a display, its highlight goes back to
 its focused window, or to the one the keys chose. Each picture has its app name and window title
-under it. Picking a window does not show the minimap.
+under it. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
+⌘Tab with either ⌘ key opens the overview like Meta + Esc, and the macOS app switcher no longer
+shows; ⌘Tab again confirms.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
 right after tinywm focuses one. Within a second and with no click or key press since, tinywm

@@ -26,6 +26,8 @@ final class MetaKey {
     /// The last key pressed anywhere, so a launcher closed with Esc can be told from one that
     /// opened an app.
     private(set) var lastKeyDown: (code: Int, at: Date)?
+    /// ⌘Tab opens the overview instead of the macOS app switcher.
+    var commandTab = false
     /// Moves windows dragged with the meta key held.
     weak var dragger: WindowDragger?
     /// Whether a meta press may start a drag now, e.g. not while the overview is open.
@@ -105,6 +107,12 @@ final class MetaKey {
     }
 
     private static let escape = 53
+    private static let tab = 48
+
+    private static func onlyCommand(_ raw: UInt64) -> Bool {
+        let flags = CGEventFlags(rawValue: raw)
+        return flags.contains(.maskCommand) && flags.isDisjoint(with: [.maskShift, .maskAlternate, .maskControl])
+    }
 
     /// Returns true when the event belongs to tinywm and must not reach apps.
     fileprivate func handle(_ e: KeyEvent) -> Bool {
@@ -121,6 +129,11 @@ final class MetaKey {
             return mouse(e)
         case .keyDown where e.keyCode == Self.escape && dragger?.isActive == true:
             dragger?.cancel()
+            return true
+        case .keyDown where commandTab && e.keyCode == Self.tab && Self.onlyCommand(e.flags)
+            && !(mode == .rightCommand && rightCommandDown):
+            lastKeyDown = (e.keyCode, Date())
+            if !e.isRepeat { run("overview") }
             return true
         case .keyDown, .keyUp:
             if type == .keyDown { lastKeyDown = (e.keyCode, Date()) }

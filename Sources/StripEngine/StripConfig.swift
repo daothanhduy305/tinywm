@@ -25,6 +25,8 @@ public struct StripConfig: Equatable, Sendable {
     public var peekCover = false
     /// Whether scrolling to a column centres it, as far as the strip's ends allow.
     public var centerFocus = false
+    /// Whether ⌘Tab opens the overview instead of the macOS app switcher.
+    public var overviewOnCommandTab = false
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
@@ -239,6 +241,8 @@ public struct StripConfig: Equatable, Sendable {
             config.peekCover = try onOff(value, for: name)
         case "center-focus":
             config.centerFocus = try onOff(value, for: name)
+        case "overview-as-mission-control":
+            config.overviewOnCommandTab = try onOff(value, for: name)
         default:
             throw Failure(message: "unknown setting '\(name)'")
         }
@@ -343,6 +347,7 @@ public struct StripConfig: Equatable, Sendable {
             "restore-layout = on",
             "peek-cover = off",
             "center-focus = off",
+            "overview-as-mission-control = off",
         ]
     }
 
