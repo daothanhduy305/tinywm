@@ -280,6 +280,17 @@ public final class StripDisplays {
 
     public func floatWindow(_ id: String) { engine(holding: id)?.floatWindow(id) }
 
+    /// A floating window the user moved onto another tiled display floats there from then on, so
+    /// the overview and workspace switches find it where it is. Only a window on the shown
+    /// workspace counts: the others' are parked off screen by tinywm, not moved by the user.
+    public func floatingMoved(_ id: String, to frame: Rect) {
+        guard let from = engine(holding: id), from.strip.floating.contains(id),
+              let to = engine(owning: frame), to !== from else { return }
+        Log.note("display", "floating \(Log.name(id)) moved from \(from.label) to \(to.label)")
+        from.windowRemoved(id, refocus: false)
+        to.windowAdded(id, floating: true, takesFocus: false)
+    }
+
     /// A window's place across displays, for one that hides for a while.
     public struct Slot: Equatable, Sendable {
         public var display: String

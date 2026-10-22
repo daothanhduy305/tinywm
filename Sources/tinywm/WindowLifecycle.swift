@@ -391,6 +391,8 @@ final class WindowLifecycle {
                 displays.windowRemoved(id)
             } else if engine.frame(of: id) != nil {
                 snapBack(id)
+            } else {
+                displays.floatingMoved(id, to: now)
             }
         } else if !arrivals.isPending(id), displays.engine(owning: now) != nil {
             recognize(id, log: false) { [unowned self] r, _ in

@@ -229,6 +229,27 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(d.engines["B"]?.strip.columns.map(\.windows) == [["y"]])
     }
 
+    @Test func aFloatingWindowMovedToAnotherDisplayFloatsThere() {
+        let (d, _) = make()
+        d.update([a, b])
+        d.windowAdded("x", frame: rect(100, 100, 300, 300))
+        d.windowAdded("f", frame: rect(100, 100, 300, 300), floating: true)
+        d.floatingMoved("f", to: rect(1100, 100, 300, 300))
+        #expect(d.engines["A"]?.strip.floating == [])
+        #expect(d.engines["B"]?.strip.floating == ["f"])
+        // Moving within its display, or a tiled window, changes nothing.
+        d.floatingMoved("f", to: rect(1200, 100, 300, 300))
+        d.floatingMoved("x", to: rect(1100, 100, 300, 300))
+        #expect(d.engines["B"]?.strip.floating == ["f"])
+        #expect(d.engines["A"]?.strip.columns.map(\.windows) == [["x"]])
+        // One on a hidden workspace is parked by tinywm, not moved by the user.
+        let home = d.engines["B"]!.workspaces.workspace(of: "f")
+        d.engines["B"]!.switchWorkspace(by: 1)
+        #expect(d.engines["B"]?.strip.floating == [])
+        d.floatingMoved("f", to: rect(100, 100, 300, 300))
+        #expect(d.engines["B"]?.workspaces.workspace(of: "f") == home)
+    }
+
     @Test func windowsGoBackToADisplayThatReturns() {
         let (d, _) = make()
         d.update([a, b])

@@ -300,7 +300,7 @@ closed hand.
 - On release the real windows take the frames their pictures already show, and the pictures
   fade. Released where no slot shows, or with Esc, the window goes back.
 - A floating window's picture follows the pointer, and the window keeps its new place. Let go
-  over another tiled display, it floats there.
+  over another tiled display, it floats there. The same goes for one moved by its title bar.
 - A press without a drag focuses the window, as the click would have.
 
 The target logic lives in `StripModel/DropTarget.swift`. `dropHint` maps the pointer to a
