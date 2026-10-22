@@ -74,6 +74,13 @@ private func sample(active: Int = 1) -> Workspaces {
         for r in layout.rows { #expect(r.rect.y >= 0 && r.rect.maxY <= display.height) }
     }
 
+    @Test func roomAboveTheRowsPushesThemDown() {
+        let style = OverviewStyle(top: 80)
+        let layout = overviewLayout(sample(), metrics, screen: display, style: style)
+        #expect(layout.rows[0].rect.y >= style.margin + style.top - 1e-9)
+        #expect(layout.rows.last!.rect.maxY <= display.height - style.margin + 1e-9)
+    }
+
     @Test func rowsStackInWorkspaceOrderWithAGap() {
         let rows = overviewLayout(sample(), metrics, screen: display).rows
         #expect(rows[1].rect.y > rows[0].rect.maxY)
@@ -172,6 +179,29 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(overviewStep(layout, from: "a", by: 1) == "b")
         #expect(overviewStep(layout, from: "c", by: 1) == "d")
         #expect(overviewStep(layout, from: "a", by: -1) == nil)
+    }
+
+    @Test func arrowsSkipWindowsTheSearchDoesNotMatch() {
+        // a | b over c on row 1, d on row 2.
+        #expect(overviewMove(layout, from: "a", .down, matching: ["d"]) == "d")
+        #expect(overviewMove(layout, from: "a", .right, matching: ["a", "d"]) == nil)
+        #expect(overviewMove(layout, from: "a", .right, matching: ["c"]) == "c")
+        #expect(overviewMove(layout, from: "b", .down, matching: ["d"]) == "d")
+        #expect(overviewMove(layout, from: "d", .up, matching: ["b"]) == "b")
+        // The start need not match.
+        #expect(overviewMove(layout, from: "b", .left, matching: ["a"]) == "a")
+    }
+
+    @Test func enteringADisplayLandsOnlyOnAMatch() {
+        #expect(overviewEntry(layout, from: "a", .right, matching: ["c"]) == "c")
+        #expect(overviewEntry(layout, from: "a", .up, matching: ["a"]) == "a")
+        #expect(overviewEntry(layout, from: "a", .right, matching: []) == nil)
+    }
+
+    @Test func stepSkipsWindowsTheSearchDoesNotMatch() {
+        #expect(overviewStep(layout, from: "a", by: 1, matching: ["d"]) == "d")
+        #expect(overviewStep(layout, from: "d", by: -1, matching: ["a", "d"]) == "a")
+        #expect(overviewStep(layout, from: "d", by: 1, matching: ["a"]) == nil)
     }
 
     @Test func hitTestFindsTheWindowUnderThePoint() {

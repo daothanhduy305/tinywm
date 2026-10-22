@@ -29,8 +29,10 @@ public struct OverviewStyle: Equatable, Sendable {
     /// Below this a wide strip stops shrinking and the view pans sideways instead. Rows still
     /// shrink past it to fit every workspace on screen, since the view cannot pan up or down.
     public var minScale = 0.15
+    /// Extra room kept above the rows, for the search bar.
+    public var top = 0.0
 
-    public init() {}
+    public init(top: Double = 0) { self.top = top }
 }
 
 /// Every workspace with windows, plus the active one, as scaled-down strips stacked top to bottom.
@@ -45,6 +47,15 @@ public struct OverviewLayout: Equatable, Sendable {
     public var windows: [OverviewWindow] { rows.flatMap(\.windows) }
 
     public func window(_ id: String) -> OverviewWindow? { windows.first { $0.id == id } }
+
+    /// This layout with only the `matching` windows, plus `id` so moves can start from it.
+    /// Nil keeps every window.
+    func keeping(_ matching: Set<String>?, and id: String? = nil) -> OverviewLayout {
+        guard let matching else { return self }
+        var out = self
+        for r in out.rows.indices { out.rows[r].windows.removeAll { $0.id != id && !matching.contains($0.id) } }
+        return out
+    }
 
     /// The topmost window under `p`; floating windows lie above the strip.
     public func window(at p: Point) -> OverviewWindow? { windows.last { $0.rect.contains(p) } }
@@ -77,7 +88,7 @@ public func overviewLayout(
     let widest = max(1, widths.max() ?? 1)
     let n = Double(max(1, shown.count))
     let availW = max(1, screen.width - 2 * style.margin)
-    let availH = max(1, screen.height - 2 * style.margin)
+    let availH = max(1, screen.height - 2 * style.margin - style.top)
 
     let fitH = (availH - (n - 1) * style.rowGap) / (n * local.viewport.height)
     let fitW = availW / widest
@@ -87,7 +98,7 @@ public func overviewLayout(
     let rowH = local.viewport.height * scale
     let blockH = n * rowH + (n - 1) * style.rowGap
     let x0 = style.margin + max(0, (availW - contentW) / 2)
-    let y0 = max(0, (screen.height - blockH) / 2)
+    let y0 = style.top + max(0, (screen.height - style.top - blockH) / 2)
     let panRange = max(0, contentW - availW)
     let shift = max(0, min(panRange, pan))
 
@@ -149,19 +160,22 @@ public func overviewRealFrames(_ ws: Workspaces, _ m: StripMetrics, floats: [Str
 
 /// The window the selection moves to, or nil at an edge.
 ///
-/// Left and right move to the neighbouring column, landing on its window nearest in height.
+/// Left and right move to the nearest column that way, landing on its window nearest in height.
 /// Up and down walk the column's stack, then cross to the nearest row that has windows, landing
-/// on the window whose centre is horizontally nearest.
-public func overviewMove(_ layout: OverviewLayout, from id: String, _ d: Direction) -> String? {
+/// on the window whose centre is horizontally nearest. With `matching`, only those windows count.
+public func overviewMove(_ layout: OverviewLayout, from id: String, _ d: Direction, matching: Set<String>? = nil) -> String? {
+    let layout = layout.keeping(matching, and: id)
     guard let w = layout.window(id), let row = layout.rows.firstIndex(where: { $0.workspace == w.workspace }) else { return nil }
     let here = layout.rows[row].windows
     switch d {
     case .left, .right:
-        let column = w.column + (d == .left ? -1 : 1)
+        let columns = here.map(\.column).filter { d == .left ? $0 < w.column : $0 > w.column }
+        guard let column = d == .left ? columns.max() : columns.min() else { return nil }
         return nearest(here.filter { $0.column == column }) { abs($0.rect.center.y - w.rect.center.y) }
     case .up, .down:
+        let stack = here.filter { $0.column == w.column && (d == .up ? $0.index < w.index : $0.index > w.index) }
+        if let next = d == .up ? stack.max(by: { $0.index < $1.index }) : stack.min(by: { $0.index < $1.index }) { return next.id }
         let step = d == .up ? -1 : 1
-        if let next = here.first(where: { $0.column == w.column && $0.index == w.index + step }) { return next.id }
         var r = row + step
         while layout.rows.indices.contains(r) {
             let candidates = layout.rows[r].windows
@@ -177,8 +191,12 @@ public func overviewMove(_ layout: OverviewLayout, from id: String, _ d: Directi
 
 /// Where the selection lands when the keys arrive from another display moving `d`, starting
 /// from the selected `id`: the near end of its row for left and right, the near row for up and down.
-public func overviewEntry(_ layout: OverviewLayout, from id: String, _ d: Direction) -> String? {
-    guard let w = layout.window(id), let row = layout.rows.first(where: { $0.workspace == w.workspace }) else { return nil }
+/// With `matching`, only those windows count.
+public func overviewEntry(_ layout: OverviewLayout, from id: String, _ d: Direction, matching: Set<String>? = nil) -> String? {
+    // The selection only says where the keys come in; it is a candidate only if it matches.
+    guard let w = layout.window(id) else { return nil }
+    let layout = layout.keeping(matching)
+    guard let row = layout.rows.first(where: { $0.workspace == w.workspace }) else { return nil }
     switch d {
     case .left, .right:
         let columns = row.windows.map(\.column)
@@ -192,11 +210,11 @@ public func overviewEntry(_ layout: OverviewLayout, from id: String, _ d: Direct
 }
 
 /// The window after (positive) or before (negative) `id` in reading order: rows top to bottom,
-/// columns left to right, stacks top to bottom.
-public func overviewStep(_ layout: OverviewLayout, from id: String, by delta: Int) -> String? {
-    let all = layout.windows
-    guard let i = all.firstIndex(where: { $0.id == id }), all.indices.contains(i + delta) else { return nil }
-    return all[i + delta].id
+/// columns left to right, stacks top to bottom. With `matching`, only those windows count.
+public func overviewStep(_ layout: OverviewLayout, from id: String, by delta: Int, matching: Set<String>? = nil) -> String? {
+    let all = layout.windows.map(\.id).filter { $0 == id || matching?.contains($0) ?? true }
+    guard let i = all.firstIndex(of: id), all.indices.contains(i + delta) else { return nil }
+    return all[i + delta]
 }
 
 private func nearest(_ windows: [OverviewWindow], by distance: (OverviewWindow) -> Double) -> String? {

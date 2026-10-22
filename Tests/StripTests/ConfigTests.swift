@@ -267,13 +267,11 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
 }
 
 @Suite struct OverviewKeysTests {
-    @Test func plainKeysFollowTheFocusBindingsAndArrows() {
+    @Test func plainLettersTypeAndTheArrowsMove() {
         let keys = OverviewKeys(bindings: StripConfig().bindings)
         let code = { KeyNames.codes[$0]! }
-        #expect(keys.command(keyCode: code("h"), shift: false) == .left)
-        #expect(keys.command(keyCode: code("j"), shift: false) == .down)
-        #expect(keys.command(keyCode: code("k"), shift: false) == .up)
-        #expect(keys.command(keyCode: code("l"), shift: false) == .right)
+        // The focus letters type into the search bar.
+        for letter in ["h", "j", "k", "l"] { #expect(keys.command(keyCode: code(letter), shift: false) == nil) }
         #expect(keys.command(keyCode: code("left"), shift: false) == .left)
         #expect(keys.command(keyCode: code("tab"), shift: false) == .next)
         #expect(keys.command(keyCode: code("tab"), shift: true) == .previous)
@@ -283,12 +281,11 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(keys.command(keyCode: code("q"), shift: false) == nil)
     }
 
-    @Test func reboundKeysMoveTheSelection() {
-        let r = StripConfig.parse("bind focus-left = n\nbind focus-right = i\nunbind focus-up-arrow")
+    @Test func reboundKeysMoveTheSelectionUnlessTheyType() {
+        let r = StripConfig.parse("bind focus-left = pageup\nbind focus-right = i\nunbind focus-up-arrow")
         let keys = OverviewKeys(bindings: r.config.bindings)
-        #expect(keys.command(keyCode: KeyNames.codes["n"]!, shift: false) == .left)
-        #expect(keys.command(keyCode: KeyNames.codes["i"]!, shift: false) == .right)
-        #expect(keys.command(keyCode: KeyNames.codes["h"]!, shift: false) == nil)
+        #expect(keys.command(keyCode: KeyNames.codes["pageup"]!, shift: false) == .left)
+        #expect(keys.command(keyCode: KeyNames.codes["i"]!, shift: false) == nil)
         // Arrows work in the overview even when unbound.
         #expect(keys.command(keyCode: KeyNames.codes["up"]!, shift: false) == .up)
     }
@@ -299,6 +296,14 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(OverviewKeys.command(forAction: "overview") == .confirm)
         #expect(OverviewKeys.command(forAction: "move-left") == nil)
         #expect(OverviewKeys.command(forAction: "close-window") == nil)
+    }
+
+    @Test func searchMatchesEveryWordIgnoringCaseAndAccents() {
+        #expect(OverviewKeys.matches("Safari — Apple", query: ""))
+        #expect(OverviewKeys.matches("Safari — Apple", query: "saf"))
+        #expect(OverviewKeys.matches("Safari — Apple", query: "apple saf"))
+        #expect(OverviewKeys.matches("Notes — Café", query: "cafe"))
+        #expect(!OverviewKeys.matches("Safari — Apple", query: "saf chrome"))
     }
 }
 

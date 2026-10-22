@@ -243,16 +243,23 @@ keys both work out of the box.
 | Meta + Q | Close the window | `close-window` |
 | Meta + left drag | Move the window with the mouse | none |
 
-The overview opens on every display with windows, each with its focused window highlighted. In
-the active display's overview, the focus keys (letters and arrows, with or without the meta key)
-move the selection, Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc
-cancels. At an edge, the arrow and focus keys move on to the display lying that way, landing on
-its window at the edge they came in by. The display the keys steer has the bright ring; the
-others' rings are faint. When the active display has no
-windows, the next display's overview takes the keys. Pointing at a window on any display
-highlights it, and a click focuses it and makes its display the active one. When the pointer
-leaves a display, its highlight goes back to its focused window, or to the one the keys chose.
-Each picture has its app name and window title under it. Picking a window does not show the minimap.
+The overview opens on every display with windows, each with its focused window highlighted. In the
+active display's overview, the arrows and the focus keys held with the meta key move the selection,
+Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels. A search bar at
+the top of every display holds one shared query; the bar on the display with the keys is bright and
+takes typing as soon as the overview opens, so plain letters type rather than move. Clicking another
+display's bar moves the keys there. The windows whose app name and title don't contain every typed
+word fade, and the selection jumps to the first match. Tab and the arrows then move among matches
+only, and the keys cross only to a display with a match. The bar edits like any text field, with a
+caret, ⌥⌫, ⌘⌫, ⌥←/→ and paste, while the plain arrows still move the selection. Esc clears the
+search before it cancels. The search covers every display, and when the keys' display has no match,
+the keys move to one that does. At an edge, the arrow and focus keys move on to the display lying
+that way, landing on its window at the edge they came in by. The display the keys steer has the
+bright ring; the others' rings are faint. When the active display has no windows, the next display's
+overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
+and makes its display the active one. When the pointer leaves a display, its highlight goes back to
+its focused window, or to the one the keys chose. Each picture has its app name and window title
+under it. Picking a window does not show the minimap.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
 right after tinywm focuses one. Within a second and with no click or key press since, tinywm

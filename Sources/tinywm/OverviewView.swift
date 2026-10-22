@@ -58,3 +58,68 @@ final class OverviewView: NSView {
         if delta != 0 { onScroll(delta) }
     }
 }
+
+/// The overview's search bar. Typing, the caret and editing keys such as ⌥⌫ and ⌘⌫ work as in
+/// any text field; the keys the overview acts on (arrows, Tab, Return, Esc) go to `onKey` instead.
+final class SearchField: NSTextField, NSTextFieldDelegate {
+    var keys = OverviewKeys()
+    var onKey: (OverviewCommand) -> Void = { _ in }
+    var onChange: (String) -> Void = { _ in }
+    /// The field took the keys, as when it was clicked.
+    var onFocus: () -> Void = {}
+
+    init() {
+        super.init(frame: .zero)
+        delegate = self
+        isBordered = false
+        drawsBackground = false
+        focusRingType = .none
+        usesSingleLineMode = true
+        cell?.isScrollable = true
+        font = NSFont.systemFont(ofSize: 19, weight: .medium)
+        textColor = .white
+        // Dark, so the caret and the selection show on the dark pill.
+        appearance = NSAppearance(named: .darkAqua)
+        placeholderAttributedString = NSAttributedString(string: "Type to search windows", attributes: [
+            .font: NSFont.systemFont(ofSize: 19, weight: .medium), .foregroundColor: NSColor(white: 1, alpha: 0.6),
+        ])
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func becomeFirstResponder() -> Bool {
+        guard super.becomeFirstResponder() else { return false }
+        onFocus()
+        return true
+    }
+
+    // A click on a display whose overview does not have the keys still reaches the field.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func controlTextDidChange(_ obj: Notification) { onChange(stringValue) }
+
+    /// tinywm has no Edit menu, which is what normally gives a field ⌘A, ⌘C, ⌘V, ⌘X and ⌘Z.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let held = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        guard event.type == .keyDown, held == .command || held == [.command, .shift] else { return super.performKeyEquivalent(with: event) }
+        let action: Selector? = switch event.charactersIgnoringModifiers?.lowercased() {
+        case "a": #selector(NSText.selectAll(_:))
+        case "c": #selector(NSText.copy(_:))
+        case "v": #selector(NSText.paste(_:))
+        case "x": #selector(NSText.cut(_:))
+        case "z": held.contains(.shift) ? Selector(("redo:")) : Selector(("undo:"))
+        default: nil
+        }
+        guard let action, NSApp.sendAction(action, to: nil, from: self) else { return super.performKeyEquivalent(with: event) }
+        return true
+    }
+
+    /// The overview's keys pressed without ⌘, ⌃ or ⌥ steer it; with them, the field edits as usual.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard let e = NSApp.currentEvent, e.type == .keyDown,
+              e.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+              let key = keys.command(keyCode: Int(e.keyCode), shift: e.modifierFlags.contains(.shift)) else { return false }
+        onKey(key)
+        return true
+    }
+}

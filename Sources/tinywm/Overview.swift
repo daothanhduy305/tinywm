@@ -18,6 +18,12 @@ final class Overview {
     var chose: (String?) -> Void = { _ in }
     /// An arrow key found no window that way on this display.
     var atEdge: (Direction) -> Void = { _ in }
+    /// The search bar's text changed. The owner keeps the query.
+    var typed: (String) -> Void = { _ in }
+    /// Esc was pressed with a query typed.
+    var clearSearch: () -> Void = {}
+    /// This display's search bar was clicked, so its overview should take the keys.
+    var wantsKeys: () -> Void = {}
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     var ringStyle = FocusHighlight.Style()
@@ -37,6 +43,15 @@ final class Overview {
     private var layers: [String: WindowLayer] = [:]
     /// Each window's "App — Title" line, under its picture.
     private var labels: [String: CATextLayer] = [:]
+    /// The text of each label, which the search matches.
+    private var titles: [String: String] = [:]
+    private let searchBar = CALayer()
+    private let searchField = SearchField()
+    private let searchIcon = CALayer()
+    /// Keeps the rows clear of the search bar at the top.
+    private static let style = OverviewStyle(top: 46)
+    /// The windows the query matches, or nil with no query.
+    private var matching: Set<String>?
 
     private var phase = Phase.closed
     private(set) var engine: StripEngine?
@@ -55,11 +70,16 @@ final class Overview {
 
     var isOpen: Bool { phase != .closed }
     var isShowing: Bool { phase == .open }
+    /// False when a search is typed and no window here matches it.
+    var hasMatches: Bool { matching.map { !$0.isEmpty } ?? true }
     /// The windows whose pictures are shown.
     var ids: Set<String> { Set(layers.keys) }
     var keys: OverviewKeys {
         get { view.keys }
-        set { view.keys = newValue }
+        set {
+            view.keys = newValue
+            searchField.keys = newValue
+        }
     }
 
     init(pictures: WindowPictures, windows: AXWindows) {
@@ -86,9 +106,39 @@ final class Overview {
         root.addSublayer(dim)
         ring.zPosition = 10
         root.addSublayer(ring)
+        // A bright, bordered pill, so it reads as a place to type rather than a caption.
+        searchBar.backgroundColor = NSColor(white: 0.16, alpha: 0.92).cgColor
+        searchBar.cornerRadius = 23
+        searchBar.borderWidth = 2
+        searchBar.shadowColor = NSColor.black.cgColor
+        searchBar.shadowOpacity = 0.5
+        searchBar.shadowRadius = 12
+        searchBar.shadowOffset = .zero
+        searchBar.zPosition = 20
+        searchBar.opacity = 0
+        let glass = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search")?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
+                .applying(NSImage.SymbolConfiguration(paletteColors: [.white])))
+        searchIcon.contents = glass
+        searchIcon.contentsGravity = .resizeAspect
+        searchBar.addSublayer(searchIcon)
+        root.addSublayer(searchBar)
         panel.contentView = view
 
         view.onKey = { [weak self] in self?.handle($0) }
+        searchField.isHidden = true
+        view.addSubview(searchField)
+        searchField.wantsLayer = true
+        searchField.layer?.zPosition = 100
+        searchField.onKey = { [weak self] in self?.handle($0) }
+        searchField.onFocus = { [weak self] in
+            guard let self, phase == .open else { return }
+            wantsKeys()
+        }
+        searchField.onChange = { [weak self] text in
+            guard let self, phase == .open else { return }
+            typed(text)
+        }
         view.onHover = { [weak self] p in
             guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
             select(hit.id, "hover at \(Int(p.x)),\(Int(p.y))")
@@ -119,7 +169,7 @@ final class Overview {
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
         floats = engine.floatFrames()
-        let probe = overviewLayout(ws, m, screen: size, floats: floats)
+        let probe = overviewLayout(ws, m, screen: size, style: Self.style, floats: floats)
         guard let first = probe.windows.first?.id else { return false }
 
         self.engine = engine
@@ -131,10 +181,13 @@ final class Overview {
         selected = focus
         home = focus
         pan = probe.pan(toReveal: focus, current: 0)
-        layout = overviewLayout(ws, m, screen: size, pan: pan, floats: floats)
+        layout = overviewLayout(ws, m, screen: size, pan: pan, style: Self.style, floats: floats)
         real = overviewRealFrames(ws, m, floats: floats)
         phase = .open
         token += 1
+        matching = nil
+        showQuery("")
+        searchIcon.contentsScale = screen.backingScaleFactor
 
         place()
         refreshBackdrop()
@@ -150,6 +203,7 @@ final class Overview {
             root.addSublayer(layer)
             layers[w.id] = layer
             let label = makeLabel(w.id, scale: screen.backingScaleFactor)
+            titles[w.id] = label.string as? String ?? ""
             label.frame = labelFrame(r)
             label.opacity = 0
             root.addSublayer(label)
@@ -159,12 +213,14 @@ final class Overview {
         ring.removeAllAnimations()
         ring.frame = outset(NSRect(real[focus]!))
         dim.opacity = 0
+        searchBar.opacity = 0
         CATransaction.commit()
         CATransaction.flush()
 
         panel.alphaValue = PictureMotion.coveringAlpha
         panel.orderFrontRegardless()
-        if active { takeKeys() } else { ring.opacity = Self.idleRing }
+        searchField.isHidden = false
+        if active { takeKeys() } else { releaseKeys() }
 
         relayout(animated: true, fromModel: true)
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -190,10 +246,10 @@ final class Overview {
         case .right: next = move(layout, selected, .right)
         case .up: next = move(layout, selected, .up)
         case .down: next = move(layout, selected, .down)
-        case .next: next = overviewStep(layout, from: selected, by: 1)
-        case .previous: next = overviewStep(layout, from: selected, by: -1)
+        case .next: next = overviewStep(layout, from: selected, by: 1, matching: matching)
+        case .previous: next = overviewStep(layout, from: selected, by: -1, matching: matching)
         case .confirm: return chose(selected)
-        case .cancel: return chose(nil)
+        case .cancel: return matching == nil ? chose(nil) : clearSearch()
         }
         if let next {
             select(next)
@@ -203,7 +259,7 @@ final class Overview {
 
     /// The window that way, or nil after handing the keys on at an edge.
     private func move(_ layout: OverviewLayout, _ from: String, _ d: Direction) -> String? {
-        let next = overviewMove(layout, from: from, d)
+        let next = overviewMove(layout, from: from, d, matching: matching)
         if next == nil { atEdge(d) }
         return next
     }
@@ -212,17 +268,49 @@ final class Overview {
     /// the window at the edge the keys came in by.
     func takeKeys(entering d: Direction? = nil) {
         panel.makeKey()
-        panel.makeFirstResponder(view)
         ring.opacity = 1
-        if let d, phase == .open, let layout, let selected, let next = overviewEntry(layout, from: selected, d) {
+        searchBar.opacity = 1
+        searchField.alphaValue = 1
+        // A click on the field already gave it the keys.
+        if searchField.currentEditor() == nil { panel.makeFirstResponder(searchField) }
+        if let d, phase == .open, let layout, let selected, let next = overviewEntry(layout, from: selected, d, matching: matching) {
             select(next)
             home = next
         }
     }
 
-    /// The ring on a display the keys do not steer is faint, so the bright one shows where they act.
+    /// The ring and search bar on a display the keys do not steer are faint, so the bright ones
+    /// show where they act.
     static let idleRing: Float = 0.35
-    func releaseKeys() { ring.opacity = Self.idleRing }
+    static let idleSearch: Float = 0.55
+    func releaseKeys() {
+        ring.opacity = Self.idleRing
+        searchBar.opacity = Self.idleSearch
+        searchField.alphaValue = CGFloat(Self.idleSearch)
+    }
+
+    /// Fades the windows `query` does not match and selects the first that does. False when
+    /// nothing on this display matches.
+    func filter(_ query: String) -> Bool {
+        guard phase == .open, let layout else { return false }
+        matching = query.isEmpty ? nil : Set(titles.filter { OverviewKeys.matches($0.value, query: query) }.keys)
+        showQuery(query)
+        for (id, layer) in layers {
+            let opacity: Float = matching?.contains(id) ?? true ? 1 : 0.25
+            layer.opacity = opacity
+            labels[id]?.opacity = opacity
+        }
+        guard let matching else { return true }
+        guard let first = layout.windows.first(where: { matching.contains($0.id) })?.id else { return false }
+        select(first, "search")
+        home = first
+        return true
+    }
+
+    /// Puts the shared query in this display's field, unless it already holds it, so the caret stays put.
+    private func showQuery(_ query: String) {
+        if searchField.stringValue != query { searchField.stringValue = query }
+    }
 
     private func select(_ id: String, _ why: String = "keys") {
         guard id != selected, let layout else { return }
@@ -280,6 +368,11 @@ final class Overview {
             label.add(out, forKey: "fade")
             label.opacity = 0
         }
+        searchBar.add(out, forKey: "fade")
+        searchBar.opacity = 0
+        searchField.isHidden = true
+        // Faded pictures come back as they zoom into place.
+        for (_, layer) in layers { layer.opacity = 1 }
         CATransaction.commit()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + longest) { [weak self] in
@@ -311,7 +404,7 @@ final class Overview {
     private func relayout(animated: Bool, fromModel: Bool = false) {
         guard let engine else { return }
         let size = Size(width: viewport.width, height: viewport.height)
-        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, floats: floats)
+        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: Self.style, floats: floats)
         layout = next
         CATransaction.begin()
         if !animated { CATransaction.setDisableActions(true) }
@@ -406,6 +499,7 @@ final class Overview {
         ring.shadowOpacity = ringStyle.glowRadius > 0 ? 0.9 : 0
         ring.shadowRadius = ringStyle.glowRadius
         ring.shadowOffset = .zero
+        searchBar.borderColor = ringStyle.color.withAlphaComponent(0.85).cgColor
     }
 
     private func removeLayers() {
@@ -413,6 +507,7 @@ final class Overview {
         for (_, label) in labels { label.removeFromSuperlayer() }
         layers = [:]
         labels = [:]
+        titles = [:]
     }
 
     /// A pill reading "App — Title", or just the app when the window has no title.
@@ -465,6 +560,10 @@ final class Overview {
         CATransaction.setDisableActions(true)
         root.frame = NSRect(origin: .zero, size: frame.size)
         dim.frame = root.bounds
+        let w = min(560, frame.width - 2 * Self.style.margin)
+        searchBar.frame = NSRect(x: (frame.width - w) / 2, y: 20, width: w, height: 46)
+        searchIcon.frame = NSRect(x: 18, y: 13, width: 20, height: 20)
+        searchField.frame = NSRect(x: searchBar.frame.minX + 48, y: searchBar.frame.minY + 10, width: w - 66, height: 26)
         if let screen {
             let whole = Screens.axRect(screen.frame)
             backdrop.frame = NSRect(x: whole.x - viewport.x, y: whole.y - viewport.y, width: whole.width, height: whole.height)
@@ -488,6 +587,8 @@ final class Overviews {
     private var byDisplay: [String: Overview] = [:]
     private var active: Overview?
     private var displays: StripDisplays?
+    /// The search bar's text, shared by every display.
+    private var query = ""
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
 
@@ -503,6 +604,7 @@ final class Overviews {
             return
         }
         self.displays = displays
+        query = ""
         byDisplay = byDisplay.filter { displays.engines[$0.key] != nil }
         active = nil
         var opened: [Overview] = []
@@ -530,6 +632,21 @@ final class Overviews {
         let o = Overview(pictures: pictures, windows: windows)
         o.chose = { [unowned self, unowned o] window in chose(window, on: o) }
         o.atEdge = { [unowned self, unowned o] d in cross(d, from: o) }
+        o.typed = { [unowned self] text in
+            query = text
+            search()
+        }
+        o.wantsKeys = { [unowned self, unowned o] in
+            guard o !== active, o.isShowing else { return }
+            Log.note("overview", "keys move to the clicked search bar")
+            active?.releaseKeys()
+            active = o
+            o.takeKeys()
+        }
+        o.clearSearch = { [unowned self] in
+            query = ""
+            search()
+        }
         byDisplay[id] = o
         return o
     }
@@ -537,11 +654,21 @@ final class Overviews {
     /// At an edge, the keys move on to the display lying that way, if its overview is showing.
     private func cross(_ d: Direction, from o: Overview) {
         guard o === active, let id = displays?.display(toward: d, from: o.engine),
-              let target = byDisplay[id], target.isShowing else { return }
+              let target = byDisplay[id], target.isShowing, target.hasMatches else { return }
         Log.note("overview", "keys move \(d) to \(id.prefix(8))")
         o.releaseKeys()
         active = target
         target.takeKeys(entering: d)
+    }
+
+    /// Filters every display. When the keys' display has no match, they move to one that does.
+    private func search() {
+        let found = byDisplay.values.filter { $0.isShowing }.filter { $0.filter(query) }
+        guard let active, !found.contains(where: { $0 === active }), let target = found.first else { return }
+        Log.note("overview", "keys move to a display matching the search")
+        active.releaseKeys()
+        self.active = target
+        target.takeKeys()
     }
 
     private func chose(_ window: String?, on picked: Overview) {
