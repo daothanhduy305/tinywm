@@ -386,8 +386,22 @@ public final class WindowTracker {
         observers[pid] = subscription.observer
         if resolved { Log.note("tracker", "\(name) runs as process \(pid); watching it") }
         for ref in subscription.windows { admit(ref.element, pid: pid) }
+        findFullScreenElsewhere(pid: pid, listed: subscription.windows)
         subscribe([kAXFocusedWindowChangedNotification, kAXApplicationHiddenNotification, kAXApplicationShownNotification],
                   on: AXUIElementCreateApplication(pid), observer: subscription.observer, pid: pid)
+    }
+
+    /// The app's fullscreen windows on other Spaces, which its list leaves out, so they are known
+    /// before the user visits them.
+    private func findFullScreenElsewhere(pid: pid_t, listed: [AXRef]) {
+        queue(for: pid).async { [weak self] in
+            let known = Set(listed.compactMap { WindowNumbers.exactWindowID(of: $0.element) })
+            let found = WindowNumbers.fullScreenElsewhere(pid: pid, known: known).map(AXRef.init(element:))
+            guard !found.isEmpty else { return }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                for ref in found { self?.admit(ref.element, pid: pid, from: .otherSpace) }
+            } }
+        }
     }
 
     /// Adds notifications on the app's queue, after the requests already waiting there. Each one
@@ -485,7 +499,8 @@ public final class WindowTracker {
     private func accept(_ ref: AXRef, pid: pid_t, _ seen: AX.Inspection, from source: Source, retries: [Double]?) {
         probing.remove(ref)
         guard let observer = observers[pid], !registered.contains(ref) else { return }
-        guard seen.isTileable else { return lookAgain(ref, pid: pid, seen, from: source, retries: retries) }
+        // A fullscreen window is followed too, so the overview can show it and it tiles once it leaves fullscreen.
+        guard seen.isTileable || seen.isFullScreenWindow else { return lookAgain(ref, pid: pid, seen, from: source, retries: retries) }
         registered.insert(ref)
         rejected.remove(ref)
         if source != .listed { Log.note("tracker", "process \(pid) window \"\(seen.title ?? "")\" accepted, found by \(source)") }
@@ -495,7 +510,7 @@ public final class WindowTracker {
                   on: ref.element, observer: observer, pid: pid)
         numbers[ref] = WindowNumbers.exactWindowID(of: ref.element)
         onAdded(ref.element, pid, WindowProbe(isDockable: seen.isDockable, frame: seen.frame, title: seen.title))
-        if !seen.isDockable { recheckDockable(ref, pid: pid, attempts: [0.25, 0.5, 1, 3]) }
+        if !seen.isDockable, !seen.isFullScreenWindow { recheckDockable(ref, pid: pid, attempts: [0.25, 0.5, 1, 3]) }
     }
 
     /// Right after it opens, a window often has no subrole or size yet. A window just reported is
@@ -520,7 +535,7 @@ public final class WindowTracker {
     }
 
     /// How a window came to be looked at. Only windows just reported are looked at again.
-    private enum Source: String { case listed, created, focused, windowServer = "the window server" }
+    private enum Source: String { case listed, created, focused, windowServer = "the window server", otherSpace = "another Space" }
     /// Windows looked at again until the retries ran out, so a focus change does not start them over.
     /// The sweep still looks at them, and drops the ones that are gone.
     private var rejected: Set<AXRef> = []

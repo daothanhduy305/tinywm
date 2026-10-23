@@ -145,6 +145,8 @@ public enum AX {
         public var role: String? = nil
         public var subrole: String? = nil
         public var isMinimized = false
+        /// A tileable window but for being fullscreen.
+        public var isFullScreenWindow = false
     }
 
     /// Looks at a window in two or three requests to its app.
@@ -160,11 +162,13 @@ public enum AX {
         let subrole = v[1] as? String
         let window = subrole == kAXStandardWindowSubrole || subrole == kAXDialogSubrole && isEnabled(button: v[9])
         // Tiny windows are helpers, such as the window that hosts a title bar's buttons.
-        let tileable = v[0] as? String == kAXWindowRole && window
-            && v[2] as? Bool != true && frame.map { $0.width >= 80 && $0.height >= 40 } == true && !fullScreen
+        let standard = v[0] as? String == kAXWindowRole && window
+            && v[2] as? Bool != true && frame.map { $0.width >= 80 && $0.height >= 40 } == true
+        let tileable = standard && !fullScreen
         return Inspection(title: v[5] as? String, frame: frame, isFullScreen: fullScreen, isTileable: tileable,
                           isDockable: tileable && isDockable(e, fullScreenButton: v[6], zoomButton: v[7]),
-                          role: v[0] as? String, subrole: v[1] as? String, isMinimized: v[2] as? Bool == true)
+                          role: v[0] as? String, subrole: v[1] as? String, isMinimized: v[2] as? Bool == true,
+                          isFullScreenWindow: standard && fullScreen)
     }
 
     /// A tileable window the app lets us resize, unless its zoom button is disabled.

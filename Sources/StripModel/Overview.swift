@@ -105,9 +105,11 @@ public struct OverviewLayout: Equatable, Sendable {
 /// proportions, since the whole strip scales by one factor. `floats` gives floating windows'
 /// frames relative to the viewport's top-left; a floating window without one is left out.
 /// `style.floating` says where floating windows go; on a shelf, the rows keep clear of it.
+/// `fullScreen` gives fullscreen windows' frames; they sit on the shelf after the floating
+/// windows, and are left out without one.
 public func overviewLayout(
     _ ws: Workspaces, _ m: StripMetrics, screen: Size, pan: Double = 0, style: OverviewStyle = OverviewStyle(),
-    floats: [String: Rect] = [:]
+    floats: [String: Rect] = [:], fullScreen: [String: Rect] = [:]
 ) -> OverviewLayout {
     var local = m
     local.viewport = Rect(x: 0, y: 0, width: m.viewport.width, height: m.viewport.height)
@@ -119,7 +121,7 @@ public func overviewLayout(
     let widths = shown.map { max(local.columnOffsets(ws.strips[$0]).total, local.viewport.width) }
     let widest = max(1, widths.max() ?? 1)
     let n = Double(max(1, widths.count))
-    let shelf = overviewShelf(ws, style, floats: floats, screen: screen)
+    let shelf = overviewShelf(ws, style, floats: floats, fullScreen: fullScreen, screen: screen)
     // The rows fit in the space the shelf leaves, as if the screen ended a row gap before it.
     var screen = screen
     if let r = shelf?.rect {
@@ -184,13 +186,14 @@ public func overviewLayout(
 
 /// Every workspace's floating windows on a shelf at the right or bottom edge of the screen, which
 /// does not pan. Pictures keep their proportions and are all `shelfSize` wide (vertical) or tall
-/// (horizontal), each with its label under it. The row's rect is the plate behind them. Nil when
-/// floating windows stay in place or there is none to show.
-func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Rect], screen: Size) -> OverviewRow? {
+/// (horizontal), each with its label under it. The row's rect is the plate behind them. Fullscreen
+/// windows come last, with workspace -1. Nil when floating windows stay in place or there is none to show.
+func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Rect], fullScreen: [String: Rect] = [:],
+                   screen: Size) -> OverviewRow? {
     guard style.floating != .off else { return nil }
-    let shown = ws.strips.enumerated().flatMap { i, strip in
-        strip.floating.compactMap { id in floats[id].flatMap { $0.width > 0 && $0.height > 0 ? (id, i, $0) : nil } }
-    }
+    let floating = ws.strips.enumerated().flatMap { i, strip in strip.floating.compactMap { id in floats[id].map { (id, i, $0) } } }
+    let shown = (floating + fullScreen.sorted { $0.key < $1.key }.map { ($0.key, -1, $0.value) })
+        .filter { $0.2.width > 0 && $0.2.height > 0 }
     guard !shown.isEmpty else { return nil }
     let pad = style.shelfPad, label = style.labelGap, gaps = Double(shown.count - 1) * style.shelfGap
     var windows: [OverviewWindow] = []

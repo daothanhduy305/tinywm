@@ -278,6 +278,19 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(overviewMove(layout, from: "g", .up) == "d")
     }
 
+    @Test func fullscreenWindowsSitOnTheShelfAfterFloatingWindows() {
+        let (ws, floats) = withFloats()
+        let full = ["z": Rect(x: 0, y: -24, width: 800, height: 624), "y": Rect(x: 0, y: -24, width: 800, height: 624)]
+        let layout = overviewLayout(ws, metrics, screen: display, floats: floats, fullScreen: full)
+        let shelf = layout.rows.last!
+        #expect(shelf.windows.map(\.id) == ["f", "g", "y", "z"])
+        #expect(layout.window("z")!.workspace == -1)
+        #expect(overviewMove(layout, from: "g", .down) == "y")
+        // A fullscreen window alone still gets a shelf, but none when floating windows stay in place.
+        #expect(overviewLayout(sample(), metrics, screen: display, fullScreen: full).rows.last?.workspace == -1)
+        #expect(overviewLayout(ws, metrics, screen: display, style: off, floats: floats, fullScreen: full).window("z") == nil)
+    }
+
     @Test func aShelfTooLongForTheScreenShrinksToFit() {
         var ws = sample()
         ws.strips[1].floating = (0..<8).map { "f\($0)" }

@@ -30,6 +30,12 @@ final class Overview {
     var renamed: (String, String?) -> Void = { _, _ in }
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
+    /// Fullscreen windows' frames on this display, relative to the viewport's top-left.
+    private var fullScreen: [String: Rect] = [:]
+    /// Windows on a Space not shown: fullscreen windows elsewhere, or, from a fullscreen window's
+    /// Space, every other window. Their pictures fade in and out in place, since zooming from or to
+    /// their real frames would show them over the Space in front. Picking one switches Space.
+    private var away: Set<String> = []
     var ringStyle = FocusHighlight.Style()
     var floating = OverviewFloating.vertical
     var stiffness = Spring.stiffness
@@ -203,13 +209,15 @@ final class Overview {
 
     /// Opens on `engine`'s display with its focused window selected. Only the active one takes
     /// keys. False when there is nothing to show.
-    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool) -> Bool {
+    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:]) -> Bool {
         guard phase == .closed, pictures.available, let screen else { return false }
         let ws = engine.workspaces
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
         floats = engine.floatFrames()
-        let probe = overviewLayout(ws, m, screen: size, style: style, floats: floats)
+        let v = engine.viewport
+        self.fullScreen = fullScreen.mapValues { Rect(x: $0.x - v.x, y: $0.y - v.y, width: $0.width, height: $0.height) }
+        let probe = overviewLayout(ws, m, screen: size, style: style, floats: floats, fullScreen: self.fullScreen)
         guard let first = probe.windows.first?.id else { return false }
 
         self.engine = engine
@@ -221,8 +229,11 @@ final class Overview {
         selected = focus
         home = focus
         pan = probe.pan(toReveal: focus, current: 0)
-        layout = overviewLayout(ws, m, screen: size, pan: pan, style: style, floats: floats)
-        real = overviewRealFrames(ws, m, floats: floats)
+        layout = overviewLayout(ws, m, screen: size, pan: pan, style: style, floats: floats, fullScreen: self.fullScreen)
+        // A fullscreen window's picture zooms out from the whole screen.
+        real = overviewRealFrames(ws, m, floats: floats).merging(self.fullScreen) { a, _ in a }
+        let onFullScreen = previous.map { self.fullScreen[$0] != nil } ?? false
+        away = (onFullScreen ? Set(layout!.windows.map(\.id)) : Set(self.fullScreen.keys)).subtracting([previous].compactMap { $0 })
         phase = .open
         token += 1
         matching = nil
@@ -255,6 +266,12 @@ final class Overview {
             layer.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
             pictures.show(w.id, on: layer)
             holder.addSublayer(layer)
+            if away.contains(w.id) {
+                holder.position = CGPoint(x: w.rect.center.x, y: w.rect.center.y)
+                let scale = CGFloat(w.rect.width) / holder.bounds.width
+                holder.transform = CATransform3DMakeScale(scale, scale, 1)
+                holder.opacity = 0
+            }
             root.addSublayer(holder)
             layers[w.id] = layer
             holders[w.id] = holder
@@ -263,7 +280,7 @@ final class Overview {
                 holder.zPosition = 7
                 label.zPosition = 8
             }
-            label.frame = labelFrame(r)
+            label.frame = labelFrame(away.contains(w.id) ? w.rect : r)
             label.opacity = 0
             root.addSublayer(label)
             labels[w.id] = label
@@ -289,7 +306,7 @@ final class Overview {
         fade.duration = 0.25
         dim.add(fade, forKey: "dim")
         dim.opacity = 1
-        for label in labels.values.map { $0 as CALayer } + [dock] {
+        for label in labels.values.map { $0 as CALayer } + [dock] + away.compactMap({ holders[$0] }) {
             label.add(fade, forKey: "fade")
             label.opacity = 1
         }
@@ -421,20 +438,30 @@ final class Overview {
         phase = .closing
         token += 1
         let mine = token
+        if let id, away.contains(id) {
+            // macOS slides to the window's Space, so the overview gets out of the way at once.
+            activate(id)
+            searchField.isHidden = true
+            finishRename(nil)
+            finish(mine)
+            return
+        }
         var targets = real
         var ringTarget = (id ?? (refocus ? previous : home)).flatMap { real[$0] }
         if let id {
             activate(id)
             targets = overviewRealFrames(engine.workspaces, engine.metrics, floats: engine.floatFrames())
-            ringTarget = targets[id]
+            ringTarget = targets[id] ?? real[id]
         } else if refocus, let previous {
             windows.focus(previous)
         }
 
         var longest: CFTimeInterval = 0
         CATransaction.begin()
+        // A fullscreen window on another Space fades where it is, unless it was picked.
+        let fading = away.subtracting([id].compactMap { $0 })
         for (wid, layer) in holders {
-            guard let t = targets[wid] ?? real[wid] else { continue }
+            guard !fading.contains(wid), let t = targets[wid] ?? real[wid] else { continue }
             longest = max(longest, move(layer, to: CGPoint(x: t.center.x, y: t.center.y),
                                         scale: CGFloat(t.width) / layer.bounds.width))
         }
@@ -459,7 +486,11 @@ final class Overview {
         searchField.isHidden = true
         finishRename(nil)
         // Faded pictures come back as they zoom into place.
-        for (_, layer) in holders { layer.opacity = 1 }
+        for (wid, layer) in holders where !fading.contains(wid) { layer.opacity = 1 }
+        for wid in fading {
+            holders[wid]?.add(out, forKey: "fade")
+            holders[wid]?.opacity = 0
+        }
         CATransaction.commit()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + longest) { [weak self] in
@@ -491,7 +522,8 @@ final class Overview {
     private func relayout(animated: Bool, fromModel: Bool = false) {
         guard let engine else { return }
         let size = Size(width: viewport.width, height: viewport.height)
-        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: style, floats: floats)
+        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: style, floats: floats,
+                                  fullScreen: fullScreen)
         layout = next
         CATransaction.begin()
         if !animated { CATransaction.setDisableActions(true) }
@@ -688,6 +720,8 @@ final class Overviews {
     var ringStyle = FocusHighlight.Style()
     var floating = OverviewFloating.vertical
     var keys = OverviewKeys()
+    /// Fullscreen windows and their frames, which the shelf shows on their display.
+    var fullScreen: () -> [String: Rect] = { [:] }
 
     private let pictures: WindowPictures
     private let windows: AXWindows
@@ -714,6 +748,7 @@ final class Overviews {
         query = ""
         byDisplay = byDisplay.filter { displays.engines[$0.key] != nil }
         active = nil
+        let full = fullScreen()
         var opened: [Overview] = []
         // The active display goes first. When it has no windows, the next one to open takes the keys.
         for (id, e) in displays.engines.sorted(by: { $0.value === engine && $1.value !== engine }) {
@@ -723,7 +758,8 @@ final class Overviews {
             o.ringStyle = ringStyle
             o.floating = floating
             o.keys = keys
-            guard o.open(e, on: Screens.screen(id: id), active: active == nil) else { continue }
+            let here = full.filter { displays.engine(owning: $0.value) === e }
+            guard o.open(e, on: Screens.screen(id: id), active: active == nil, fullScreen: here) else { continue }
             if active == nil { active = o }
             opened.append(o)
         }

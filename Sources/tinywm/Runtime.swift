@@ -117,6 +117,7 @@ final class Runtime {
             windows.focus(id)
         }
         overview.name = { [unowned self] id in persistence.names[id] }
+        overview.fullScreen = { [unowned self] in lifecycle.fullScreenWindows() }
         overview.renamed = { [unowned self] id, name in
             persistence.names[id] = name
             persistence.changed()

@@ -31,6 +31,45 @@ public enum WindowNumbers {
         return getWindow(element, &id) == .success && id != 0 ? id : nil
     }
 
+    private typealias CreateWithToken = @convention(c) (CFData) -> Unmanaged<AXUIElement>?
+
+    private static let createWithToken: CreateWithToken? = {
+        guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementCreateWithRemoteToken") else { return nil }
+        return unsafeBitCast(sym, to: CreateWithToken.self)
+    }()
+
+    /// The app's fullscreen windows on Spaces not shown, which its window list leaves out. They are
+    /// found by trying the app's element numbers through the SPI `_AXUIElementCreateWithRemoteToken`,
+    /// as AltTab does, and keeping the elements whose window number matches. `known` are window
+    /// numbers already in hand. Waits for the app, so call it off the main thread.
+    public static func fullScreenElsewhere(pid: pid_t, known: Set<CGWindowID>) -> [AXUIElement] {
+        let displays = AX.displayBounds()
+        let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        var wanted = Set(list.compactMap { info -> CGWindowID? in
+            guard (info[kCGWindowOwnerPID as String] as? Int32) == pid, (info[kCGWindowLayer as String] as? Int) == 0,
+                  info[kCGWindowIsOnscreen as String] as? Bool != true,
+                  let id = info[kCGWindowNumber as String] as? CGWindowID, !known.contains(id),
+                  let b = info[kCGWindowBounds as String] as? [String: Double] else { return nil }
+            let r = Rect(x: b["X"] ?? 0, y: b["Y"] ?? 0, width: b["Width"] ?? 0, height: b["Height"] ?? 0)
+            return displays.contains { r.isApproximately($0, tolerance: 1) } ? id : nil
+        })
+        guard !wanted.isEmpty, let createWithToken else { return [] }
+        // The token is the process ID, four zero bytes, "coco", then the element number.
+        var token = Data(count: 20)
+        token.replaceSubrange(0..<4, with: withUnsafeBytes(of: pid) { Data($0) })
+        token.replaceSubrange(8..<12, with: withUnsafeBytes(of: Int32(0x636f636f)) { Data($0) })
+        var found: [AXUIElement] = []
+        // ponytail: blind scan of the first 1000 element numbers, capped at half a second per app.
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.5
+        for n in UInt64(0)..<1000 where !wanted.isEmpty && ProcessInfo.processInfo.systemUptime < deadline {
+            token.replaceSubrange(12..<20, with: withUnsafeBytes(of: n) { Data($0) })
+            guard let element = createWithToken(token as CFData)?.takeRetainedValue(),
+                  let id = exactWindowID(of: element), wanted.remove(id) != nil else { continue }
+            found.append(element)
+        }
+        return found
+    }
+
     /// Which of these windows still exist, and whether each is shown. An app's hidden tab, a
     /// minimized window or one of a hidden app still exists but is not shown. Asks only the window
     /// server, never the app, so it is quick and never waits.

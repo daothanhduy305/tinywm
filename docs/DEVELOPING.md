@@ -264,7 +264,8 @@ its focused window, or to the one the keys chose. Each picture casts a soft shad
 edge, so light windows stand out from the desktop. `overview-floating` puts floating windows on a
 shelf, a dock-like plate that stays put while the rows pan: `vertical` (the default) stacks them
 down the right side as pictures of the same width, `horizontal` lines them up along the bottom as
-pictures of the same height, and `off` shows them at their real place, above the strip. The arrow
+pictures of the same height, and `off` shows them at their real place, above the strip. Fullscreen
+windows sit on the shelf too, after the floating ones; picking one switches to its Space. The arrow
 keys move right into a vertical shelf and left out of it, or down into a horizontal one. Each picture has its app name and window title
 under it. Right-click a picture and choose Rename…, or press Meta + R, to name the selected
 window. The `width-cycle` key renames too, if it is bound elsewhere. Return saves, Esc cancels,

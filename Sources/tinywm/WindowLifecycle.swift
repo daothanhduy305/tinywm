@@ -33,6 +33,9 @@ final class WindowLifecycle {
     private var hiddenSlots: [CGWindowID: StripDisplays.Slot] = [:]
     /// Slots of windows that went fullscreen, so each comes back where it was.
     private var fullScreenSlots: [String: StripDisplays.Slot] = [:]
+    /// Fullscreen windows on another Space. Their apps leave them out of their lists, but they
+    /// are still there.
+    private var fullScreenAway: Set<String> = []
     private var closeFocus = CloseFocus()
     private var focusRequest = FocusRequest()
     private var framesBeingRead: Set<String> = []
@@ -82,6 +85,8 @@ final class WindowLifecycle {
             // Some apps, such as Brave, report a window gone during the lock and hand back the
             // same element after it, so any report of a held window ends its hold.
             let wasHeld = heldWhileLocked.remove(id) != nil
+            // Back from another Space, out of fullscreen: reading its frame returns it to its slot.
+            if fullScreenAway.remove(id) != nil, displays.engine(holding: id) == nil { readChangedFrame(id) }
             if rebound {
                 Log.note("tracker", "\(Log.name(id)) is back with a new element, window number \(windows.number(of: id).map(String.init) ?? "?"); it keeps its place")
                 return
@@ -198,6 +203,10 @@ final class WindowLifecycle {
                 Log.note("tracker", "window gone \(Log.name(id)) while locked, window number \(windows.number(of: id).map(String.init) ?? "?"); held until the unlock")
                 return
             }
+            if windows.isFullScreen(id), let number = windows.number(of: id), WindowNumbers.states([number])[number] != nil {
+                if fullScreenAway.insert(id).inserted { Log.note("tracker", "\(Log.name(id)) is fullscreen on another Space; kept") }
+                return
+            }
             Log.note("tracker", "window gone \(Log.name(id)) temporary=\(temporary) slot=\(displays.slot(of: id).map { "\($0)" } ?? "none")")
             if temporary, let number = windows.number(of: id), let slot = displays.slot(of: id) {
                 hiddenSlots[number] = slot
@@ -233,12 +242,29 @@ final class WindowLifecycle {
         snapTimes[id] = nil
         placedAt[id] = nil
         fullScreenSlots[id] = nil
+        fullScreenAway.remove(id)
         heldWhileLocked.remove(id)
         displays.windowRemoved(id, refocus: refocus)
         dragger.windowRemoved(id)
         snapshots.forget(id)
         arrivals.forget(id)
         windows.forget(id)
+    }
+
+    /// Fullscreen windows off every strip and their frames. Those that no longer exist are forgotten.
+    func fullScreenWindows() -> [String: Rect] {
+        let ids = windows.allIDs.filter { windows.isFullScreen($0) && displays.engine(holding: $0) == nil }
+        let states = WindowNumbers.states(ids.compactMap { windows.number(of: $0) })
+        var out: [String: Rect] = [:]
+        for id in ids {
+            guard let number = windows.number(of: id), states[number] != nil else {
+                Log.note("tracker", "fullscreen \(Log.name(id)) is gone")
+                forget(id)
+                continue
+            }
+            if let frame = windows.frameOf(id) { out[id] = frame }
+        }
+        return out
     }
 
     /// Puts windows back where they were found, as when quitting.
