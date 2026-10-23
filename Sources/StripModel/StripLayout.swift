@@ -116,11 +116,19 @@ public func scrollAfterResize(_ before: Strip, _ after: Strip, _ m: StripMetrics
 }
 
 /// Scroll positions a swipe can settle on: each column flush with the screen's left edge,
-/// plus the strip's end, all kept inside the strip.
-public func snapPoints(_ strip: Strip, _ m: StripMetrics) -> [Double] {
+/// plus the strip's end, all kept inside the strip. With `.center`, each column centred instead.
+public func snapPoints(_ strip: Strip, _ m: StripMetrics, mode: ScrollMode = .fit) -> [Double] {
+    if mode == .center { return Array(Set(strip.columns.indices.map { centredScroll(strip, m, column: $0) })).sorted() }
     let (lefts, total) = m.columnOffsets(strip)
     let maxScroll = max(0, total - m.viewport.width)
     var points = lefts.map { max(0, min(maxScroll, $0 - m.gap)) }
     points.append(maxScroll)
     return Array(Set(points)).sorted()
+}
+
+/// The scroll that centres `column`, as far as the strip's ends allow.
+public func centredScroll(_ strip: Strip, _ m: StripMetrics, column: Int) -> Double {
+    var s = strip
+    s.focusedColumn = column
+    return scrollToFocus(s, m, mode: .center)
 }

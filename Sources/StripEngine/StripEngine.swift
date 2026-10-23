@@ -355,7 +355,7 @@ public final class StripEngine {
         guard let scroll = swipeScroll else { return }
         swipeScroll = nil
         let projected = scroll - velocity * swipeScale * viewport.width * swipeProjection
-        let points = snapPoints(strip, metrics)
+        let points = snapPoints(strip, metrics, mode: settings.scrollMode)
         let target = points.min { abs($0 - projected) < abs($1 - projected) } ?? 0
 
         // Motion starts from where the pictures are now, not from the old real frames.
@@ -365,7 +365,15 @@ public final class StripEngine {
 
         var next = strip
         next.scroll = target
-        if let f = next.focusedColumn {
+        if settings.scrollMode == .center, let f = next.focusedColumn {
+            // Focus follows the column the swipe centred, or the nearest one where the strip's end stops it.
+            let m = metrics
+            if abs(centredScroll(next, m, column: f) - target) >= 0.5 {
+                next.focusedColumn = next.columns.indices.min {
+                    abs(centredScroll(next, m, column: $0) - target) < abs(centredScroll(next, m, column: $1) - target)
+                }
+            }
+        } else if let f = next.focusedColumn {
             let m = metrics
             let (lefts, _) = m.columnOffsets(next)
             let left = lefts[f] - settings.gap, right = lefts[f] + m.width(of: next.columns[f]) + settings.gap

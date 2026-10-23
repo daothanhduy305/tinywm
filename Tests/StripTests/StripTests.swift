@@ -785,6 +785,18 @@ final class CountingWindows: WindowSystem {
         #expect(w.focusedWindow == "c")
     }
 
+    @Test func withCenterFocusASwipeCentresAColumnAndFocusesIt() {
+        let (e, w, _) = make()
+        e.settings.scrollMode = .center
+        #expect(snapPoints(e.strip, e.metrics, mode: .center) == [0, 250, 750, 1000])
+        e.beginSwipe()
+        e.swipe(by: -0.4) // 600 points
+        e.endSwipe(velocity: 0)
+        #expect(e.strip.scroll == 750)
+        #expect(e.strip.focusedWindow == "c")
+        #expect(w.focusedWindow == "c")
+    }
+
     @Test func pullingPastTheEndRubberBandsAndReturns() {
         let (e, _, p) = make()
         e.beginSwipe()
