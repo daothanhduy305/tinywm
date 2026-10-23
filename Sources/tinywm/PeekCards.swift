@@ -100,7 +100,8 @@ final class PeekCards {
         p.hasShadow = false
         // Under the motion overlay, so a card shows through the pictures as they fade.
         p.level = .normal
-        p.collectionBehavior = [.canJoinAllSpaces, .ignoresCycle, .stationary]
+        // On the strip's Space only, so a card slides away with it and never covers a fullscreen app.
+        p.collectionBehavior = [.ignoresCycle, .stationary]
         p.animationBehavior = .none
         let view = ClickView()
         view.onClick = { [unowned self] in onClick(id) }
