@@ -59,6 +59,11 @@ public enum LayoutMatcher {
             openSlots.remove(p.slot)
             openWindows.remove(p.window)
         }
+        // Last, an app's windows take its slots left over, in order, as a relaunched browser's
+        // windows whose titles all changed.
+        freeSlots = freeSlots.filter(openSlots.contains)
+        freeWindows = freeWindows.filter(openWindows.contains)
+        take { s, w in s.bundleID != nil && s.bundleID == w.bundleID }
         return result
     }
 

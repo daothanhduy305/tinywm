@@ -316,7 +316,11 @@ public final class StripDisplays {
         return app
     }
 
-    public func windowRemoved(_ id: String, refocus: Bool = true) {
+    /// Takes a window off its strip. Only a window that `closed` leaves the layouts of other
+    /// setups and of displays that went away; one that went fullscreen or left the strip
+    /// keeps its place there.
+    public func windowRemoved(_ id: String, refocus: Bool = true, closed: Bool = true) {
+        guard closed else { engine(holding: id)?.windowRemoved(id, refocus: refocus); return }
         if let s = slot(of: id)?.slot, s.column != nil, let app = app(of: id), widths[app] != s.width {
             widths[app] = s.width
             onWidthsChanged?(widths)
@@ -329,6 +333,15 @@ public final class StripDisplays {
 
     public func windowReplaced(_ old: String, by new: String) {
         apps[old] = nil
+        // The new tab takes the old one's place in the other setups too.
+        func swap(_ w: inout Workspaces) {
+            guard w.workspace(of: old) != nil else { return }
+            // Removing normalises, which can shift the workspaces, so the old one is looked up again.
+            w.remove(new)
+            if let i = w.workspace(of: old) { w.strips[i].replace(old, with: new) }
+        }
+        for d in retired.keys { swap(&retired[d]!) }
+        for k in setups.keys { for d in setups[k]!.keys { swap(&setups[k]![d]!) } }
         guard let e = engine(holding: old) else { return }
         if let other = engine(holding: new), other !== e { other.windowRemoved(new) }
         e.windowReplaced(old, by: new)

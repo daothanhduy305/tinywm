@@ -370,7 +370,9 @@ relaunches the match goes by title, so a name can be lost, or land on a similar 
 
 At startup `LayoutPersistence` holds the windows the first scan finds. After a short settle
 time, `SavedLayout.plan` matches them to saved slots, each slot used once: first CGWindowID with
-the same pid and app, then bundle ID with the exact title, then bundle ID with a similar title.
+the same pid and app, then bundle ID with the exact title, then bundle ID with a similar title. Last, an app's
+windows left over take its slots left over, in saved order, so a relaunched browser whose titles
+all changed still gets its places.
 Each display's workspaces are rebuilt and normalised, written once without motion, and windows
 that no slot claimed join the usual way. Displays that are unplugged or switched off keep their
 saved layout in the file. With `restore-layout = off` the file is neither read nor written.
@@ -380,7 +382,8 @@ arrangement and resolution do not count, and turning tiling off for one is not a
 the setup changes, `StripDisplays.update` keeps the layout of the setup being left. If the new
 setup was seen before, every display gets that setup's layout back, without the windows that closed
 since. Windows the layout does not name stay on their display, or join the first display if theirs
-went away. In a setup not seen before, windows of a display
+went away. A window keeps its place in the other setups while it is fullscreen, on a display
+that is not tiled, or swapped for another tab; only closing it drops it. In a setup not seen before, windows of a display
 that went away move to the first display and go back when it returns. The file keeps these layouts
 under `setups`, keyed by the sorted UUIDs joined with commas. At startup the current setup's layout
 is restored, else each display's own; the other setups are matched against the same windows so a

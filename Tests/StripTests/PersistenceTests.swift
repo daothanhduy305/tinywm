@@ -119,11 +119,19 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
         #expect(r["w1"] == s[1].0)
     }
 
-    @Test func titlesTooDifferentDoNotMatch() {
-        let s = slots(saved([[desc(1, "app.a", "Inbox")]]))
-        #expect(LayoutMatcher.assign(slots: s, windows: [live("w1", desc(2, "app.a", "Calendar"))]).isEmpty)
-        #expect(LayoutMatcher.assign(slots: slots(saved([[desc(1, "app.a", "")]])),
-                                     windows: [live("w1", desc(2, "app.a", ""))]).isEmpty)
+    @Test func anAppsLeftoverSlotsTakeItsWindowsInOrder() {
+        // A relaunched browser: new numbers, every title changed.
+        let s = slots(saved([[desc(1, "app.a", "Inbox")], [desc(9, "app.b", "x")], [desc(2, "app.a", "")]]))
+        let r = LayoutMatcher.assign(slots: s, windows: [
+            live("w1", desc(5, "app.a", "Calendar")), live("w2", desc(6, "app.a", "")), live("w3", desc(7, "app.z", "x")),
+        ])
+        #expect(r == ["w1": s[0].0, "w2": s[2].0])
+    }
+
+    @Test func titleMatchesComeBeforeLeftoverSlots() {
+        let s = slots(saved([[desc(1, "app.a", "Inbox")], [desc(2, "app.a", "Calendar")]]))
+        let r = LayoutMatcher.assign(slots: s, windows: [live("w1", desc(5, "app.a", "Notes")), live("w2", desc(6, "app.a", "Inbox"))])
+        #expect(r == ["w2": s[0].0, "w1": s[1].0])
     }
 
     @Test func eachSlotIsUsedOnce() {

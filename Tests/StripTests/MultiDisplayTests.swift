@@ -322,6 +322,37 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(d.engines["A"]?.strip.allWindows == ["x"])
     }
 
+    @Test func aWindowThatLeftTheStripForAWhileKeepsItsPlaceInOtherSetups() {
+        let (d, _) = make()
+        d.update([a])
+        for id in ["x", "y", "z"] { d.windowAdded(id, frame: rect(100, 100, 300, 300)) }
+        let alone = d.engines["A"]!.strip.columns.map(\.windows)
+        d.update([a, b])
+        // On B, y goes fullscreen and comes back, as a browser playing a video does.
+        d.windowRemoved("y", closed: false)
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        let slot = d.slot(of: "y")!
+        d.windowRemoved("y", closed: false)
+        #expect(d.restore("y", to: slot))
+        d.update([a])
+        #expect(d.engines["A"]?.strip.columns.map(\.windows) == alone)
+    }
+
+    @Test func aTabThatReplacedAWindowTakesItsPlaceInOtherSetups() {
+        let (d, _) = make()
+        d.update([a])
+        for id in ["x", "y", "z"] { d.windowAdded(id, frame: rect(100, 100, 300, 300)) }
+        let alone = d.engines["A"]!.strip.columns.map { $0.windows.map { $0 == "y" ? "t" : $0 } }
+        d.update([a, b])
+        d.windowRemoved("y", closed: false)
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.windowAdded("t", frame: rect(1100, 100, 300, 300))
+        d.windowReplaced("y", by: "t")
+        d.windowRemoved("y")
+        d.update([a])
+        #expect(d.engines["A"]?.strip.columns.map(\.windows) == alone)
+    }
+
     @Test func aNewFloatingWindowStaysWhereItOpened() {
         let (d, w) = make()
         d.update([a, b])

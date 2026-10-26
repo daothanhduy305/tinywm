@@ -104,7 +104,7 @@ final class WindowLifecycle {
             let id = windows.id(for: element, pid: pid)
             let wasAutoFloat = autoFloats.contains(id)
             Log.note("tracker", "\(Log.name(id)) became dockable; auto-floating=\(wasAutoFloat)")
-            if autoFloats.remove(id) != nil { displays.windowRemoved(id) }
+            if autoFloats.remove(id) != nil { displays.windowRemoved(id, closed: false) }
             arrivals.arrived(id, element: element)
         }
         tracker.onDeminiaturized = { [unowned self] element in
@@ -404,7 +404,7 @@ final class WindowLifecycle {
             guard let slot = displays.slot(of: id) else { return }
             Log.note("place", "\(Log.name(id)) went fullscreen; it leaves the strip until it comes back")
             fullScreenSlots[id] = slot
-            displays.windowRemoved(id, refocus: false)
+            displays.windowRemoved(id, refocus: false, closed: false)
             return
         }
         if let engine = displays.engine(holding: id) {
@@ -414,7 +414,7 @@ final class WindowLifecycle {
             }
             if displays.engine(owning: now) == nil {
                 Log.note("drag", "\(Log.name(id)) moved to \(Log.rect(now)), off every tiled display; it leaves the strip")
-                displays.windowRemoved(id)
+                displays.windowRemoved(id, closed: false)
             } else if engine.frame(of: id) != nil {
                 snapBack(id)
             } else {
