@@ -210,7 +210,8 @@ final class Overview {
     /// Opens on `engine`'s display with its focused window selected. Only the active one takes
     /// keys. False when there is nothing to show.
     func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:]) -> Bool {
-        guard phase == .closed, pictures.available, let screen else { return false }
+        // Also while closing, so the hotkey works again at once.
+        guard phase != .open, pictures.available, let screen else { return false }
         let ws = engine.workspaces
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
@@ -241,6 +242,10 @@ final class Overview {
         searchIcon.contentsScale = screen.backingScaleFactor
 
         place()
+        // Keys typed before the panel is key go to the app in front, so take them before the slower setup.
+        panel.orderFrontRegardless()
+        searchField.isHidden = false
+        if active { takeKeys() } else { releaseKeys() }
         refreshBackdrop()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -290,14 +295,15 @@ final class Overview {
         ring.frame = outset(NSRect(real[focus]!))
         dim.opacity = 0
         dock.opacity = 0
-        searchBar.opacity = 0
+        searchBar.removeAllAnimations()
         CATransaction.commit()
         CATransaction.flush()
 
-        panel.alphaValue = PictureMotion.coveringAlpha
-        panel.orderFrontRegardless()
-        searchField.isHidden = false
-        if active { takeKeys() } else { releaseKeys() }
+        // Also stops the fade out of a close still running.
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0
+            panel.animator().alphaValue = PictureMotion.coveringAlpha
+        }
 
         relayout(animated: true, fromModel: true)
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -350,7 +356,11 @@ final class Overview {
         searchBar.opacity = 1
         searchField.alphaValue = 1
         // A click on the field already gave it the keys.
-        if searchField.currentEditor() == nil { panel.makeFirstResponder(searchField) }
+        if searchField.currentEditor() == nil, panel.makeFirstResponder(searchField) {
+            // Taking the keys selects the whole query, so the next key would replace it, as when
+            // the keys move to a display that matches the search.
+            searchField.currentEditor()?.selectedRange = NSRange(location: (searchField.stringValue as NSString).length, length: 0)
+        }
         if let d, phase == .open, let layout, let selected, let next = overviewEntry(layout, from: selected, d, matching: matching) {
             select(next)
             home = next
@@ -740,10 +750,12 @@ final class Overviews {
 
     /// Opens on every display, or closes onto the active display's highlighted window.
     func toggle(_ engine: StripEngine, displays: StripDisplays) {
-        if isOpen {
-            if let active, active.isShowing { active.handle(.confirm) }
+        // Overviews still zooming closed open again.
+        if byDisplay.values.contains(where: \.isShowing) {
+            active?.handle(.confirm)
             return
         }
+        let start = CACurrentMediaTime()
         self.displays = displays
         query = ""
         byDisplay = byDisplay.filter { displays.engines[$0.key] != nil }
@@ -764,6 +776,7 @@ final class Overviews {
             opened.append(o)
         }
         guard !opened.isEmpty else { return }
+        Log.note("overview", "opened on \(opened.count) displays in \(Int((CACurrentMediaTime() - start) * 1000)) ms")
         pictures.snapshots.beginLive(opened.reduce(into: Set()) { $0.formUnion($1.ids) }, rate: opened[0].rate)
     }
 
@@ -782,10 +795,11 @@ final class Overviews {
             search()
         }
         o.wantsKeys = { [unowned self, unowned o] in
-            guard o !== active, o.isShowing else { return }
+            // While opening, before `active` is set, the field taking the keys is no click.
+            guard let active, o !== active, o.isShowing else { return }
             Log.note("overview", "keys move to the clicked search bar")
-            active?.releaseKeys()
-            active = o
+            active.releaseKeys()
+            self.active = o
             o.takeKeys()
         }
         o.renamed = { [unowned self] id, name in
