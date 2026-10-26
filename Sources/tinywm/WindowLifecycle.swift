@@ -505,7 +505,13 @@ final class WindowLifecycle {
         guard locked != screenLocked else { return }
         screenLocked = locked
         lockRelease?.cancel()
+        lockRelease = nil
         guard !locked else { return }
+        scheduleLockRelease()
+    }
+
+    private func scheduleLockRelease() {
+        lockRelease?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated { self?.releaseLockHold() }
         }
@@ -513,10 +519,19 @@ final class WindowLifecycle {
         DispatchQueue.main.asyncAfter(deadline: .now() + lockReturnWait, execute: work)
     }
 
+    /// Restarts the wait after the unlock, as when displays change. Apps hand back their windows
+    /// only once the displays have settled, which can take longer than the wait.
+    func extendLockHold() {
+        guard lockRelease != nil, !screenLocked else { return }
+        Log.note("tracker", "displays changed; the lock hold waits \(Int(lockReturnWait)) s more")
+        scheduleLockRelease()
+    }
+
     /// Removes the windows that went during the lock and did not come back, then writes every
     /// window again, since macOS may have moved some meanwhile.
     private func releaseLockHold() {
         guard !screenLocked else { return }
+        lockRelease = nil
         let gone = heldWhileLocked
         heldWhileLocked = []
         Log.note("tracker", "lock hold ends; \(gone.isEmpty ? "every window came back" : "gone for good: \(Log.names(Array(gone)))")")

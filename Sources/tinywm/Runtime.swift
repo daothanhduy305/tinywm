@@ -309,6 +309,7 @@ final class Runtime {
     /// nothing moves; the change is applied once they are back.
     private func screensChanged() {
         pendingScreens?.cancel()
+        lifecycle.extendLockHold()
         let infos = Screens.infos()
         let vanished = displays.engines.keys.contains { id in !infos.contains { $0.id == id } }
         Log.note("display", "screens changed: \(infos.count) attached, vanished=\(vanished), away=\(userAway)")
@@ -326,6 +327,7 @@ final class Runtime {
 
     private func applyScreens() {
         displays.update(Screens.infos())
+        lifecycle.extendLockHold()
         for (id, engine) in displays.engines { overlays[id]?.pictures.viewport = engine.viewport }
         menu.showDisplays(disabled: displays.disabled)
         // macOS moves windows itself for a while after a display changes, as on a new resolution,
