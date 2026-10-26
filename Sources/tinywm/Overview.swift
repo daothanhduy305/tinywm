@@ -647,13 +647,14 @@ final class Overview {
         titles = [:]
     }
 
-    /// "App — Title", "App — Name" for a named window, or just the app when there is neither.
+    /// "App — Title", "Name (App)" for a named window, or just the app when there is neither.
     /// Also sets the text the search matches, which keeps a named window's title.
     private func labelText(_ id: String) -> String {
         let app = windows.pid(of: id).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
         let title = windows.cachedTitle(of: id).flatMap { $0.isEmpty ? nil : $0 }
         let given = name(id)
-        let text = [app, given ?? title].compactMap { $0 }.joined(separator: " — ")
+        let text = given.map { g in app.map { "\(g) (\($0))" } ?? g }
+            ?? [app, title].compactMap { $0 }.joined(separator: " — ")
         titles[id] = given == nil ? text : [text, title].compactMap { $0 }.joined(separator: " — ")
         return text
     }

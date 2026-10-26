@@ -380,7 +380,7 @@ final class Runtime {
             return image
         }
         minimap.name = { [unowned self] wid in
-            windows.pid(of: wid).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
+            persistence.names[wid] ?? windows.pid(of: wid).flatMap { NSRunningApplication(processIdentifier: $0)?.localizedName }
         }
         overlays[id] = (pictures, minimap, cards)
 
