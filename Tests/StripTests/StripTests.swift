@@ -472,11 +472,13 @@ final class FakePresenter: StripPresenter {
     var writeDelay = 0.034
     var begun: [(moves: [String: (from: Rect, to: Rect)], still: [String: Rect])] = []
     var focused: [String?] = []
+    var lifted: [String?] = []
     var landedIDs: [String] = []
     var issued: Set<String>?
-    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?) -> Int? {
+    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?, lifted: String?) -> Int? {
         begun.append((moves, still))
         self.focused.append(focused)
+        self.lifted.append(lifted)
         return accept ? begun.count : nil
     }
     func landed(_ id: String, token: Int) { landedIDs.append(id) }
@@ -514,6 +516,70 @@ final class CountingWindows: WindowSystem {
         clock.advance(by: 1)
         w.writes = [:]
         return (e, w, p, clock)
+    }
+
+    @Test func aMovedWindowIsLifted() {
+        let (e, _, p, clock) = make()
+        e.move(.left)
+        #expect(p.lifted.last == "c")
+        clock.advance(by: 1)
+        e.focus(.left)
+        #expect(p.lifted.last == .some(nil))
+    }
+
+    @Test func aWindowMovedInItsStackOrToAnotherWorkspaceIsLifted() {
+        let (e, _, p, clock) = make()
+        e.stack(.left)
+        clock.advance(by: 1)
+        e.move(.up)
+        #expect(p.lifted.last == "c")
+        #expect(p.begun.last!.moves["c"] != nil)
+        clock.advance(by: 1)
+        e.moveToWorkspace(by: 1)
+        #expect(p.lifted.last == "c")
+    }
+
+    @Test func aFullWidthWindowMovedIsLiftedInPlace() {
+        let (e, _, p, clock) = make()
+        e.toggleFullWidth()
+        clock.advance(by: 1)
+        let frame = e.frame(of: "c")!
+        e.move(.left)
+        #expect(p.lifted.last == "c")
+        #expect(p.begun.last!.moves["c"].map { $0.from == frame && $0.to == frame } == true)
+    }
+
+    @Test func theWindowsALiftedOnePassesTravelAlongTheStrip() {
+        let (e, _, p, clock) = make()
+        e.toggleFullWidth()
+        clock.advance(by: 1)
+        e.move(.left)
+        // b was just left of the screen and ends just right of it, crossing under c.
+        let b = p.begun.last!.moves["b"]!
+        #expect(b.from.x == -500)
+        #expect(b.to.x == 1000)
+    }
+
+    @Test func aWorkspaceAWindowIsCarriedToComesInAsItWasThenMakesRoom() {
+        let (e, _, p, clock) = make()
+        e.moveToWorkspace(by: 1)
+        e.toggleFullWidth()
+        e.switchWorkspace(by: -1)
+        clock.advance(by: 1)
+        e.moveToWorkspace(by: 1)
+        #expect(p.lifted.last == "b")
+        // c filled the screen; it comes up from below there, then moves aside for b.
+        let c = p.begun.last!.moves["c"]!
+        #expect(c.from == Rect(x: 0, y: 600, width: 1000, height: 600))
+        #expect(c.to.x == -500)
+    }
+
+    @Test func aMoveThatChangesNothingLiftsNothing() {
+        let (e, _, p, _) = make()
+        let count = p.begun.count
+        e.move(.right)
+        e.move(.up)
+        #expect(p.begun.count == count)
     }
 
     @Test func windowsWrittenWithoutMotionAreReportedSoTheirPicturesAreRetaken() {

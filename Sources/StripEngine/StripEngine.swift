@@ -36,6 +36,12 @@ public final class StripEngine {
     /// The width each window took when its column asked for another, with the width asked.
     /// Its column takes that width until its share or the screen changes.
     private var refusals: [String: (asked: Double, took: Double)] = [:]
+    /// Set by a command that moves the focused window, so its picture lifts while it travels.
+    private var liftNext = false
+    /// Each window's place on the strip as last laid out, past the screen's edges too.
+    private var stripPlaces: [String: Rect] = [:]
+    /// Where the workspace a window is carried to showed its windows before it arrived.
+    private var arrivalPlaces: [String: Rect] = [:]
 
     private let windows: WindowSystem
     /// The frame each window should have now: the layout's target, set before it is written, so a
@@ -549,6 +555,9 @@ public final class StripEngine {
     /// Carries the focused window to the workspace above or below and follows it.
     public func moveToWorkspace(by delta: Int) {
         let id = newColumnID()
+        liftNext = strip.focusedWindow != nil
+        let to = workspaces.active + delta
+        arrivalPlaces = workspaces.strips.indices.contains(to) ? stripFrames(workspaces.strips[to], metrics, clamp: false) : [:]
         changeWorkspaces { $0.moveFocused(by: delta, width: settings.defaultWidth, columnID: id) }
     }
 
@@ -556,11 +565,11 @@ public final class StripEngine {
 
     public func focus(_ d: Direction) { change { $0.focus(d) } }
     public func focusColumn(_ i: Int) { change { $0.focusColumn(i) } }
-    public func move(_ d: Direction) { change { $0.move(d) } }
-    public func stack(_ d: Direction) { change { $0.stack(d) } }
+    public func move(_ d: Direction) { lift { $0.move(d) } }
+    public func stack(_ d: Direction) { lift { $0.stack(d) } }
     public func popOut() {
         let id = newColumnID()
-        change { $0.popOut(columnID: id) }
+        lift { $0.popOut(columnID: id) }
     }
     public func cycleWidth(backward: Bool = false) { resize { $0.cycleWidth(settings.widthPresets, backward: backward) } }
     public func toggleFullWidth() { resize { $0.toggleFullWidth() } }
@@ -599,6 +608,14 @@ public final class StripEngine {
     /// Edits the strip, scrolls to the focused column, moves windows, and focuses the new target.
     private func change(raise: Bool = true, caller: String = #function, _ edit: (inout Strip) -> Void) {
         changeWorkspaces(raise: raise, caller: caller) { edit(&$0.current) }
+    }
+
+    /// A change that moves the focused window lifts its picture, even when its frame stays the same.
+    private func lift(caller: String = #function, _ edit: (inout Strip) -> Void) {
+        var probe = strip
+        edit(&probe)
+        liftNext = probe.columns != strip.columns
+        change(caller: caller, edit)
     }
 
     /// Width changes keep the view the user had before the column grew.
@@ -667,6 +684,8 @@ public final class StripEngine {
             if !real.isApproximately(edge) { slides[id] = edge }
         }
         let peekStripBefore = peekStrip
+        let placesBefore = stripPlaces
+        stripPlaces = unclamped
         peekStrip = unclamped.filter { peeks[$0.key] != nil }
         var parkedNow: Set<String> = []
         for (i, other) in workspaces.strips.enumerated() where i != workspaces.active {
@@ -727,6 +746,29 @@ public final class StripEngine {
                 moves[id] = (from, to, to.isApproximately(target) ? nil : target)
             }
         }
+        // A moved window lifts even when it keeps its frame, as a full-width one does.
+        var lifted: String?
+        if liftNext, let id = strip.focusedWindow, direct[id] == nil, let to = frames[id] {
+            if moves[id] == nil { moves[id] = (to, to, nil) }
+            lifted = id
+            // The others travel along the strip, across the screen even between hidden places,
+            // so the lifted window passes over them. On a workspace it is carried to, they come in
+            // where that workspace showed them, then make room.
+            for other in strip.allWindows where other != id {
+                let from: Rect?
+                if isParked(other, before: true) {
+                    from = arrivalPlaces[other].map { Rect(x: $0.x, y: $0.y + delta * height, width: $0.width, height: $0.height) }
+                } else {
+                    from = placesBefore[other]
+                }
+                guard let from, let along = unclamped[other], !from.isApproximately(along),
+                      let target = frames[other] else { continue }
+                moves[other] = (from, along, along.isApproximately(target) ? nil : target)
+                direct[other] = nil
+            }
+        }
+        liftNext = false
+        arrivalPlaces = [:]
         // A window staying behind a card keeps its hidden frame, but its picture follows the strip.
         for (id, to) in peekStrip where moves[id] == nil {
             if let from = peekStripBefore[id], !from.isApproximately(to) { moves[id] = (from, to, frames[id]) }
@@ -751,7 +793,7 @@ public final class StripEngine {
         let finals = moves.mapValues { $0.then ?? $0.to }
         if !moves.isEmpty, let presenter,
            let token = presenter.begin(moves: moves.mapValues { (from: $0.from, to: $0.to) }, still: still,
-                                       focused: strip.focusedWindow) {
+                                       focused: strip.focusedWindow, lifted: lifted) {
             let write: @MainActor () -> Void = { [weak self, weak presenter] in
                 guard let self else { return }
                 // A window given another frame since, or taken off this strip, has a newer write coming

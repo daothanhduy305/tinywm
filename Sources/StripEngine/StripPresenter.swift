@@ -11,8 +11,9 @@ import WindowCore
 @MainActor
 public protocol StripPresenter: AnyObject {
     /// Starts a motion. `focused` is the window that has focus once it lands, so the focus border
-    /// can travel with the pictures. Returns a token for it, or nil when pictures are unavailable.
-    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?) -> Int?
+    /// can travel with the pictures. `lifted` is the window a command moved: its picture shrinks,
+    /// travels over the others, then grows back. Returns a token for it, or nil when pictures are unavailable.
+    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?, lifted: String?) -> Int?
     /// Seconds to wait after `begin` before writing the real windows.
     var writeDelay: Double { get }
     /// Called when the system confirms a real window reached its frame for motion `token`.

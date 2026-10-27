@@ -139,7 +139,7 @@ final class PictureMotion: StripPresenter {
 
     // MARK: StripPresenter
 
-    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?) -> Int? {
+    func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?, lifted: String?) -> Int? {
         guard pictures.available else { return nil }
         current = Motion(began: CACurrentMediaTime())
         token += 1
@@ -165,8 +165,14 @@ final class PictureMotion: StripPresenter {
         refreshBackdrop()
         // A picture already in flight continues from where it is on screen.
         var start: [String: NSRect] = [:]
+        var startScale: [String: CGFloat] = [:]
         for (id, m) in glides {
-            if active, let p = layers[id]?.presentation() { start[id] = p.frame } else { start[id] = local(m.from) }
+            if active, let p = layers[id]?.presentation() {
+                start[id] = unscaled(p)
+                startScale[id] = scale(of: p)
+            } else {
+                start[id] = local(m.from)
+            }
         }
         let shown = Set(moves.keys).union(still.keys)
         for (id, layer) in layers where !shown.contains(id) {
@@ -177,6 +183,8 @@ final class PictureMotion: StripPresenter {
             let layer = layers[id] ?? makeLayer(id)
             layer.removeAllAnimations()
             layer.frame = start[id] ?? local(still[id]!)
+            // The lifted picture travels over the others.
+            layer.zPosition = id == lifted ? 1 : 0
             // The picture shows at its own size and is clipped, never stretched. A window that
             // changes size gets live pictures at its new size as soon as it has relaid out.
             pictures.show(id, on: layer, growingTo: current.targetSizes[id])
@@ -186,7 +194,7 @@ final class PictureMotion: StripPresenter {
         if showRing(), let focused, let end = moves[focused]?.to ?? still[focused] {
             ringTo = outset(local(end))
             let from: NSRect
-            if active, !ring.isHidden, let p = ring.presentation() { from = p.frame }
+            if active, !ring.isHidden, let p = ring.presentation() { from = unscaled(p) }
             else if let last = ringTarget { from = last }
             else { from = outset(start[focused] ?? local(end)) }
             styleRing()
@@ -225,15 +233,34 @@ final class PictureMotion: StripPresenter {
             let from = layer.frame
             let to = local(m.to)
             layer.frame = to
-            let group = springs(from: from, to: to)
+            let s = startScale[id] ?? 1
+            let group: CAAnimationGroup
+            if id == lifted {
+                group = lift(from: from, to: to, scale: s)
+                layer.followCover(from: from.size, to: to.size) { keyframes("position", [$0, $0, $1, $1]) }
+            } else if lifted != nil {
+                // The others slide at the same time, so the lifted picture passes over them.
+                group = slide(from: from, to: to)
+                layer.followCover(from: from.size, to: to.size) { keyframes("position", [$0, $0, $1, $1]) }
+            } else {
+                group = springs(from: from, to: to)
+                layer.followCover(from: from.size, to: to.size) { spring("position", $0, $1) }
+            }
+            // A picture still shrunk from an interrupted lift grows back as it goes.
+            if id != lifted, s < 1 {
+                group.animations?.append(spring("transform.scale", NSNumber(value: Double(s)), NSNumber(value: 1)))
+            }
             longest = max(longest, group.duration)
             layer.add(group, forKey: "move")
-            layer.followCover(from: from.size, to: to.size) { spring("position", $0, $1) }
         }
         if let ringTo {
             let from = ring.frame
             ring.frame = ringTo
-            if from != ringTo {
+            if focused != nil, focused == lifted {
+                let group = lift(from: from, to: ringTo)
+                longest = max(longest, group.duration)
+                ring.add(group, forKey: "move")
+            } else if from != ringTo {
                 let group = springs(from: from, to: ringTo)
                 longest = max(longest, group.duration)
                 ring.add(group, forKey: "move")
@@ -440,6 +467,48 @@ final class PictureMotion: StripPresenter {
         group.duration = max(move.duration, size.duration)
         return group
     }
+
+    /// How far a lifted picture shrinks, and how long its shrink, slide and grow take together.
+    static let liftScale: CGFloat = 0.9
+    static let liftDuration: CFTimeInterval = 0.5
+
+    /// Shrinks a picture where it is, slides it to `to`, then grows it back.
+    private func lift(from: NSRect, to: NSRect, scale: CGFloat = 1) -> CAAnimationGroup {
+        let small = Self.liftScale
+        let group = slide(from: from, to: to)
+        group.animations?.append(keyframes("transform.scale", [scale, small, small, 1].map { NSNumber(value: Double($0)) }))
+        return group
+    }
+
+    /// Moves a picture to `to` in the slide step of a lift, holding still while the lifted one shrinks and grows.
+    private func slide(from: NSRect, to: NSRect) -> CAAnimationGroup {
+        let a = NSValue(point: NSPoint(x: from.midX, y: from.midY)), b = NSValue(point: NSPoint(x: to.midX, y: to.midY))
+        let group = CAAnimationGroup()
+        group.animations = [
+            keyframes("position", [a, a, b, b]),
+            keyframes("bounds.size", [from.size, from.size, to.size, to.size].map { NSValue(size: $0) }),
+        ]
+        group.duration = Self.liftDuration
+        return group
+    }
+
+    /// Steps of a lift: shrink in the first fifth, slide until three quarters, then grow.
+    private func keyframes(_ key: String, _ values: [Any]) -> CAKeyframeAnimation {
+        let k = CAKeyframeAnimation(keyPath: key)
+        k.values = values
+        k.keyTimes = [0, 0.2, 0.75, 1]
+        k.timingFunctions = [.init(name: .easeOut), .init(name: .easeInEaseOut), .init(name: .easeOut)]
+        k.duration = Self.liftDuration
+        return k
+    }
+
+    /// A layer's frame on screen without its scale, as a picture caught mid-lift has.
+    private func unscaled(_ p: CALayer) -> NSRect {
+        NSRect(x: p.position.x - p.bounds.width / 2, y: p.position.y - p.bounds.height / 2,
+               width: p.bounds.width, height: p.bounds.height)
+    }
+
+    private func scale(of p: CALayer) -> CGFloat { (p.value(forKeyPath: "transform.scale") as? CGFloat) ?? 1 }
 
     /// The ring sits just outside the window, like the real border.
     private func outset(_ r: NSRect) -> NSRect { r.insetBy(dx: -ringStyle.borderWidth, dy: -ringStyle.borderWidth) }
