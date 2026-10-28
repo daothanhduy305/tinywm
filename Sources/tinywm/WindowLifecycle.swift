@@ -190,6 +190,10 @@ final class WindowLifecycle {
     }
     /// When each window was last put on a strip as a new window.
     private var placedAt: [String: Double] = [:]
+    /// Focused windows that just closed, kept on their strip a moment: an app such as Ghostty
+    /// closes a tab's window before it shows the tab that takes its place.
+    private var closingTabs: Set<String> = []
+    private let tabSwapWait = 0.5
 
     // MARK: Removal
 
@@ -213,6 +217,15 @@ final class WindowLifecycle {
             }
             if !temporary, windows.knownFocus == id, let pid = windows.pid(of: id), closeFocus.closing == nil {
                 closeFocus.closing(id, app: pid)
+            }
+            // ponytail: every close of the focused window moves focus 0.5 s late; skip the hold
+            // when the window server lists no other window of the app if that lag shows.
+            if !temporary, windows.knownFocus == id, closingTabs.insert(id).inserted {
+                Log.note("tracker", "\(Log.name(id)) closed with focus; held \(tabSwapWait) s for a tab that replaces it")
+                DispatchQueue.main.asyncAfter(deadline: .now() + tabSwapWait) { [weak self] in
+                    MainActor.assumeIsolated { if self?.closingTabs.remove(id) != nil { self?.forget(id) } }
+                }
+                return
             }
             // A window that hid without focus must not pull another app's window to the front.
             forget(id, refocus: !temporary || windows.focusedWindow == id)
@@ -244,6 +257,7 @@ final class WindowLifecycle {
         fullScreenSlots[id] = nil
         fullScreenAway.remove(id)
         heldWhileLocked.remove(id)
+        closingTabs.remove(id)
         displays.windowRemoved(id, refocus: refocus)
         dragger.windowRemoved(id)
         snapshots.forget(id)
