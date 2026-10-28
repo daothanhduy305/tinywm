@@ -163,6 +163,7 @@ final class ShortcutCommands {
         a["width-cycle"] = { $0.cycleWidth() }
         a["width-cycle-back"] = { $0.cycleWidth(backward: true) }
         a["width-full"] = { $0.toggleFullWidth() }
+        a["width-half"] = { $0.halfWidth() }
         a["center"] = { $0.center() }
         a["wider"] = { $0.wider() }
         a["narrower"] = { $0.narrower() }

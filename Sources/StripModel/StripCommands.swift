@@ -157,6 +157,12 @@ extension Strip {
         }
     }
 
+    public mutating func setWidth(_ width: Double) {
+        guard let f = focusedColumn else { return }
+        columns[f].width = width
+        columns[f].widthBeforeFull = nil
+    }
+
     public mutating func nudgeWidth(by delta: Double) {
         guard let f = focusedColumn else { return }
         columns[f].width = min(1, max(0.1, columns[f].width + delta))

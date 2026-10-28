@@ -18,10 +18,11 @@ public enum KeyNames {
             ("esc", 53), ("escape", 53), ("tab", 48), ("return", 36), ("enter", 36), ("space", 49),
             ("equal", 24), ("minus", 27), ("leftbracket", 33), ("rightbracket", 30), ("comma", 43),
             ("period", 47), ("slash", 44), ("semicolon", 41), ("quote", 39),
+            ("backslash", 42), ("grave", 50),
         ]
         for (n, c) in others { m[n] = c }
         let symbols: [(String, Int)] = [
-            ("=", 24), ("-", 27), ("[", 33), ("]", 30), (",", 43), (".", 47), ("/", 44), (";", 41), ("'", 39),
+            ("=", 24), ("-", 27), ("[", 33), ("]", 30), (",", 43), (".", 47), ("/", 44), (";", 41), ("'", 39), ("\\", 42), ("`", 50),
         ]
         for (n, c) in symbols { m[n] = c }
         return m
@@ -36,7 +37,8 @@ public enum KeyNames {
             m[code] = name
         }
         let words = ["left", "right", "up", "down", "pageup", "pagedown", "esc", "tab", "return", "space", "equal",
-                     "minus", "leftbracket", "rightbracket", "comma", "period", "slash", "semicolon", "quote"]
+                     "minus", "leftbracket", "rightbracket", "comma", "period", "slash", "semicolon", "quote",
+                     "backslash", "grave"]
         for w in words { if let c = codes[w] { m[c] = w } }
         return m
     }()

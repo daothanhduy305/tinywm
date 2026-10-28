@@ -89,7 +89,7 @@ Hold **right ⌘** (the "meta" key) and press:
 | F / C | Full width / centre the window |
 | = / − | Wider / narrower |
 | [ / ] | Stack the window into its neighbour · ⇧] pops it out |
-| T | Float or tile the window |
+| T | Float or tile the window · ⇧T sets half width |
 | V | Focus the floating windows, then the strip again |
 | 1 – 9 | Jump to a column |
 | Esc | Overview: type to search, pick a window with the arrows or Tab (the arrows cross to the next display at an edge), then Return; Esc clears the search, then closes it |

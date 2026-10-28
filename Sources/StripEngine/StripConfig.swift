@@ -388,8 +388,8 @@ public struct StripConfig: Equatable, Sendable {
         #
         # The meta key is implied in every binding. Extra modifiers: shift, option and control
         # (with meta = control-option, command instead of option, and no control). Keys: letters, digits, left right up
-        # down pageup pagedown esc tab return space, and = - [ ] , . / ; ' or the names
-        # equal minus leftbracket rightbracket comma period slash semicolon quote.
+        # down pageup pagedown esc tab return space, and = - [ ] , . / ; ' \\ ` or the names
+        # equal minus leftbracket rightbracket comma period slash semicolon quote backslash grave.
         # "unbind <action>" removes a default binding. Two actions on one key: the later line wins.
         #
         # Your own shortcuts. "run" starts a shell command; "send" presses other keys, with any of

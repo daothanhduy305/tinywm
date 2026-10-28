@@ -141,8 +141,8 @@ unbind focus-left-arrow         # removes a default binding
 ```
 
 - Keys: letters, digits, `left right up down pageup pagedown esc tab return space`, and
-  `= - [ ] , . / ; '` (also spelled `equal minus leftbracket rightbracket comma period slash
-  semicolon quote`).
+  `= - [ ] , . / ; ' \ `` ` `` (also spelled `equal minus leftbracket rightbracket comma period slash
+  semicolon quote backslash grave`).
 - Extra modifiers: `shift`, `option` and `control`, joined with `+` (`shift+option+left`,
   `control+h`). With `meta = control-option` the extra modifier is `command` instead of
   `option`, and `control` is not available, since ⌃ is already part of the meta key.
@@ -233,6 +233,7 @@ keys both work out of the box.
 | Meta + 1 to 9 | Focus a column | `focus-column-1` to `focus-column-9` |
 | Meta + R / E | Cycle the column width wider / narrower | `width-cycle` `width-cycle-back` |
 | Meta + F | Full width | `width-full` |
+| Meta + ⇧ + T | Half width | `width-half` |
 | Meta + C | Center the column | `center` |
 | Meta + = / - | Wider / narrower | `wider` `narrower` |
 | Meta + ] / [ | Stack into the right / left column | `stack-right` `stack-left` |

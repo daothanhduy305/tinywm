@@ -43,6 +43,7 @@ public enum StripActions {
         add("width-cycle", "Cycle width", "r")
         add("width-cycle-back", "Cycle width backward", "e")
         add("width-full", "Full width", "f")
+        add("width-half", "Half width", "t", shift: true)
         add("center", "Center column", "c")
         add("wider", "Wider", "equal", repeats: true)
         add("narrower", "Narrower", "minus", repeats: true)

@@ -18,6 +18,13 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.describe(key("n", control: true), meta: .rightCommand) == "control+n")
     }
 
+    @Test func backslashAndBacktickAreKeys() {
+        let r = StripConfig.parse("meta = control-option\nbind width-half = shift+command+\\\nbind center = grave")
+        #expect(r.issues.isEmpty)
+        #expect(r.config.bindings["width-half"] == key("backslash", shift: true, alt: true))
+        #expect(r.config.bindings["center"] == key("`"))
+    }
+
     @Test func controlSurvivesTheShortcutRoundTrip() {
         let chord = key("n", control: true)
         let s = Shortcut(keyCode: chord.keyCode, modifiers: 0x1800 | MetaKeyBindings.extraControl)
@@ -270,7 +277,7 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
             "workspace-move-up-arrow": key("up", shift: true, alt: true),
             "workspace-down-page": key("pagedown"), "workspace-up-page": key("pageup"),
             "workspace-move-down-page": key("pagedown", shift: true), "workspace-move-up-page": key("pageup", shift: true),
-            "width-cycle": key("r"), "width-cycle-back": key("e"), "width-full": key("f"), "center": key("c"),
+            "width-cycle": key("r"), "width-cycle-back": key("e"), "width-full": key("f"), "width-half": key("t", shift: true), "center": key("c"),
             "wider": key("="), "narrower": key("-"),
             "stack-right": key("]"), "stack-left": key("["), "pop-out": key("]", shift: true),
             "float": key("t"), "float-focus": key("v"),

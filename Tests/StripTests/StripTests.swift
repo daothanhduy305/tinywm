@@ -146,6 +146,8 @@ private func strip(_ widths: [Double], focus: Int? = 0) -> Strip {
         #expect(s.columns[0].width == 1.0 / 3)
         s.nudgeWidth(by: -1)
         #expect(s.columns[0].width == 0.1)
+        s.setWidth(0.5)
+        #expect(s.columns[0].width == 0.5)
     }
 
     @Test func floatingTakesAWindowOffTheStripAndBack() {
