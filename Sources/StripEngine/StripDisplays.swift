@@ -402,10 +402,10 @@ public final class StripDisplays {
     @discardableResult
     public func moveFocused(by delta: Int, from current: StripEngine?) -> String? {
         guard let current, let target = neighbour(of: current, by: delta), let e = engines[target], e !== current,
-              let moved = current.takeFocused() else { return nil }
+              let moved = current.takeFocused(toward: e.viewport) else { return nil }
         Log.note("display", "move \(Log.name(moved.id)) from \(current.label) to \(Self.short(target))")
         chosen = nil
-        e.adopt(moved.id, width: moved.width, focus: true)
+        e.adopt(moved.id, width: moved.width, focus: true, from: moved.frame)
         return target
     }
 
@@ -427,10 +427,10 @@ public final class StripDisplays {
     @discardableResult
     public func moveFocused(toward direction: Direction, from current: StripEngine?) -> String? {
         guard let current, let target = neighbour(of: current, toward: direction), let e = engines[target],
-              e !== current, let moved = current.takeFocused() else { return nil }
+              e !== current, let moved = current.takeFocused(toward: e.viewport) else { return nil }
         Log.note("display", "move \(Log.name(moved.id)) \(direction) from \(current.label) to \(Self.short(target))")
         chosen = nil
-        e.adopt(moved.id, width: moved.width, focus: true)
+        e.adopt(moved.id, width: moved.width, focus: true, from: moved.frame)
         return target
     }
 

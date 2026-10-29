@@ -474,10 +474,29 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         source.windowAdded("a")
         source.wider()
         let target = StripEngine(windows: w, viewport: rect(1000, 0))
-        let moved = source.takeFocused()!
-        target.adopt(moved.id, width: moved.width, focus: true)
+        let moved = source.takeFocused(toward: target.viewport)!
+        target.adopt(moved.id, width: moved.width, focus: true, from: moved.frame)
         let expected = target.frame(of: "a")
         clock.advance(by: 0.1)
         #expect(w.frames["a"] == expected)
+    }
+
+    @Test func aWindowMovedToAnotherDisplayLiftsOffOneAndOntoTheOther() {
+        let w = FakeWindows()
+        let clock = TestClock()
+        let leaving = FakePresenter(), arriving = FakePresenter()
+        let source = StripEngine(windows: w, viewport: rect(0, 0))
+        let target = StripEngine(windows: w, viewport: rect(1000, 0))
+        for (e, p) in [(source, leaving), (target, arriving)] { e.clock = clock; e.presenter = p }
+        w.focusedWindow = "a"
+        source.windowAdded("a")
+        clock.advance(by: 1)
+        let old = source.frame(of: "a")!
+        let moved = source.takeFocused(toward: target.viewport)!
+        target.adopt(moved.id, width: moved.width, focus: true, from: moved.frame)
+        #expect(leaving.lifted.last == "a")
+        #expect(leaving.begun.last!.moves["a"]!.to.x == old.x + 1000)
+        #expect(arriving.lifted.last == "a")
+        #expect(arriving.begun.last!.moves["a"]!.from == old)
     }
 }

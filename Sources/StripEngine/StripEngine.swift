@@ -42,6 +42,10 @@ public final class StripEngine {
     private var stripPlaces: [String: Rect] = [:]
     /// Where the workspace a window is carried to showed its windows before it arrived.
     private var arrivalPlaces: [String: Rect] = [:]
+    /// The frame on another display a window arriving from it had, so it flies in from there.
+    private var arrivalFrame: Rect?
+    /// A window leaving for another display, whose picture flies off toward it.
+    private var departing: (id: String, from: Rect, to: Rect)?
 
     private let windows: WindowSystem
     /// The frame each window should have now: the layout's target, set before it is written, so a
@@ -248,19 +252,30 @@ public final class StripEngine {
     // MARK: Moving between displays
 
     /// A window arriving from another display becomes a column right of the focused one.
-    public func adopt(_ id: String, width: Double, focus: Bool) {
+    /// With `from`, its frame there, it lifts and flies in from it.
+    public func adopt(_ id: String, width: Double, focus: Bool, from: Rect? = nil) {
         Log.note("engine", "\(label) adopt \(Log.name(id)) width=\(width) focus=\(focus)")
         guard workspaces.workspace(of: id) == nil else { return }
+        if let from, focus { liftNext = true; arrivalFrame = from }
         change { $0.insert(id, width: width, columnID: newColumnID(), focus: focus) }
+        arrivalFrame = nil
     }
 
     /// Takes the focused window off this strip so another display can adopt it. The window keeps
     /// system focus: focusing a window left behind would arrive after the move and pull focus back.
-    public func takeFocused() -> (id: String, width: Double)? {
+    /// With `toward`, the other display's frame, its picture lifts and flies off that way.
+    public func takeFocused(toward: Rect? = nil) -> (id: String, width: Double, frame: Rect?)? {
         guard let f = strip.focusedColumn, let id = strip.focusedWindow else { return nil }
         let width = strip.columns[f].width
+        let frame = frame(of: id)
+        if let toward, let frame {
+            let dx = toward.x + toward.width / 2 - (viewport.x + viewport.width / 2)
+            let dy = toward.y + toward.height / 2 - (viewport.y + viewport.height / 2)
+            departing = (id, frame, Rect(x: frame.x + dx, y: frame.y + dy, width: frame.width, height: frame.height))
+        }
         windowRemoved(id, refocus: false)
-        return (id, width)
+        departing = nil
+        return (id, width, frame)
     }
 
     /// Gives the focused window system focus, as when the user switches to this display.
@@ -749,6 +764,11 @@ public final class StripEngine {
         }
         // A moved window lifts even when it keeps its frame, as a full-width one does.
         var lifted: String?
+        // A window from another display is new here, but flies in from where it was.
+        if liftNext, let from = arrivalFrame, let id = strip.focusedWindow, let to = direct[id] {
+            direct[id] = nil
+            moves[id] = (from, to, nil)
+        }
         if liftNext, let id = strip.focusedWindow, direct[id] == nil, let to = frames[id] {
             if moves[id] == nil { moves[id] = (to, to, nil) }
             lifted = id
@@ -770,6 +790,11 @@ public final class StripEngine {
         }
         liftNext = false
         arrivalPlaces = [:]
+        // The display it goes to writes a departing window; here only its picture leaves.
+        if let d = departing {
+            moves[d.id] = (d.from, d.to, nil)
+            lifted = d.id
+        }
         // A window staying behind a card keeps its hidden frame, but its picture follows the strip.
         for (id, to) in peekStrip where moves[id] == nil {
             if let from = peekStripBefore[id], !from.isApproximately(to) { moves[id] = (from, to, frames[id]) }
@@ -791,7 +816,7 @@ public final class StripEngine {
 
         var still: [String: Rect] = [:]
         for id in strip.allWindows where moves[id] == nil { still[id] = peekStrip[id] ?? slides[id] ?? frames[id] }
-        let finals = moves.mapValues { $0.then ?? $0.to }
+        let finals = moves.filter { $0.key != departing?.id }.mapValues { $0.then ?? $0.to }
         if !moves.isEmpty, let presenter,
            let token = presenter.begin(moves: moves.mapValues { (from: $0.from, to: $0.to) }, still: still,
                                        focused: strip.focusedWindow, lifted: lifted) {
