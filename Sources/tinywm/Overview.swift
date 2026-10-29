@@ -87,6 +87,8 @@ final class Overview {
     private var previous: String?
     private var pan = 0.0
     private var token = 0
+    /// Windows whose picture has faded in since the overview opened.
+    private var faded: Set<String> = []
 
     var isOpen: Bool { phase != .closed }
     var isShowing: Bool { phase == .open }
@@ -238,6 +240,7 @@ final class Overview {
         phase = .open
         token += 1
         matching = nil
+        faded = []
         showQuery("")
         searchIcon.contentsScale = screen.backingScaleFactor
 
@@ -623,11 +626,14 @@ final class Overview {
             return
         }
         guard phase != .closed, !pictures.coverMode, let layer = layers[id] else { return }
-        // A newer picture fades in over the old one rather than jumping.
-        let fade = CATransition()
-        fade.type = .fade
-        fade.duration = 0.2
-        layer.add(fade, forKey: "picture")
+        // The first new picture fades in over the old one rather than jumping. Later ones swap
+        // at once: a fade on every refresh blends large pictures all the time and stutters.
+        if faded.insert(id).inserted {
+            let fade = CATransition()
+            fade.type = .fade
+            fade.duration = 0.2
+            layer.add(fade, forKey: "picture")
+        }
         layer.setPicture(snapshots.surface(of: id))
     }
 
