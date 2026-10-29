@@ -312,3 +312,55 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(real["g"]!.y == 2 * 600)
     }
 }
+
+@Suite struct OverviewDropTests {
+    @Test func findsColumnSlotsAndRows() {
+        let ws = sample()
+        let layout = overviewLayout(ws, metrics, screen: display)
+        let a = layout.window("a")!.rect, b = layout.window("b")!.rect
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: Point(x: a.x - 10, y: a.center.y), dragging: "a")?.target == .newColumn(1))
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: Point(x: (a.maxX + b.x) / 2, y: a.center.y), dragging: "a")?.target == .newColumn(1))
+        let d = layout.window("d")!.rect
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: d.center, dragging: "a")?.workspace == 2)
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: Point(x: d.x, y: layout.rows.last!.rect.maxY + layout.margin + 1), dragging: "a") == nil)
+        var withFloat = ws
+        withFloat.strips[1].floating = ["float"]
+        let shelf = overviewLayout(withFloat, metrics, screen: display, floats: ["float": Rect(x: 0, y: 0, width: 200, height: 200)])
+        #expect(overviewDrop(shelf, shownWS: withFloat, base: withFloat, at: shelf.rows.last!.rect.center, dragging: "a") == nil)
+    }
+}
+
+@Suite struct OverviewPreviewTests {
+    @Test func explicitRowsIncludeEmptyEnds() {
+        let ws = sample()
+        let layout = overviewLayout(ws, metrics, screen: display, rows: [0, 1, 2, 3])
+        #expect(layout.rows.map(\.workspace) == [0, 1, 2, 3])
+    }
+
+    @Test func previewMovesAndRemovesWithoutNormalizing() {
+        let ws = sample()
+        let moved = overviewPreview(ws, moving: "a", to: (3, .newColumn(0)), width: 0.5, columnID: "preview")
+        #expect(moved.strips.count == ws.strips.count)
+        #expect(moved.workspace(of: "a") == 3)
+        let reordered = overviewPreview(ws, moving: "a", to: (1, .newColumn(2)), width: 0.5, columnID: "preview")
+        #expect(reordered.strips[1].columns.map(\.windows) == [["b", "c"], ["a"]])
+        #expect(overviewPreview(ws, moving: "missing", to: nil, width: 0.5, columnID: "preview") == ws)
+        let removed = overviewPreview(ws, moving: "d", to: nil, width: 0.5, columnID: "preview")
+        #expect(removed.strips.count == ws.strips.count)
+        #expect(removed.workspace(of: "d") == nil)
+        #expect(removed.strips[2].isEmpty)
+    }
+
+    @Test func previewSlotKeepsItsBaseTargetAndEmptyRowsAcceptDrops() {
+        let ws = sample()
+        let shown = overviewPreview(ws, moving: "a", to: (2, .newColumn(0)), width: 0.5, columnID: "preview")
+        let layout = overviewLayout(shown, metrics, screen: display, rows: [0, 1, 2, 3])
+        let slot = layout.window("a")!.rect
+        let left = overviewDrop(layout, shownWS: shown, base: ws, at: Point(x: slot.x + 1, y: slot.center.y), dragging: "a")
+        let right = overviewDrop(layout, shownWS: shown, base: ws, at: Point(x: slot.maxX - 1, y: slot.center.y), dragging: "a")
+        #expect(left?.target == right?.target)
+        #expect(left?.target == .newColumn(0))
+        #expect(overviewDrop(layout, shownWS: shown, base: ws, at: Point(x: layout.rows[0].rect.center.x, y: layout.rows[0].rect.y - 1), dragging: "a")?.workspace == 0)
+        #expect(overviewDrop(layout, shownWS: shown, base: ws, at: Point(x: layout.rows[3].rect.center.x, y: layout.rows[3].rect.maxY + 1), dragging: "a")?.workspace == 3)
+    }
+}

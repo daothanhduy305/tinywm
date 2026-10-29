@@ -24,7 +24,9 @@ final class OverviewView: NSView {
     var onKey: (Key) -> Void = { _ in }
     var onHover: (CGPoint) -> Void = { _ in }
     var onExit: () -> Void = {}
-    var onClick: (CGPoint) -> Void = { _ in }
+    var onPress: (CGPoint) -> Void = { _ in }
+    var onDrag: (CGPoint) -> Void = { _ in }
+    var onRelease: (CGPoint) -> Void = { _ in }
     var onRightClick: (CGPoint) -> Void = { _ in }
     var onScroll: (CGFloat) -> Void = { _ in }
 
@@ -53,8 +55,10 @@ final class OverviewView: NSView {
     }
     override func mouseExited(with event: NSEvent) { onExit() }
     override func mouseDown(with event: NSEvent) {
-        if let p = pointer(), bounds.contains(p) { onClick(p) }
+        if let p = pointer(), bounds.contains(p) { onPress(p) }
     }
+    override func mouseDragged(with event: NSEvent) { if let p = pointer() { onDrag(p) } }
+    override func mouseUp(with event: NSEvent) { if let p = pointer() { onRelease(p) } }
     override func rightMouseDown(with event: NSEvent) {
         if let p = pointer(), bounds.contains(p) { onRightClick(p) }
     }

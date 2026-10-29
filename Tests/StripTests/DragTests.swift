@@ -294,6 +294,32 @@ final class FakeDragPresenter: DragPresenter {
         return (d, drag, w, p)
     }
 
+    @Test func overviewMoveKeepsWidthAcrossWorkspaces() {
+        let (displays, _, _, _) = make()
+        let engine = displays.engines["A"]!
+        engine.windowAdded("a")
+        engine.windowAdded("z", workspace: 2)
+        let source = engine.workspaces.workspace(of: "a")!
+        let width = engine.workspaces.strips[source].columns[engine.workspaces.strips[source].column(of: "a")!].width
+        let destination = engine.workspaces.workspace(of: "z")!
+        engine.moveWindow("a", toWorkspace: destination, at: .newColumn(0))
+        let moved = engine.workspaces.workspace(of: "a")!
+        #expect(moved == engine.workspaces.workspace(of: "z"))
+        #expect(engine.workspaces.strips[moved].columns[engine.workspaces.strips[moved].column(of: "a")!].width == width)
+    }
+
+    @Test func overviewMoveAcrossDisplaysKeepsWidth() {
+        let (displays, _, _, _) = make()
+        let source = displays.engines["A"]!, target = displays.engines["B"]!
+        let workspace = source.workspaces.workspace(of: "x")!
+        let width = source.workspaces.strips[workspace].columns[source.workspaces.strips[workspace].column(of: "x")!].width
+        source.handOver("x")
+        target.moveWindow("x", toWorkspace: target.workspaces.active, at: .newColumn(0), width: width)
+        #expect(source.workspaces.workspace(of: "x") == nil)
+        let moved = target.workspaces.workspace(of: "x")!
+        #expect(target.workspaces.strips[moved].columns[target.workspaces.strips[moved].column(of: "x")!].width == width)
+    }
+
     func order(_ d: StripDisplays, _ id: String = "A") -> [[String]] {
         d.engines[id]!.strip.columns.map(\.windows)
     }

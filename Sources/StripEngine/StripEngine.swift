@@ -640,6 +640,24 @@ public final class StripEngine {
         changeWorkspaces(scroll: { scrollAfterResize(before, $0, $1, mode: $2) }, caller: caller) { edit(&$0.current) }
     }
 
+    /// Moves a window from the overview without switching workspaces.
+    public func moveWindow(_ id: String, toWorkspace w: Int, at target: DropTarget, width incoming: Double? = nil) {
+        guard workspaces.strips.indices.contains(w) else { return }
+        let src = workspaces.workspace(of: id)
+        let width = src.flatMap { i in workspaces.strips[i].column(of: id).map { workspaces.strips[i].columns[$0].width } } ?? incoming
+        guard let width else { return }
+        let columnID = newColumnID()
+        changeWorkspaces(raise: false) { ws in
+            let focused = ws.strips[w].focusedWindow
+            if let src, src != w { ws.strips[src].remove(id) }
+            ws.strips[w].place(id, at: target, width: width, columnID: columnID)
+            if let focused, let c = ws.strips[w].column(of: focused) {
+                ws.strips[w].focusedColumn = c
+                ws.strips[w].columns[c].focused = ws.strips[w].columns[c].windows.firstIndex(of: focused) ?? 0
+            }
+        }
+    }
+
     private func changeWorkspaces(
         raise: Bool = true,
         scroll: ((Strip, StripMetrics, ScrollMode) -> Strip)? = nil,

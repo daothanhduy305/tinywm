@@ -249,33 +249,36 @@ keys both work out of the box.
 | Meta + left drag | Move the window with the mouse | none |
 
 The overview opens on every display with windows, each with its focused window highlighted. It first
-waits up to 150 ms for new pictures of the windows on screen, so they don't jump from an old picture;
-pictures that arrive later fade in. In the
-active display's overview, the arrows and the focus keys held with the meta key move the selection,
-Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels. A search bar at
-the top of every display holds one shared query; the bar on the display with the keys is bright and
-takes typing as soon as the overview opens, so plain letters type rather than move. Clicking another
-display's bar moves the keys there. The windows whose app name and title don't contain every typed
-word fade, and the selection jumps to the first match. Tab and the arrows then move among matches
-only, and the keys cross only to a display with a match. The bar edits like any text field, with a
-caret, ⌥⌫, ⌘⌫, ⌥←/→ and paste, while the plain arrows still move the selection. Esc clears the
-search before it cancels. The search covers every display, and when the keys' display has no match,
-the keys move to one that does. At an edge, the arrow and focus keys move on to the display lying
-that way, landing on its window at the edge they came in by. The display the keys steer has the
-bright ring; the others' rings are faint. When the active display has no windows, the next display's
-overview takes the keys. Pointing at a window on any display highlights it, and a click focuses it
-and makes its display the active one. When the pointer leaves a display, its highlight goes back to
-its focused window, or to the one the keys chose. Each picture casts a soft shadow and has a faint
-edge, so light windows stand out from the desktop. `overview-floating` puts floating windows on a
-shelf, a dock-like plate that stays put while the rows pan: `vertical` (the default) stacks them
-down the right side as pictures of the same width, `horizontal` lines them up along the bottom as
-pictures of the same height, and `off` shows them at their real place, above the strip. Fullscreen
-windows sit on the shelf too, after the floating ones; picking one switches to its Space. The arrow
-keys move right into a vertical shelf and left out of it, or down into a horizontal one. Each picture has its app name and window title
-under it. Right-click a picture and choose Rename…, or press Meta + R, to name the selected
-window. The `width-cycle` key renames too, if it is bound elsewhere. Return saves, Esc cancels,
-and an empty name brings the title back. The label then reads `Name (App)`, the minimap shows the name, and the search matches the name, the app and
-the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
+waits up to 150 ms for new pictures of the windows on screen, so they don't jump from an old
+picture; pictures that arrive later fade in. In the active display's overview, the arrows and the
+focus keys held with the meta key move the selection, Tab and ⇧Tab step through windows, Return or
+Meta + Esc confirms, and Esc cancels. A search bar at the top of every display holds one shared
+query; the bar on the display with the keys is bright and takes typing as soon as the overview
+opens, so plain letters type rather than move. Clicking another display's bar moves the keys there.
+The windows whose app name and title don't contain every typed word fade, and the selection jumps to
+the first match. Tab and the arrows then move among matches only, and the keys cross only to a
+display with a match. The bar edits like any text field, with a caret, ⌥⌫, ⌘⌫, ⌥←/→ and paste, while
+the plain arrows still move the selection. Esc clears the search before it cancels. The search
+covers every display, and when the keys' display has no match, the keys move to one that does. At an
+edge, the arrow and focus keys move on to the display lying that way, landing on its window at the
+edge they came in by. The display the keys steer has the bright ring; the others' rings are faint.
+When the active display has no windows, the next display's overview takes the keys. Pointing at a
+window on any display highlights it, and a click focuses it and makes its display the active one.
+Drag a tiled window picture to move it to a column or workspace on any display. The other pictures
+move aside to open a gap. Empty rows above and below let you create a workspace. The picture shrinks
+while dragged and grows into its new place. When the pointer leaves a display,
+its highlight goes back to its focused window, or to the one the keys chose. Each picture casts a
+soft shadow and has a faint edge, so light windows stand out from the desktop. `overview-floating`
+puts floating windows on a shelf, a dock-like plate that stays put while the rows pan: `vertical`
+(the default) stacks them down the right side as pictures of the same width, `horizontal` lines them
+up along the bottom as pictures of the same height, and `off` shows them at their real place, above
+the strip. Fullscreen windows sit on the shelf too, after the floating ones; picking one switches to
+its Space. The arrow keys move right into a vertical shelf and left out of it, or down into a
+horizontal one. Each picture has its app name and window title under it. Right-click a picture and
+choose Rename…, or press Meta + R, to name the selected window. The `width-cycle` key renames too,
+if it is bound elsewhere. Return saves, Esc cancels, and an empty name brings the title back. The
+label then reads `Name (App)`, the minimap shows the name, and the search matches the name, the app
+and the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
 ⌘Tab with either ⌘ key opens the overview like Meta + Esc, and the macOS app switcher no longer
 shows; ⌘Tab again confirms.
 

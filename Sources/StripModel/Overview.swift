@@ -101,6 +101,41 @@ public struct OverviewLayout: Equatable, Sendable {
     }
 }
 
+public struct OverviewDrop: Equatable, Sendable {
+    public var workspace: Int
+    public var target: DropTarget
+    public var marker: Rect
+}
+
+/// A drag preview keeps workspace indices stable until the drop is committed.
+public func overviewPreview(_ base: Workspaces, moving id: String, to destination: (workspace: Int, target: DropTarget)?,
+                            width: Double, columnID: String) -> Workspaces {
+    var out = base
+    let source = out.workspace(of: id)
+    if let destination, out.strips.indices.contains(destination.workspace) {
+        if let source, source != destination.workspace { out.strips[source].remove(id) }
+        out.strips[destination.workspace].place(id, at: destination.target, width: width, columnID: columnID)
+    } else if let source { out.strips[source].remove(id) }
+    return out
+}
+
+/// Finds a base column slot from the layout currently shown.
+public func overviewDrop(_ layout: OverviewLayout, shownWS: Workspaces, base: Workspaces, at p: Point, dragging: String) -> OverviewDrop? {
+    if layout.rows.contains(where: { $0.workspace == -1 && $0.rect.contains(p) }) { return nil }
+    let rows = layout.rows.filter { shownWS.strips.indices.contains($0.workspace) && base.strips.indices.contains($0.workspace) }
+    guard let first = rows.first, let last = rows.last,
+          p.y >= first.rect.y - layout.margin, p.y <= last.rect.maxY + layout.margin,
+          let row = rows.min(by: { abs($0.rect.center.y - p.y) < abs($1.rect.center.y - p.y) }) else { return nil }
+    let columns = (0..<shownWS.strips[row.workspace].columns.count).compactMap { c -> (Double, Double)? in
+        let windows = row.windows.filter { $0.column == c }
+        guard let left = windows.map(\.rect.x).min(), let right = windows.map(\.rect.maxX).max() else { return nil }
+        return (left, right)
+    }
+    let k = columns.filter { ($0.0 + $0.1) / 2 < p.x }.count
+    let target = baseTarget(.newColumn(k), from: shownWS.strips[row.workspace], to: base.strips[row.workspace], dragging: dragging)
+    return OverviewDrop(workspace: row.workspace, target: target, marker: layout.window(dragging)?.rect ?? row.rect)
+}
+
 /// Lays out the overview for a screen of `screen` points. Window rects keep each window's
 /// proportions, since the whole strip scales by one factor. `floats` gives floating windows'
 /// frames relative to the viewport's top-left; a floating window without one is left out.
@@ -109,12 +144,12 @@ public struct OverviewLayout: Equatable, Sendable {
 /// windows, and are left out without one.
 public func overviewLayout(
     _ ws: Workspaces, _ m: StripMetrics, screen: Size, pan: Double = 0, style: OverviewStyle = OverviewStyle(),
-    floats: [String: Rect] = [:], fullScreen: [String: Rect] = [:]
+    floats: [String: Rect] = [:], fullScreen: [String: Rect] = [:], rows: [Int]? = nil
 ) -> OverviewLayout {
     var local = m
     local.viewport = Rect(x: 0, y: 0, width: m.viewport.width, height: m.viewport.height)
     let shelved = style.floating != .off
-    let shown = ws.strips.indices.filter {
+    let shown = rows ?? ws.strips.indices.filter {
         !ws.strips[$0].columns.isEmpty || $0 == ws.active
             || !shelved && ws.strips[$0].floating.contains { floats[$0] != nil }
     }

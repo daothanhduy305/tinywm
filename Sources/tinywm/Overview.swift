@@ -28,6 +28,13 @@ final class Overview {
     var name: (String) -> String? = { _ in nil }
     /// A window was given a name, or nil to clear it.
     var renamed: (String, String?) -> Void = { _, _ in }
+    var dragStarted: (String, Point, Point) -> Void = { _, _, _ in }
+    var dragMoved: (Point) -> Void = { _ in }
+    var dragReleased: () -> Void = {}
+    var cancelDragging: () -> Bool = { false }
+    var preview: Workspaces?
+    var dragRows: [Int]?
+    var previewID: String?
     /// Floating windows' frames, read once when the overview opens.
     private var floats: [String: Rect] = [:]
     /// Fullscreen windows' frames on this display, relative to the viewport's top-left.
@@ -47,20 +54,22 @@ final class Overview {
     private let windows: AXWindows
     private let panel: OverviewPanel
     private let view = OverviewView()
-    private let root = CALayer()
+    fileprivate let root = CALayer()
     private let backdrop = CALayer()
     private let dim = CALayer()
-    private let ring = CALayer()
+    fileprivate let ring = CALayer()
+    fileprivate let marker = CALayer()
+    fileprivate var drag: (id: String, press: CGPoint, grab: CGPoint, canDrag: Bool, started: Bool, drop: OverviewDrop?)?
     /// A rounded plate behind the shelf of floating windows, like the Dock.
     private let dock = CALayer()
-    private var layers: [String: WindowLayer] = [:]
+    fileprivate var layers: [String: WindowLayer] = [:]
     /// Holds each picture and casts its shadow, which the picture's own clipping would cut off.
     /// Moves, zooms and fades in place of the picture.
-    private var holders: [String: CALayer] = [:]
+    fileprivate var holders: [String: CALayer] = [:]
     /// Each window's "App — Title" line, under its picture.
-    private var labels: [String: CATextLayer] = [:]
+    fileprivate var labels: [String: CATextLayer] = [:]
     /// The text of each label, which the search matches.
-    private var titles: [String: String] = [:]
+    fileprivate var titles: [String: String] = [:]
     private let searchBar = CALayer()
     private let searchField = SearchField()
     private let searchIcon = CALayer()
@@ -76,14 +85,14 @@ final class Overview {
     private var phase = Phase.closed
     private(set) var engine: StripEngine?
     private var screen: NSScreen?
-    private var viewport = Rect(x: 0, y: 0, width: 1, height: 1)
+    fileprivate var viewport = Rect(x: 0, y: 0, width: 1, height: 1)
     private var metrics = StripMetrics(viewport: Rect(x: 0, y: 0, width: 1, height: 1), gap: 0)
-    private var layout: OverviewLayout?
+    fileprivate var layout: OverviewLayout?
     /// Each window's real frame when the overview opened, which is also its picture's size.
     private var real: [String: Rect] = [:]
-    private var selected: String?
+    fileprivate var selected: String?
     /// The selection the overview opened with or the keys moved to; it comes back when the pointer leaves.
-    private var home: String?
+    fileprivate var home: String?
     private var previous: String?
     private var pan = 0.0
     private var token = 0
@@ -93,7 +102,7 @@ final class Overview {
     var isOpen: Bool { phase != .closed }
     var isShowing: Bool { phase == .open }
     /// False when a search is typed and no window here matches it.
-    var hasMatches: Bool { matching.map { !$0.isEmpty } ?? true }
+    var hasMatches: Bool { !ids.isEmpty && (matching.map { !$0.isEmpty } ?? true) }
     /// The windows whose pictures are shown.
     var ids: Set<String> { Set(layers.keys) }
     var keys: OverviewKeys {
@@ -134,6 +143,9 @@ final class Overview {
         dock.opacity = 0
         dock.zPosition = 6
         root.addSublayer(dock)
+        marker.zPosition = 9
+        marker.isHidden = true
+        root.addSublayer(marker)
         ring.zPosition = 10
         root.addSublayer(ring)
         // A bright, bordered pill, so it reads as a place to type rather than a caption.
@@ -183,10 +195,18 @@ final class Overview {
             guard let self, phase == .open else { return }
             if let home { select(home, "pointer left") }
         }
-        view.onClick = { [weak self] p in
-            guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
-            chose(hit.id)
+        view.onPress = { [weak self] p in
+            guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)), let engine else { return }
+            let canDrag = !away.contains(hit.id) && engine.workspaces.strips.indices.contains(hit.workspace)
+                && engine.workspaces.strips[hit.workspace].column(of: hit.id) != nil
+                && layout?.rows.first(where: { $0.workspace == -1 })?.windows.contains(hit) != true
+            guard let holder = holders[hit.id], holder.bounds.width > 0 else { return }
+            let scale = hit.rect.width / holder.bounds.width
+            guard scale > 0 else { return }
+            drag = (hit.id, p, CGPoint(x: (p.x - hit.rect.center.x) / scale, y: (p.y - hit.rect.center.y) / scale), canDrag, false, nil)
         }
+        view.onDrag = { [weak self] p in self?.dragged(p) }
+        view.onRelease = { [weak self] p in self?.released(p) }
         renameField.isHidden = true
         view.addSubview(renameField)
         renameField.wantsLayer = true
@@ -221,7 +241,7 @@ final class Overview {
         let v = engine.viewport
         self.fullScreen = fullScreen.mapValues { Rect(x: $0.x - v.x, y: $0.y - v.y, width: $0.width, height: $0.height) }
         let probe = overviewLayout(ws, m, screen: size, style: style, floats: floats, fullScreen: self.fullScreen)
-        guard let first = probe.windows.first?.id else { return false }
+        let first = probe.windows.first?.id
 
         self.engine = engine
         self.screen = screen
@@ -231,7 +251,7 @@ final class Overview {
         let focus = ws.current.focusedWindow.flatMap { probe.window($0) != nil ? $0 : nil } ?? first
         selected = focus
         home = focus
-        pan = probe.pan(toReveal: focus, current: 0)
+        pan = focus.map { probe.pan(toReveal: $0, current: 0) } ?? 0
         layout = overviewLayout(ws, m, screen: size, pan: pan, style: style, floats: floats, fullScreen: self.fullScreen)
         // A fullscreen window's picture zooms out from the whole screen.
         real = overviewRealFrames(ws, m, floats: floats).merging(self.fullScreen) { a, _ in a }
@@ -295,7 +315,8 @@ final class Overview {
         }
         styleRing()
         ring.removeAllAnimations()
-        ring.frame = outset(NSRect(real[focus]!))
+        ring.isHidden = focus == nil
+        if let focus, let frame = real[focus] { ring.frame = outset(NSRect(frame)) }
         dim.opacity = 0
         dock.opacity = 0
         searchBar.removeAllAnimations()
@@ -325,7 +346,10 @@ final class Overview {
     // MARK: Keys and selection
 
     func handle(_ key: OverviewCommand) {
-        guard phase == .open, let layout, let selected else { return }
+        guard phase == .open, let layout else { return }
+        if key == .cancel, cancelDragging() { return }
+        if key == .cancel, selected == nil { chose(nil); return }
+        guard let selected else { return }
         let next: String?
         switch key {
         case .left: next = move(layout, selected, .left)
@@ -439,7 +463,37 @@ final class Overview {
     /// Redraws when `engine`'s strip changes while open, so a window that closes leaves.
     func changed(_ engine: StripEngine) {
         guard phase == .open, engine === self.engine else { return }
+        real = overviewRealFrames(engine.workspaces, metrics, floats: floats).merging(fullScreen) { a, _ in a }
         relayout(animated: true)
+    }
+
+    private func dragged(_ p: CGPoint) {
+        guard var d = drag, d.canDrag, let layer = holders[d.id] else { return }
+        let pointer = Point(x: viewport.x + p.x, y: viewport.y + p.y)
+        if !d.started {
+            guard hypot(p.x - d.press.x, p.y - d.press.y) >= DropStyle().threshold else { return }
+            d.started = true
+            drag = d
+            layer.zPosition = 15
+            labels[d.id]?.opacity = 0
+            ring.opacity = 0
+            let shown = layer.presentation() ?? layer
+            let position = shown.position, transform = shown.transform
+            layer.removeAllAnimations()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.position = position
+            layer.transform = transform
+            CATransaction.commit()
+            dragStarted(d.id, pointer, Point(x: d.grab.x, y: d.grab.y))
+        } else { dragMoved(pointer) }
+    }
+
+    private func released(_ p: CGPoint) {
+        if drag?.started == true { dragged(p) }
+        guard let d = drag else { return }
+        drag = nil
+        if d.started { dragReleased() } else { chose(d.id) }
     }
 
     // MARK: Closing
@@ -448,6 +502,8 @@ final class Overview {
     /// gives focus back to the window that had it before.
     func close(selecting id: String?, refocus: Bool) {
         guard phase == .open, let engine else { return }
+        drag = nil
+        marker.isHidden = true
         phase = .closing
         token += 1
         let mine = token
@@ -532,16 +588,16 @@ final class Overview {
 
     /// Puts every picture and the ring where the current layout says. Pictures are scaled by
     /// their layer's transform, so each stays in proportion.
-    private func relayout(animated: Bool, fromModel: Bool = false) {
+    fileprivate func relayout(animated: Bool, fromModel: Bool = false) {
         guard let engine else { return }
         let size = Size(width: viewport.width, height: viewport.height)
-        let next = overviewLayout(engine.workspaces, metrics, screen: size, pan: pan, style: style, floats: floats,
-                                  fullScreen: fullScreen)
+        let next = overviewLayout(preview ?? engine.workspaces, metrics, screen: size, pan: pan, style: style, floats: floats,
+                                  fullScreen: fullScreen, rows: dragRows)
         layout = next
         CATransaction.begin()
         if !animated { CATransaction.setDisableActions(true) }
         // A window that closed while the overview is open loses its picture.
-        for id in Set(layers.keys).subtracting(next.windows.map(\.id)) {
+        for id in Set(layers.keys).subtracting(next.windows.map(\.id)).subtracting([previewID].compactMap { $0 }) {
             layers.removeValue(forKey: id)
             holders.removeValue(forKey: id)?.removeFromSuperlayer()
             labels.removeValue(forKey: id)?.removeFromSuperlayer()
@@ -549,6 +605,7 @@ final class Overview {
         if let s = selected, next.window(s) == nil { selected = home.flatMap { next.window($0) != nil ? $0 : nil } ?? next.windows.first?.id }
         if let h = home, next.window(h) == nil { home = selected }
         for w in next.windows {
+            if previewID == w.id { continue }
             guard let layer = holders[w.id] else { continue }
             let centre = CGPoint(x: w.rect.center.x, y: w.rect.center.y)
             let scale = CGFloat(w.rect.width) / layer.bounds.width
@@ -573,6 +630,7 @@ final class Overview {
         } else {
             dock.isHidden = true
         }
+        ring.isHidden = selected == nil
         if let selected, let w = next.window(selected) {
             let target = outset(NSRect(w.rect))
             if animated { _ = moveRing(to: target, fromModel: fromModel) } else {
@@ -639,6 +697,10 @@ final class Overview {
 
     private func styleRing() {
         let color = ringStyle.color.cgColor
+        marker.backgroundColor = ringStyle.color.withAlphaComponent(0.12).cgColor
+        marker.borderColor = color
+        marker.borderWidth = 2
+        marker.cornerRadius = 10
         ring.borderWidth = ringStyle.borderWidth
         ring.borderColor = color
         ring.cornerRadius = ringStyle.cornerRadius / 2 + ringStyle.borderWidth / 2
@@ -754,6 +816,24 @@ final class Overviews {
     private var query = ""
     /// True while waiting for new pictures before opening.
     private var waiting = false
+    private final class DragState {
+        let source: Overview
+        let id: String
+        let width: Double
+        var carrier: Overview
+        var candidate: (Overview, OverviewDrop)?
+        var serial = 0
+        var centre: Point
+        var pointer: Point
+        let grab: Point
+        var workspaces: [ObjectIdentifier: Workspaces] = [:]
+        init(source: Overview, id: String, width: Double, pointer: Point, grab: Point) {
+            self.source = source; self.id = id; self.width = width; self.carrier = source
+            self.pointer = pointer; self.grab = grab; self.centre = pointer
+        }
+    }
+    private var dragging: DragState?
+    private var committing = false
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
 
@@ -805,23 +885,40 @@ final class Overviews {
             o.floating = floating
             o.keys = keys
             let here = full.filter { displays.engine(owning: $0.value) === e }
-            guard o.open(e, on: Screens.screen(id: id), active: active == nil, fullScreen: here) else { continue }
-            if active == nil { active = o }
+            guard o.open(e, on: Screens.screen(id: id), active: false, fullScreen: here) else { continue }
+            if active == nil, !o.ids.isEmpty { active = o }
             opened.append(o)
         }
         guard !opened.isEmpty else { return }
+        if active == nil { active = opened.first }
+        active?.takeKeys()
         Log.note("overview", "opened on \(opened.count) displays in \(Int((CACurrentMediaTime() - start) * 1000)) ms")
         pictures.snapshots.beginLive(opened.reduce(into: Set()) { $0.formUnion($1.ids) }, rate: opened[0].rate)
     }
 
-    func handle(_ command: OverviewCommand) { active?.handle(command) }
+    func handle(_ command: OverviewCommand) {
+        if command == .cancel, dragging != nil { cancelDrag(); return }
+        active?.handle(command)
+    }
 
     func changed(_ engine: StripEngine) {
+        if let dragging, !committing {
+            guard let before = dragging.workspaces[ObjectIdentifier(engine)], before != engine.workspaces else { return }
+            cancelDrag()
+        }
         for o in byDisplay.values { o.changed(engine) }
     }
 
     private func make(_ id: String) -> Overview {
         let o = Overview(pictures: pictures, windows: windows)
+        o.dragStarted = { [unowned self, unowned o] id, pointer, grab in startDrag(o, id, pointer, grab) }
+        o.dragMoved = { [unowned self] pointer in moveDrag(pointer) }
+        o.dragReleased = { [unowned self] in dropDrag() }
+        o.cancelDragging = { [unowned self] in
+            guard dragging != nil else { return false }
+            cancelDrag()
+            return true
+        }
         o.chose = { [unowned self, unowned o] window in chose(window, on: o) }
         o.atEdge = { [unowned self, unowned o] d in cross(d, from: o) }
         o.typed = { [unowned self] text in
@@ -848,6 +945,148 @@ final class Overviews {
         return o
     }
 
+    private func startDrag(_ source: Overview, _ id: String, _ pointer: Point, _ grab: Point) {
+        guard let engine = source.engine, let w = engine.workspaces.workspace(of: id),
+              let c = engine.workspaces.strips[w].column(of: id) else { return }
+        let state = DragState(source: source, id: id, width: engine.workspaces.strips[w].columns[c].width, pointer: pointer, grab: grab)
+        dragging = state
+        for o in byDisplay.values where o.isShowing {
+            guard let engine = o.engine, let layout = o.layout else { continue }
+            let ws = engine.workspaces
+            state.workspaces[ObjectIdentifier(engine)] = ws
+            o.dragRows = Array(Set(layout.rows.filter { $0.workspace >= 0 }.map(\.workspace) + [0, ws.strips.count - 1])).sorted()
+            o.previewID = id
+            o.relayout(animated: true)
+        }
+        moveDrag(pointer)
+        fitDragScale(state)
+    }
+
+    private func fitDragScale(_ state: DragState) {
+        guard let holder = state.source.holders[state.id], let layout = state.carrier.layout else { return }
+        let scale = (layout.window(state.id).map { $0.rect.width / holder.bounds.width } ?? layout.scale) * 0.85
+        guard abs(holder.transform.m11 - scale) > 0.0001 else { return }
+        let from = holder.presentation()?.transform.m11 ?? holder.transform.m11
+        let fromPosition = holder.presentation()?.position ?? holder.position
+        state.centre = Point(x: state.pointer.x - state.grab.x * scale, y: state.pointer.y - state.grab.y * scale)
+        let position = CGPoint(x: state.centre.x - state.carrier.viewport.x, y: state.centre.y - state.carrier.viewport.y)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        holder.transform = CATransform3DMakeScale(scale, scale, 1)
+        holder.position = position
+        CATransaction.commit()
+        holder.add(Spring.critical("transform.scale", from: NSNumber(value: Double(from)),
+                                   to: NSNumber(value: Double(scale)), stiffness: state.carrier.stiffness), forKey: "dragScale")
+        holder.add(Spring.critical("position", from: NSValue(point: fromPosition), to: NSValue(point: position),
+                                   stiffness: state.carrier.stiffness), forKey: "dragPosition")
+    }
+
+    private func moveDrag(_ pointer: Point) {
+        guard let state = dragging, let holder = state.source.holders[state.id] else { return }
+        state.pointer = pointer
+        let target = byDisplay.values.first { $0.isShowing && $0.viewport.contains(pointer) }
+        let carrier = target ?? state.source
+        let changedCarrier = carrier !== state.carrier
+        if changedCarrier {
+            holder.removeFromSuperlayer()
+            carrier.root.addSublayer(holder)
+            state.carrier = carrier
+        }
+        let scale = holder.transform.m11
+        state.centre = Point(x: pointer.x - state.grab.x * scale, y: pointer.y - state.grab.y * scale)
+        holder.removeAnimation(forKey: "dragPosition")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        holder.position = CGPoint(x: state.centre.x - carrier.viewport.x, y: state.centre.y - carrier.viewport.y)
+        CATransaction.commit()
+        if changedCarrier { fitDragScale(state) }
+        let drop: OverviewDrop? = target.flatMap { o in
+            guard let layout = o.layout, let base = o.engine?.workspaces else { return nil }
+            return overviewDrop(layout, shownWS: o.preview ?? base, base: base,
+                                at: Point(x: pointer.x - o.viewport.x, y: pointer.y - o.viewport.y), dragging: state.id)
+        }
+        let changed = state.candidate?.0 !== target || state.candidate?.1.workspace != drop?.workspace || state.candidate?.1.target != drop?.target
+        guard changed else { return }
+        state.candidate = target.flatMap { o in drop.map { (o, $0) } }
+        state.serial += 1
+        let serial = state.serial
+        if state.candidate == nil { showPreview(state, target: nil); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self, weak state] in
+            guard let self, let state, self.dragging === state, state.serial == serial else { return }
+            self.showPreview(state, target: state.candidate)
+        }
+    }
+
+    private func showPreview(_ state: DragState, target: (Overview, OverviewDrop)?) {
+        for o in byDisplay.values where o.isShowing {
+            guard let base = o.engine?.workspaces else { continue }
+            if let target, o === target.0 {
+                o.preview = overviewPreview(base, moving: state.id, to: (target.1.workspace, target.1.target), width: state.width, columnID: "overview-preview")
+            } else if target != nil && o === state.source {
+                o.preview = overviewPreview(base, moving: state.id, to: nil, width: state.width, columnID: "overview-preview")
+            } else { o.preview = nil }
+            o.marker.isHidden = true
+            o.relayout(animated: true)
+            if let target, o === target.0, let rect = o.layout?.window(state.id)?.rect {
+                o.marker.frame = NSRect(rect)
+                o.marker.isHidden = false
+            }
+        }
+        fitDragScale(state)
+    }
+
+    private func clearPreview(_ state: DragState) {
+        for o in byDisplay.values where o.isShowing {
+            o.preview = nil
+            o.dragRows = nil
+            o.previewID = nil
+            o.marker.isHidden = true
+        }
+    }
+
+    private func cancelDrag() {
+        guard let state = dragging, let holder = state.source.holders[state.id] else { return }
+        dragging = nil
+        state.source.drag = nil
+        holder.removeFromSuperlayer()
+        state.source.root.addSublayer(holder)
+        holder.position = CGPoint(x: state.centre.x - state.source.viewport.x, y: state.centre.y - state.source.viewport.y)
+        holder.zPosition = 0
+        state.source.labels[state.id]?.opacity = 1
+        state.source.ring.opacity = state.source === active ? 1 : Overview.idleRing
+        clearPreview(state)
+        for o in byDisplay.values where o.isShowing { o.relayout(animated: true) }
+    }
+
+    private func dropDrag() {
+        guard let state = dragging else { return }
+        guard let (target, drop) = state.candidate, let sourceEngine = state.source.engine, let targetEngine = target.engine else { cancelDrag(); return }
+        dragging = nil
+        committing = true
+        if target !== state.source {
+            target.holders[state.id] = state.source.holders.removeValue(forKey: state.id)
+            target.layers[state.id] = state.source.layers.removeValue(forKey: state.id)
+            if let label = state.source.labels.removeValue(forKey: state.id) {
+                label.removeFromSuperlayer(); target.root.addSublayer(label); target.labels[state.id] = label
+            }
+            target.titles[state.id] = state.source.titles.removeValue(forKey: state.id)
+        }
+        clearPreview(state)
+        target.previewID = state.id
+        if target !== state.source { sourceEngine.handOver(state.id) }
+        targetEngine.moveWindow(state.id, toWorkspace: drop.workspace, at: drop.target, width: state.width)
+        target.previewID = nil
+        target.holders[state.id]?.zPosition = 0
+        target.labels[state.id]?.opacity = 1
+        target.selected = state.id
+        target.home = state.id
+        target.ring.isHidden = false
+        target.ring.opacity = target === active ? 1 : Overview.idleRing
+        state.source.ring.opacity = state.source === active ? 1 : Overview.idleRing
+        committing = false
+        for o in byDisplay.values where o.isShowing { o.relayout(animated: true) }
+    }
+
     /// At an edge, the keys move on to the display lying that way, if its overview is showing.
     private func cross(_ d: Direction, from o: Overview) {
         guard o === active, let id = displays?.display(toward: d, from: o.engine),
@@ -870,6 +1109,7 @@ final class Overviews {
 
     private func chose(_ window: String?, on picked: Overview) {
         guard picked.isShowing else { return }
+        if dragging != nil { cancelDrag() }
         // Only the picked display moves focus; the rest zoom back unchanged.
         picked.close(selecting: window, refocus: true)
         for o in byDisplay.values where o !== picked && o.isShowing { o.close(selecting: nil, refocus: false) }
