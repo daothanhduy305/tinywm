@@ -248,6 +248,8 @@ keys both work out of the box.
 | Meta + Q | Close the window | `close-window` |
 | Meta + left drag | Move the window with the mouse | none |
 
+A size HUD shows the new size when a width shortcut resizes a window.
+
 The overview opens on every display with windows, each with its focused window highlighted. It first
 waits up to 150 ms for new pictures of the windows on screen, so they don't jump from an old
 picture; pictures that arrive later fade in. In the active display's overview, the arrows and the
@@ -266,7 +268,8 @@ When the active display has no windows, the next display's overview takes the ke
 window on any display highlights it, and a click focuses it and makes its display the active one.
 Drag a tiled window picture to move it to a column or workspace on any display. The other pictures
 move aside to open a gap. Empty rows above and below let you create a workspace. The picture shrinks
-while dragged and grows into its new place. When the pointer leaves a display,
+while dragged and grows into its new place. Right-click while dragging to cycle its column width;
+the same size HUD shows the new size. When the pointer leaves a display,
 its highlight goes back to its focused window, or to the one the keys chose. Each picture casts a
 soft shadow and has a faint edge, so light windows stand out from the desktop. `overview-floating`
 puts floating windows on a shelf, a dock-like plate that stays put while the rows pan: `vertical`

@@ -5,6 +5,14 @@ import WindowCore
 
 public enum Direction: Sendable { case left, right, up, down }
 
+/// The next width in the preset order, or nil when there are no presets.
+public func nextWidthPreset(after current: Double, _ presets: [Double], backward: Bool = false) -> Double? {
+    guard !presets.isEmpty else { return nil }
+    return backward
+        ? presets.last { $0 < current - 0.01 } ?? presets[presets.count - 1]
+        : presets.first { $0 > current + 0.01 } ?? presets[0]
+}
+
 extension Strip {
     /// Adds a window as a new column right of the focused one, or at the end of an empty strip.
     public mutating func insert(_ window: String, width: Double, columnID: String, focus: Bool) {
@@ -136,11 +144,7 @@ extension Strip {
 
     /// Steps the focused column through `presets`, to the next wider one, or the next narrower one when `backward`.
     public mutating func cycleWidth(_ presets: [Double], backward: Bool = false) {
-        guard let f = focusedColumn, !presets.isEmpty else { return }
-        let current = columns[f].width
-        let next = backward
-            ? presets.last { $0 < current - 0.01 } ?? presets[presets.count - 1]
-            : presets.first { $0 > current + 0.01 } ?? presets[0]
+        guard let f = focusedColumn, let next = nextWidthPreset(after: columns[f].width, presets, backward: backward) else { return }
         columns[f].width = next
         columns[f].widthBeforeFull = nil
     }

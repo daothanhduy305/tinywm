@@ -60,7 +60,7 @@ final class OverviewView: NSView {
     override func mouseDragged(with event: NSEvent) { if let p = pointer() { onDrag(p) } }
     override func mouseUp(with event: NSEvent) { if let p = pointer() { onRelease(p) } }
     override func rightMouseDown(with event: NSEvent) {
-        if let p = pointer(), bounds.contains(p) { onRightClick(p) }
+        if let p = pointer() { onRightClick(p) }
     }
 
     private var renameAction: () -> Void = {}

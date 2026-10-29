@@ -126,6 +126,15 @@ private func strip(_ widths: [Double], focus: Int? = 0) -> Strip {
         #expect(s.columns[1].windows == ["x", "w0"])
     }
 
+    @Test func nextWidthPresetUsesTheSameOrderAndWraps() {
+        let presets = [0.333, 0.5, 0.667]
+        #expect(nextWidthPreset(after: 0.4, presets) == 0.5)
+        #expect(nextWidthPreset(after: 0.667, presets) == 0.333)
+        #expect(nextWidthPreset(after: 0.333, presets, backward: true) == 0.667)
+        #expect(nextWidthPreset(after: 0.4, presets, backward: true) == 0.333)
+        #expect(nextWidthPreset(after: 0.5, []) == nil)
+    }
+
     @Test func widthPresetsCycleAndFullWidthRestores() {
         var s = strip([0.5])
         s.cycleWidth([1.0 / 3, 0.5, 2.0 / 3])

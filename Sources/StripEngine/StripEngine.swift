@@ -644,13 +644,17 @@ public final class StripEngine {
     public func moveWindow(_ id: String, toWorkspace w: Int, at target: DropTarget, width incoming: Double? = nil) {
         guard workspaces.strips.indices.contains(w) else { return }
         let src = workspaces.workspace(of: id)
-        let width = src.flatMap { i in workspaces.strips[i].column(of: id).map { workspaces.strips[i].columns[$0].width } } ?? incoming
+        let width = incoming ?? src.flatMap { i in workspaces.strips[i].column(of: id).map { workspaces.strips[i].columns[$0].width } }
         guard let width else { return }
         let columnID = newColumnID()
         changeWorkspaces(raise: false) { ws in
             let focused = ws.strips[w].focusedWindow
             if let src, src != w { ws.strips[src].remove(id) }
             ws.strips[w].place(id, at: target, width: width, columnID: columnID)
+            if incoming != nil, let c = ws.strips[w].column(of: id) {
+                if ws.strips[w].columns[c].width != width { ws.strips[w].columns[c].widthBeforeFull = nil }
+                ws.strips[w].columns[c].width = width
+            }
             if let focused, let c = ws.strips[w].column(of: focused) {
                 ws.strips[w].focusedColumn = c
                 ws.strips[w].columns[c].focused = ws.strips[w].columns[c].windows.firstIndex(of: focused) ?? 0

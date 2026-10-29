@@ -29,6 +29,7 @@ final class Runtime {
     /// Pictures or, in cover mode, covers for every overlay.
     private let pictures: WindowPictures
     private let highlight: FocusHighlight
+    private let sizeHUD = SizeHUD()
     private let overview: Overviews
     private let displays: StripDisplays
     private let release: WindowRelease
@@ -81,7 +82,7 @@ final class Runtime {
             if let id = Screens.displayID(of: screen) { _ = snapshots.wallpaper(of: id) }
         }
         highlight = FocusHighlight(windows: windows)
-        overview = Overviews(pictures: pictures, windows: windows)
+        overview = Overviews(pictures: pictures, windows: windows, hud: sizeHUD)
         let hooks = DisplayHooks()
         let saved = UserDefaults.standard.stringArray(forKey: Defaults.disabledDisplays) ?? []
         displays = StripDisplays(windows: windows, disabled: Set(saved),
@@ -96,7 +97,7 @@ final class Runtime {
                                     persistence: persistence, focusKeeper: focusKeeper, dragger: dragger,
                                     snapshots: snapshots)
         commands = ShortcutCommands(windows: windows, displays: displays, overview: overview, dragger: dragger,
-                                    lifecycle: lifecycle, metaKey: metaKey)
+                                    lifecycle: lifecycle, metaKey: metaKey, hud: sizeHUD)
 
         hooks.attach = { [unowned self] engine, info in attach(engine, to: info) }
         hooks.detach = { [unowned self] id in detach(id) }

@@ -344,6 +344,8 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(moved.workspace(of: "a") == 3)
         let reordered = overviewPreview(ws, moving: "a", to: (1, .newColumn(2)), width: 0.5, columnID: "preview")
         #expect(reordered.strips[1].columns.map(\.windows) == [["b", "c"], ["a"]])
+        let resized = overviewPreview(ws, moving: "a", to: (1, .newColumn(2)), width: 0.667, columnID: "preview")
+        #expect(resized.strips[1].columns[resized.strips[1].column(of: "a")!].width == 0.667)
         #expect(overviewPreview(ws, moving: "missing", to: nil, width: 0.5, columnID: "preview") == ws)
         let removed = overviewPreview(ws, moving: "d", to: nil, width: 0.5, columnID: "preview")
         #expect(removed.strips.count == ws.strips.count)

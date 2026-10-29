@@ -20,15 +20,17 @@ final class ShortcutCommands {
     private let dragger: WindowDragger
     private let lifecycle: WindowLifecycle
     private let focusReturn: FocusReturn
+    private let hud: SizeHUD
     private let registry = ShortcutRegistry.shared
 
     init(windows: AXWindows, displays: StripDisplays, overview: Overviews, dragger: WindowDragger,
-         lifecycle: WindowLifecycle, metaKey: MetaKey) {
+         lifecycle: WindowLifecycle, metaKey: MetaKey, hud: SizeHUD) {
         self.windows = windows
         self.displays = displays
         self.overview = overview
         self.dragger = dragger
         self.lifecycle = lifecycle
+        self.hud = hud
         focusReturn = FocusReturn(windows: windows)
         focusReturn.lastKeyDown = { [unowned metaKey] in metaKey.lastKeyDown }
     }
@@ -160,13 +162,13 @@ final class ShortcutCommands {
             a["workspace-move-up\(suffix)"] = { $0.moveToWorkspace(by: -1) }
         }
         for n in 1...9 { a["focus-column-\(n)"] = { $0.focusColumn(n - 1) } }
-        a["width-cycle"] = { $0.cycleWidth() }
-        a["width-cycle-back"] = { $0.cycleWidth(backward: true) }
-        a["width-full"] = { $0.toggleFullWidth() }
-        a["width-half"] = { $0.halfWidth() }
+        a["width-cycle"] = withSizeHUD { $0.cycleWidth() }
+        a["width-cycle-back"] = withSizeHUD { $0.cycleWidth(backward: true) }
+        a["width-full"] = withSizeHUD { $0.toggleFullWidth() }
+        a["width-half"] = withSizeHUD { $0.halfWidth() }
         a["center"] = { $0.center() }
-        a["wider"] = { $0.wider() }
-        a["narrower"] = { $0.narrower() }
+        a["wider"] = withSizeHUD { $0.wider() }
+        a["narrower"] = withSizeHUD { $0.narrower() }
         a["stack-right"] = { $0.stack(.right) }
         a["stack-left"] = { $0.stack(.left) }
         a["pop-out"] = { $0.popOut() }
@@ -194,6 +196,17 @@ final class ShortcutCommands {
             }
         }
         return a
+    }
+
+    private func withSizeHUD(_ action: @escaping (StripEngine) -> Void) -> (StripEngine) -> Void {
+        { [unowned self] engine in
+            action(engine)
+            guard let id = engine.strip.focusedWindow, windows.focusedWindow == id,
+                  let c = engine.strip.column(of: id) else { return }
+            let width = engine.strip.columns[c].width
+            let height = engine.frame(of: id)?.height ?? engine.viewport.height
+            hud.show(share: width, pixels: CGSize(width: engine.metrics.columnWidth(width), height: height), on: engine.viewport)
+        }
     }
 
     /// An empty display has no window to take focus, so the pointer goes there to show where commands act.

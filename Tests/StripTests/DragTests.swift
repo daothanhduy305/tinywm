@@ -308,6 +308,15 @@ final class FakeDragPresenter: DragPresenter {
         #expect(engine.workspaces.strips[moved].columns[engine.workspaces.strips[moved].column(of: "a")!].width == width)
     }
 
+    @Test func overviewMoveAppliesExplicitWidthOnSameWorkspace() {
+        let (displays, _, _, _) = make()
+        let engine = displays.engines["A"]!
+        let workspace = engine.workspaces.workspace(of: "x")!
+        engine.moveWindow("x", toWorkspace: workspace, at: .newColumn(2), width: 0.667)
+        let moved = engine.workspaces.workspace(of: "x")!
+        #expect(engine.workspaces.strips[moved].columns[engine.workspaces.strips[moved].column(of: "x")!].width == 0.667)
+    }
+
     @Test func overviewMoveAcrossDisplaysKeepsWidth() {
         let (displays, _, _, _) = make()
         let source = displays.engines["A"]!, target = displays.engines["B"]!

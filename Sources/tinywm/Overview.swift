@@ -31,6 +31,7 @@ final class Overview {
     var dragStarted: (String, Point, Point) -> Void = { _, _, _ in }
     var dragMoved: (Point) -> Void = { _ in }
     var dragReleased: () -> Void = {}
+    var dragRightClick: () -> Bool = { false }
     var cancelDragging: () -> Bool = { false }
     var preview: Workspaces?
     var dragRows: [Int]?
@@ -213,7 +214,9 @@ final class Overview {
         renameField.layer?.zPosition = 100
         renameField.onDone = { [weak self] in self?.finishRename($0) }
         view.onRightClick = { [weak self] p in
-            guard let self, phase == .open, let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
+            guard let self, phase == .open else { return }
+            if dragRightClick() { return }
+            guard view.bounds.contains(p), let hit = layout?.window(at: Point(x: p.x, y: p.y)) else { return }
             view.showMenu(at: p) { [weak self] in
                 guard let self, phase == .open, let w = layout?.window(hit.id) else { return }
                 startRename(w.id, at: w.rect)
@@ -809,6 +812,7 @@ final class Overviews {
 
     private let pictures: WindowPictures
     private let windows: AXWindows
+    private let hud: SizeHUD
     private var byDisplay: [String: Overview] = [:]
     private var active: Overview?
     private var displays: StripDisplays?
@@ -819,17 +823,18 @@ final class Overviews {
     private final class DragState {
         let source: Overview
         let id: String
-        let width: Double
+        var width: Double
+        let originalBounds: CGRect
         var carrier: Overview
         var candidate: (Overview, OverviewDrop)?
         var serial = 0
         var centre: Point
         var pointer: Point
-        let grab: Point
+        var grab: Point
         var workspaces: [ObjectIdentifier: Workspaces] = [:]
-        init(source: Overview, id: String, width: Double, pointer: Point, grab: Point) {
+        init(source: Overview, id: String, width: Double, pointer: Point, grab: Point, bounds: CGRect) {
             self.source = source; self.id = id; self.width = width; self.carrier = source
-            self.pointer = pointer; self.grab = grab; self.centre = pointer
+            self.pointer = pointer; self.grab = grab; self.centre = pointer; self.originalBounds = bounds
         }
     }
     private var dragging: DragState?
@@ -837,9 +842,10 @@ final class Overviews {
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
 
-    init(pictures: WindowPictures, windows: AXWindows) {
+    init(pictures: WindowPictures, windows: AXWindows, hud: SizeHUD) {
         self.pictures = pictures
         self.windows = windows
+        self.hud = hud
     }
 
     /// Opens on every display, or closes onto the active display's highlighted window.
@@ -914,6 +920,7 @@ final class Overviews {
         o.dragStarted = { [unowned self, unowned o] id, pointer, grab in startDrag(o, id, pointer, grab) }
         o.dragMoved = { [unowned self] pointer in moveDrag(pointer) }
         o.dragReleased = { [unowned self] in dropDrag() }
+        o.dragRightClick = { [unowned self] in cycleDragWidth() }
         o.cancelDragging = { [unowned self] in
             guard dragging != nil else { return false }
             cancelDrag()
@@ -946,9 +953,9 @@ final class Overviews {
     }
 
     private func startDrag(_ source: Overview, _ id: String, _ pointer: Point, _ grab: Point) {
-        guard let engine = source.engine, let w = engine.workspaces.workspace(of: id),
+        guard let engine = source.engine, let holder = source.holders[id], let w = engine.workspaces.workspace(of: id),
               let c = engine.workspaces.strips[w].column(of: id) else { return }
-        let state = DragState(source: source, id: id, width: engine.workspaces.strips[w].columns[c].width, pointer: pointer, grab: grab)
+        let state = DragState(source: source, id: id, width: engine.workspaces.strips[w].columns[c].width, pointer: pointer, grab: grab, bounds: holder.bounds)
         dragging = state
         for o in byDisplay.values where o.isShowing {
             guard let engine = o.engine, let layout = o.layout else { continue }
@@ -965,10 +972,11 @@ final class Overviews {
     private func fitDragScale(_ state: DragState) {
         guard let holder = state.source.holders[state.id], let layout = state.carrier.layout else { return }
         let scale = (layout.window(state.id).map { $0.rect.width / holder.bounds.width } ?? layout.scale) * 0.85
-        guard abs(holder.transform.m11 - scale) > 0.0001 else { return }
+        let centre = Point(x: state.pointer.x - state.grab.x * scale, y: state.pointer.y - state.grab.y * scale)
+        guard abs(holder.transform.m11 - scale) > 0.0001 || abs(state.centre.x - centre.x) > 0.01 || abs(state.centre.y - centre.y) > 0.01 else { return }
         let from = holder.presentation()?.transform.m11 ?? holder.transform.m11
         let fromPosition = holder.presentation()?.position ?? holder.position
-        state.centre = Point(x: state.pointer.x - state.grab.x * scale, y: state.pointer.y - state.grab.y * scale)
+        state.centre = centre
         let position = CGPoint(x: state.centre.x - state.carrier.viewport.x, y: state.centre.y - state.carrier.viewport.y)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -988,6 +996,7 @@ final class Overviews {
         let carrier = target ?? state.source
         let changedCarrier = carrier !== state.carrier
         if changedCarrier {
+            hud.hide()
             holder.removeFromSuperlayer()
             carrier.root.addSublayer(holder)
             state.carrier = carrier
@@ -1035,7 +1044,29 @@ final class Overviews {
         fitDragScale(state)
     }
 
+    private func cycleDragWidth() -> Bool {
+        guard let state = dragging else { return false }
+        guard let engine = state.carrier.engine ?? state.source.engine,
+              let width = nextWidthPreset(after: state.width, engine.settings.widthPresets),
+              let holder = state.source.holders[state.id] else { return true }
+        let oldWidth = holder.bounds.width
+        let newWidth = engine.metrics.columnWidth(width)
+        state.width = width
+        state.grab.x *= newWidth / oldWidth
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        holder.bounds.size.width = newWidth
+        state.source.layers[state.id]?.frame = holder.bounds
+        holder.shadowPath = CGPath(roundedRect: holder.bounds, cornerWidth: 10, cornerHeight: 10, transform: nil)
+        CATransaction.commit()
+        state.serial += 1
+        showPreview(state, target: state.candidate)
+        hud.show(share: width, pixels: CGSize(width: newWidth, height: holder.bounds.height), on: state.carrier.viewport)
+        return true
+    }
+
     private func clearPreview(_ state: DragState) {
+        hud.hide()
         for o in byDisplay.values where o.isShowing {
             o.preview = nil
             o.dragRows = nil
@@ -1048,6 +1079,12 @@ final class Overviews {
         guard let state = dragging, let holder = state.source.holders[state.id] else { return }
         dragging = nil
         state.source.drag = nil
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        holder.bounds = state.originalBounds
+        state.source.layers[state.id]?.frame = holder.bounds
+        holder.shadowPath = CGPath(roundedRect: holder.bounds, cornerWidth: 10, cornerHeight: 10, transform: nil)
+        CATransaction.commit()
         holder.removeFromSuperlayer()
         state.source.root.addSublayer(holder)
         holder.position = CGPoint(x: state.centre.x - state.source.viewport.x, y: state.centre.y - state.source.viewport.y)
@@ -1109,6 +1146,7 @@ final class Overviews {
 
     private func chose(_ window: String?, on picked: Overview) {
         guard picked.isShowing else { return }
+        hud.hide()
         if dragging != nil { cancelDrag() }
         // Only the picked display moves focus; the rest zoom back unchanged.
         picked.close(selecting: window, refocus: true)

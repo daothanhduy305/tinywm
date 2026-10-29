@@ -115,6 +115,9 @@ public func overviewPreview(_ base: Workspaces, moving id: String, to destinatio
     if let destination, out.strips.indices.contains(destination.workspace) {
         if let source, source != destination.workspace { out.strips[source].remove(id) }
         out.strips[destination.workspace].place(id, at: destination.target, width: width, columnID: columnID)
+        if let c = out.strips[destination.workspace].column(of: id) {
+            out.strips[destination.workspace].columns[c].width = width
+        }
     } else if let source { out.strips[source].remove(id) }
     return out
 }
