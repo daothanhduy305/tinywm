@@ -283,6 +283,22 @@ final class PictureMotion: StripPresenter {
     func preview(frames: [String: Rect], focused: String?) -> Bool {
         guard pictures.available else { return false }
         token += 1 // a fade or settle still pending from an earlier motion no longer applies
+        // Once a drag is on screen, each frame only moves the pictures. Contact frames come
+        // faster than the display, so this stays cheap and does not wait on the render server.
+        if phase == .previewing, Set(frames.keys) == Set(layers.keys) {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (id, r) in frames {
+                layers[id]?.removeAllAnimations()
+                layers[id]?.frame = local(r)
+            }
+            if !ring.isHidden, let focused, let r = frames[focused] {
+                ring.frame = outset(local(r))
+                ringTarget = ring.frame
+            }
+            CATransaction.commit()
+            return true
+        }
         // Cards stand still while fingers drag the strip, so they go until the strip settles.
         showCards([:])
         CATransaction.begin()
@@ -317,6 +333,7 @@ final class PictureMotion: StripPresenter {
             snapshots.beginLive(Set(frames.keys), rate: motionRate)
         }
         phase = .previewing
+        if let view = panel.contentView { meter.start(on: view) }
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0
             panel.animator().alphaValue = Self.coveringAlpha

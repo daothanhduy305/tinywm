@@ -18,6 +18,21 @@ public final class Multitouch {
         touching.withLock { if $0.fingers == 0 && n > 0 { $0.touch += 1 }; $0.fingers = n }
     }
 
+    /// Frames waiting for the main thread. While it is busy, a frame replaces the one before it
+    /// when the finger count is the same, so a swipe catches up instead of replaying old frames.
+    /// Positions are absolute, so no travel is lost; a change in finger count still arrives in order.
+    private nonisolated static let pending = OSAllocatedUnfairLock(initialState: [([(x: Double, y: Double)], Double)]())
+
+    /// Queues a frame. Returns true when the main thread must be asked to take the queue.
+    nonisolated fileprivate static func enqueue(_ touches: [(x: Double, y: Double)], _ t: Double) -> Bool {
+        pending.withLock {
+            let wasEmpty = $0.isEmpty
+            if let last = $0.last, last.0.count == touches.count { $0[$0.count - 1] = (touches, t) }
+            else { $0.append((touches, t)) }
+            return wasEmpty
+        }
+    }
+
     private var devices: [UnsafeMutableRawPointer] = []
     private var stop: StopFn?
     nonisolated(unsafe) fileprivate static var current: Multitouch?
@@ -58,7 +73,10 @@ public final class Multitouch {
         return !devices.isEmpty
     }
 
-    fileprivate func deliver(_ touches: [(x: Double, y: Double)], _ t: Double) { onFrame(touches, t) }
+    fileprivate func drain() {
+        let frames = Self.pending.withLock { f in defer { f = [] }; return f }
+        for (touches, t) in frames { onFrame(touches, t) }
+    }
 }
 
 /// One finger in MultitouchSupport's 96-byte contact record.
@@ -71,15 +89,18 @@ private enum Touch {
     static let touchingStates: Set<Int32> = [3, 4]
 }
 
+/// Records the fingers touching and hands the frame to the main thread, unless a hop is already waiting.
+private func post(_ touches: [(x: Double, y: Double)], _ t: Double) {
+    Multitouch.setTouching(touches.count)
+    guard Multitouch.enqueue(touches, t) else { return }
+    DispatchQueue.main.async { MainActor.assumeIsolated { Multitouch.current?.drain() } }
+}
+
 /// Runs on MultitouchSupport's own thread, so it copies the touches and hops to the main thread.
 private let contactCallback: @convention(c) (
     UnsafeMutableRawPointer?, UnsafeMutableRawPointer?, Int32, Double, Int32
 ) -> Int32 = { _, data, count, timestamp, _ in
-    guard let data, count > 0 else {
-        Multitouch.setTouching(0)
-        DispatchQueue.main.async { MainActor.assumeIsolated { Multitouch.current?.deliver([], timestamp) } }
-        return 0
-    }
+    guard let data, count > 0 else { post([], timestamp); return 0 }
     var touches: [(x: Double, y: Double)] = []
     for i in 0..<Int(count) {
         let base = data + i * Touch.stride
@@ -89,8 +110,6 @@ private let contactCallback: @convention(c) (
         let y = Double(base.load(fromByteOffset: Touch.yOffset, as: Float.self))
         touches.append((x, y))
     }
-    let frame = touches
-    Multitouch.setTouching(frame.count)
-    DispatchQueue.main.async { MainActor.assumeIsolated { Multitouch.current?.deliver(frame, timestamp) } }
+    post(touches, timestamp)
     return 0
 }

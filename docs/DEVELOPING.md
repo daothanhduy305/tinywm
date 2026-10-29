@@ -355,7 +355,8 @@ out as it comes back. The card's panel shows again under the pictures as they fa
 ## Trackpad swipes
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or
-down swipe changes workspace. While that many fingers are down, an event tap keeps the scroll
+down swipe changes workspace. When the main thread falls behind, contact frames waiting for it
+are merged, so the strip jumps to the fingers instead of replaying old frames. While that many fingers are down, an event tap keeps the scroll
 and gesture events macOS makes from them away from apps, so the app under the pointer does not
 scroll or go back. Scrolls stay blocked until one begins in a new touch, so the scroll macOS
 restarts as fingers lift, and its momentum, are blocked too. `SwipeShield` decides what to drop;
