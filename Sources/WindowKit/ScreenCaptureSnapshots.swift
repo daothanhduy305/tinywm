@@ -107,6 +107,9 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
     /// ScreenCaptureKit's handle on each window and its window number, found once.
     private var targets: [String: SCWindow] = [:]
     private var numbers: [String: CGWindowID] = [:]
+    /// The windows `freshen` still waits for, and what it runs once they are in.
+    private var waiting: Set<String> = []
+    private var waiter: (@MainActor () -> Void)?
     public static let wallpaperID = "wallpaper"
 
     public init(windows: AXWindows) {
@@ -190,6 +193,35 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
         refresh(ids.filter { frames[$0] == nil })
     }
 
+    /// Takes new pictures of the windows whose picture is older than `maxAge`, then calls `done`
+    /// once they are all in or `timeout` has passed, whichever comes first.
+    public func freshen(_ ids: Set<String>, maxAge: TimeInterval = 0.5, timeout: TimeInterval = 0.15,
+                        then done: @escaping @MainActor () -> Void) {
+        finishWaiting()
+        let now = CACurrentMediaTime()
+        let stale = ids.filter { now - (takenAt[$0] ?? 0) > maxAge && windows.element(of: $0) != nil }
+        guard !stale.isEmpty, !inert, hasAccess() else { return done() }
+        waiting = stale
+        waiter = done
+        refresh(stale)
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            MainActor.assumeIsolated { self?.finishWaiting() }
+        }
+    }
+
+    private func arrived(_ id: String) {
+        guard waiting.remove(id) != nil, waiting.isEmpty else { return }
+        finishWaiting()
+    }
+
+    /// Runs the waiter at most once.
+    private func finishWaiting() {
+        waiting = []
+        let done = waiter
+        waiter = nil
+        done?()
+    }
+
     /// Drops a closed window's last picture.
     public func forget(_ id: String) {
         live.remove(id)
@@ -264,6 +296,7 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
         Task {
             defer {
                 inFlight.remove(id)
+                arrived(id)
                 runPump()
             }
             guard let window = await target(of: id, box, pid), let frame = await Self.frame(of: box),

@@ -623,6 +623,11 @@ final class Overview {
             return
         }
         guard phase != .closed, !pictures.coverMode, let layer = layers[id] else { return }
+        // A newer picture fades in over the old one rather than jumping.
+        let fade = CATransition()
+        fade.type = .fade
+        fade.duration = 0.2
+        layer.add(fade, forKey: "picture")
         layer.setPicture(snapshots.surface(of: id))
     }
 
@@ -741,6 +746,8 @@ final class Overviews {
     private var displays: StripDisplays?
     /// The search bar's text, shared by every display.
     private var query = ""
+    /// True while waiting for new pictures before opening.
+    private var waiting = false
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
 
@@ -756,6 +763,26 @@ final class Overviews {
             active?.handle(.confirm)
             return
         }
+        guard !waiting else { return }
+        // Pictures of on-screen windows open right over the windows, so an old one would show
+        // and then jump. Wait briefly for new ones first.
+        var onScreen: Set<String> = []
+        if !pictures.coverMode {
+            for e in displays.engines.values {
+                let v = Rect(x: 0, y: 0, width: e.viewport.width, height: e.viewport.height)
+                for (id, r) in overviewRealFrames(e.workspaces, e.metrics, floats: e.floatFrames())
+                where r.overlap(v) != nil { onScreen.insert(id) }
+            }
+        }
+        waiting = true
+        pictures.snapshots.freshen(onScreen) { [weak self] in
+            guard let self else { return }
+            waiting = false
+            show(engine, displays: displays)
+        }
+    }
+
+    private func show(_ engine: StripEngine, displays: StripDisplays) {
         let start = CACurrentMediaTime()
         self.displays = displays
         query = ""

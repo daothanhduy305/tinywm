@@ -248,7 +248,9 @@ keys both work out of the box.
 | Meta + Q | Close the window | `close-window` |
 | Meta + left drag | Move the window with the mouse | none |
 
-The overview opens on every display with windows, each with its focused window highlighted. In the
+The overview opens on every display with windows, each with its focused window highlighted. It first
+waits up to 150 ms for new pictures of the windows on screen, so they don't jump from an old picture;
+pictures that arrive later fade in. In the
 active display's overview, the arrows and the focus keys held with the meta key move the selection,
 Tab and ⇧Tab step through windows, Return or Meta + Esc confirms, and Esc cancels. A search bar at
 the top of every display holds one shared query; the bar on the display with the keys is bright and
