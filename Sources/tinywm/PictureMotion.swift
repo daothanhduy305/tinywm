@@ -36,10 +36,12 @@ final class PictureMotion: StripPresenter {
     private var cards: [String: WindowLayer] = [:]
     /// Where the motion just begun takes each picture (overlay coordinates), for `showCards`.
     private var cardMoves: [String: (from: NSRect, to: NSRect)] = [:]
-    /// The focus border drawn among the pictures, so it travels with them.
+    /// The focus border drawn over the pictures.
     private let ring = CALayer()
     /// Where the ring was last sent, which is where the real border sits between motions.
     private var ringTarget: NSRect?
+    /// The focused window the ring target belongs to.
+    private var ringOwner: String?
     private var backdropURL: URL?
     private let meter = FrameMeter()
 
@@ -189,7 +191,7 @@ final class PictureMotion: StripPresenter {
             // changes size gets live pictures at its new size as soon as it has relaid out.
             pictures.show(id, on: layer, growingTo: current.targetSizes[id])
         }
-        // The ring starts where the real border is: around the window focused before this motion.
+        // The ring sits at the destination and only resizes, unless it follows a lifted window.
         var ringTo: NSRect?
         if showRing(), let focused, let end = moves[focused]?.to ?? still[focused] {
             ringTo = outset(local(end))
@@ -200,6 +202,9 @@ final class PictureMotion: StripPresenter {
             styleRing()
             ring.removeAllAnimations()
             ring.frame = from
+            if focused != lifted, let ringTo {
+                ring.position = NSPoint(x: ringTo.midX, y: ringTo.midY)
+            }
             ring.isHidden = false
         } else {
             ring.isHidden = true
@@ -260,12 +265,13 @@ final class PictureMotion: StripPresenter {
                 let group = lift(from: from, to: ringTo)
                 longest = max(longest, group.duration)
                 ring.add(group, forKey: "move")
-            } else if from != ringTo {
-                let group = springs(from: from, to: ringTo)
-                longest = max(longest, group.duration)
-                ring.add(group, forKey: "move")
+            } else if from.size != ringTo.size {
+                let size = spring("bounds.size", NSValue(size: from.size), NSValue(size: ringTo.size))
+                longest = max(longest, size.duration)
+                ring.add(size, forKey: "move")
             }
             ringTarget = ringTo
+            ringOwner = focused
         }
         CATransaction.commit()
         snapshots.beginLive(shown, rate: motionRate)
@@ -292,10 +298,6 @@ final class PictureMotion: StripPresenter {
                 layers[id]?.removeAllAnimations()
                 layers[id]?.frame = local(r)
             }
-            if !ring.isHidden, let focused, let r = frames[focused] {
-                ring.frame = outset(local(r))
-                ringTarget = ring.frame
-            }
             CATransaction.commit()
             return true
         }
@@ -318,9 +320,13 @@ final class PictureMotion: StripPresenter {
         if showRing(), let focused, let r = frames[focused] {
             styleRing()
             ring.removeAllAnimations()
-            ring.frame = outset(local(r))
+            if let ringTarget, ringOwner == focused { ring.frame = ringTarget }
+            else {
+                ring.frame = outset(local(r))
+                ringTarget = ring.frame
+                ringOwner = focused
+            }
             ring.isHidden = false
-            ringTarget = ring.frame
         } else {
             ring.isHidden = true
         }
