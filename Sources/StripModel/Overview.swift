@@ -45,7 +45,7 @@ public struct OverviewStyle: Equatable, Sendable {
     public var floating = OverviewFloating.vertical
     /// The width of every picture on a vertical shelf, or the height of every one on a horizontal
     /// shelf. A shelf too long for the screen shrinks to fit.
-    public var shelfSize = 160.0
+    public var shelfSize = 128.0
     public var shelfGap = 24.0
     /// On a horizontal shelf a slot is at least this wide, so labels under narrow pictures do
     /// not overlap.
@@ -224,7 +224,8 @@ public func overviewLayout(
 
 /// Every workspace's floating windows on a shelf at the right or bottom edge of the screen, which
 /// does not pan. Pictures keep their proportions and are all `shelfSize` wide (vertical) or tall
-/// (horizontal), each with its label under it. The row's rect is the plate behind them. Fullscreen
+/// (horizontal), each with its label under it. Pictures stay centred on a plate spanning the available
+/// height or width, inset by `shelfEdge`. The vertical plate starts below `style.top`. Fullscreen
 /// windows come last, with workspace -1. Nil when floating windows stay in place or there is none to show.
 func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Rect], fullScreen: [String: Rect] = [:],
                    screen: Size) -> OverviewRow? {
@@ -243,13 +244,13 @@ func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Re
         let w = style.shelfSize * s
         let x = screen.width - style.shelfEdge - pad - w
         var y = style.top + (screen.height - style.top - total * s) / 2
-        let start = y
         for (k, (id, workspace, _)) in shown.enumerated() {
             windows.append(OverviewWindow(id: id, workspace: workspace, column: 0, index: k,
                                           rect: Rect(x: x, y: y, width: w, height: heights[k] * s)))
             y += (heights[k] + label + style.shelfGap) * s
         }
-        let plate = Rect(x: x - pad, y: start - pad, width: w + 2 * pad, height: total * s + 2 * pad)
+        let plate = Rect(x: x - pad, y: style.top + style.shelfEdge, width: w + 2 * pad,
+                         height: screen.height - style.top - 2 * style.shelfEdge)
         return OverviewRow(workspace: -1, isActive: false, rect: plate, windows: windows)
     }
     let widths = shown.map { $0.2.width / $0.2.height * style.shelfSize }
@@ -258,14 +259,13 @@ func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Re
     let h = style.shelfSize * s
     let y = screen.height - style.shelfEdge - pad - label - h
     var x = (screen.width - total * s) / 2
-    let start = x
     for (k, (id, workspace, _)) in shown.enumerated() {
         let w = widths[k] * s, slot = max(widths[k], style.shelfSlot) * s
         windows.append(OverviewWindow(id: id, workspace: workspace, column: k, index: 0,
                                       rect: Rect(x: x + (slot - w) / 2, y: y, width: w, height: h)))
         x += slot + style.shelfGap * s
     }
-    let plate = Rect(x: start - pad, y: y - pad, width: total * s + 2 * pad, height: h + label + 2 * pad)
+    let plate = Rect(x: style.shelfEdge, y: y - pad, width: screen.width - 2 * style.shelfEdge, height: h + label + 2 * pad)
     return OverviewRow(workspace: -1, isActive: false, rect: plate, windows: windows)
 }
 

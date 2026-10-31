@@ -242,9 +242,9 @@ private func sample(active: Int = 1) -> Workspaces {
 
     @Test func verticalShelfStacksEquallyWidePicturesOnTheRight() {
         let (ws, floats) = withFloats()
-        let style = OverviewStyle()
+        let style = OverviewStyle(top: 46)
         #expect(style.floating == .vertical)
-        let layout = overviewLayout(ws, metrics, screen: display, floats: floats)
+        let layout = overviewLayout(ws, metrics, screen: display, style: style, floats: floats)
         // Workspace 3 holds only "g", so it gets no row of its own.
         #expect(layout.rows.map(\.workspace) == [1, 2, -1])
         let shelf = layout.rows.last!
@@ -253,9 +253,15 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(shelf.windows.allSatisfy { $0.rect.width == style.shelfSize })
         #expect(abs(layout.window("f")!.rect.height - 200.0 / 300 * style.shelfSize) < 1e-9)
         #expect(shelf.rect.maxX == display.width - style.shelfEdge)
+        #expect(shelf.rect.y == style.top + style.shelfEdge)
+        #expect(shelf.rect.maxY == display.height - style.shelfEdge)
+        #expect(abs((shelf.windows.first!.rect.y + shelf.windows.last!.rect.maxY + style.labelGap) / 2 - shelf.rect.center.y) < 1e-9)
+        let edge = Point(x: shelf.rect.center.x, y: shelf.rect.y + 1)
+        #expect(layout.window(at: edge) == nil)
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: edge, dragging: "a") == nil)
         // The rows keep clear of it and it stays put while they pan.
         #expect(layout.rows.dropLast().allSatisfy { $0.rect.maxX <= shelf.rect.x - style.rowGap + 1e-9 })
-        #expect(overviewLayout(ws, metrics, screen: display, pan: 500, floats: floats).rows.last == shelf)
+        #expect(overviewLayout(ws, metrics, screen: display, pan: 500, style: style, floats: floats).rows.last == shelf)
         #expect(overviewMove(layout, from: "b", .right) == "f")
         #expect(overviewMove(layout, from: "f", .down) == "g")
         #expect(overviewMove(layout, from: "g", .down) == nil)
@@ -271,8 +277,14 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(layout.rows.map(\.workspace) == [1, 2, -1])
         let shelf = layout.rows.last!
         #expect(shelf.windows.allSatisfy { $0.rect.height == style.shelfSize })
+        #expect(shelf.rect.x == style.shelfEdge)
+        #expect(shelf.rect.maxX == display.width - style.shelfEdge)
         #expect(shelf.rect.maxY == display.height - style.shelfEdge)
         #expect(layout.rows[1].rect.maxY <= shelf.rect.y - style.rowGap + 1e-9)
+        #expect(abs((shelf.windows.first!.rect.x + shelf.windows.last!.rect.maxX) / 2 - shelf.rect.center.x) < 1e-9)
+        let edge = Point(x: shelf.rect.x + 1, y: shelf.rect.center.y)
+        #expect(layout.window(at: edge) == nil)
+        #expect(overviewDrop(layout, shownWS: ws, base: ws, at: edge, dragging: "a") == nil)
         #expect(overviewMove(layout, from: "d", .down) == "f")
         #expect(overviewMove(layout, from: "f", .right) == "g")
         #expect(overviewMove(layout, from: "g", .up) == "d")

@@ -288,7 +288,8 @@ while dragged and grows into its new place. Right-click while dragging to cycle 
 the same size HUD shows the new size. When the pointer leaves a display,
 its highlight goes back to its focused window, or to the one the keys chose. Each picture casts a
 soft shadow and has a faint edge, so light windows stand out from the desktop. `overview-floating`
-puts floating windows on a shelf, a dock-like plate that stays put while the rows pan: `vertical`
+puts floating windows on a shelf. Its plate spans the available height or width and stays put while
+the rows pan. `vertical`
 (the default) stacks them down the right side as pictures of the same width, `horizontal` lines them
 up along the bottom as pictures of the same height, and `off` shows them at their real place, above
 the strip. Fullscreen windows sit on the shelf too, after the floating ones; picking one switches to

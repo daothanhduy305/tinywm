@@ -136,7 +136,7 @@ final class Overview {
         root.addSublayer(backdrop)
         dim.backgroundColor = NSColor(white: 0, alpha: 0.45).cgColor
         root.addSublayer(dim)
-        dock.backgroundColor = NSColor(white: 0.2, alpha: 0.7).cgColor
+        dock.backgroundColor = NSColor(white: 0.2, alpha: 0.5).cgColor
         dock.cornerRadius = 20
         dock.cornerCurve = .continuous
         dock.borderWidth = 1
