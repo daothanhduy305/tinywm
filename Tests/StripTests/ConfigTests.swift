@@ -333,7 +333,7 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(OverviewKeys.command(forAction: "focus-left") == .left)
         #expect(OverviewKeys.command(forAction: "focus-down-arrow") == .down)
         #expect(OverviewKeys.command(forAction: "overview") == .confirm)
-        #expect(OverviewKeys.command(forAction: "width-cycle") == .rename)
+        #expect(OverviewKeys().command(forAction: "width-cycle") == .rename)
         let ctrlOpt = OverviewKeys(meta: .controlOption)
         #expect(ctrlOpt.isRename(keyCode: 15, flags: 0x40000 | 0x80000))
         #expect(!ctrlOpt.isRename(keyCode: 15, flags: 0x40000 | 0x80000 | 0x20000))
@@ -341,6 +341,23 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(OverviewKeys(meta: .rightCommand).isRename(keyCode: 15, flags: 0x100000 | 0x10))
         #expect(OverviewKeys.command(forAction: "move-left") == nil)
         #expect(OverviewKeys.command(forAction: "close-window") == nil)
+    }
+
+    @Test func renameHasItsOwnBinding() {
+        let r = StripConfig.parse("bind overview-rename = shift+n\nbind width-cycle = x")
+        #expect(r.issues.isEmpty)
+        #expect(r.config.bindings["width-cycle"]?.keyCode == KeyNames.codes["x"])
+        let keys = OverviewKeys(bindings: r.config.bindings, rename: r.config.overviewRename)
+        #expect(keys.command(forAction: "width-cycle") == nil)
+        #expect(keys.isRename(keyCode: KeyNames.codes["n"]!, flags: 0x100000 | 0x10 | 0x20000))
+        #expect(!keys.isRename(keyCode: KeyNames.codes["n"]!, flags: 0x100000 | 0x10))
+        #expect(!keys.isRename(keyCode: 15, flags: 0x100000 | 0x10))
+        // A global action on the rename chord renames in the overview.
+        let shared = StripConfig.parse("bind overview-rename = q")
+        #expect(OverviewKeys(bindings: shared.config.bindings, rename: shared.config.overviewRename).command(forAction: "close-window") == .rename)
+        let off = StripConfig.parse("unbind overview-rename").config
+        #expect(off.overviewRename == nil)
+        #expect(!OverviewKeys(rename: off.overviewRename).isRename(keyCode: 15, flags: 0x100000 | 0x10))
     }
 
     @Test func searchMatchesEveryWordIgnoringCaseAndAccents() {

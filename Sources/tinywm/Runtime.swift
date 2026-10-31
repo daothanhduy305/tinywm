@@ -151,7 +151,7 @@ final class Runtime {
         scrollTap.shield.enabled = config.swipe
         scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
-        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta)
+        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta, rename: config.overviewRename)
         displays.settings = config.applied(to: displays.settings)
         displays.update(Screens.infos())
         menu.showDisplays(disabled: displays.disabled)
@@ -219,7 +219,7 @@ final class Runtime {
         scrollTap.shield.enabled = config.swipe
         scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
-        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta)
+        overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta, rename: config.overviewRename)
         showShortcuts()
         lifecycle.applyRules()
     }

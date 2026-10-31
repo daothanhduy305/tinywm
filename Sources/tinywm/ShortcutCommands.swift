@@ -83,7 +83,7 @@ final class ShortcutCommands {
         // key moves real windows.
         if overview.isOpen {
             Log.note("key", "\(name) in the overview")
-            if let command = OverviewKeys.command(forAction: name) { overview.handle(command) }
+            if let command = overview.keys.command(forAction: name) { overview.handle(command) }
         } else if let engine = activeEngine {
             Log.note("key", "\(name) on \(engine.label); system focus \(windows.knownFocus.map(Log.name) ?? "none"), "
                 + "strip focus \(engine.strip.focusedWindow.map(Log.name) ?? "none")")

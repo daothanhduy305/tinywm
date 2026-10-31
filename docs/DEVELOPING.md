@@ -279,8 +279,9 @@ up along the bottom as pictures of the same height, and `off` shows them at thei
 the strip. Fullscreen windows sit on the shelf too, after the floating ones; picking one switches to
 its Space. The arrow keys move right into a vertical shelf and left out of it, or down into a
 horizontal one. Each picture has its app name and window title under it. Right-click a picture and
-choose Rename…, or press Meta + R, to name the selected window. The `width-cycle` key renames too,
-if it is bound elsewhere. Return saves, Esc cancels, and an empty name brings the title back. The
+choose Rename…, or press Meta + R, to name the selected window. `bind overview-rename = <key>`
+moves that key; it works only in the overview, so it can share a key with any other action, and
+`unbind overview-rename` leaves only the menu. Return saves, Esc cancels, and an empty name brings the title back. The
 label then reads `Name (App)`, the minimap shows the name, and the search matches the name, the app
 and the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
 ⌘Tab with either ⌘ key opens the overview like Meta + Esc, and the macOS app switcher no longer

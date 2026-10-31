@@ -169,7 +169,7 @@ final class Overview {
         panel.contentView = view
 
         view.onKey = { [weak self] in self?.handle($0) }
-        // Meta + R would otherwise type into the search bar when no shortcut takes it first.
+        // The rename key would otherwise type into the search bar when no shortcut takes it first.
         panel.onKeyDown = { [weak self] e in
             guard let self, keys.isRename(keyCode: Int(e.keyCode), flags: UInt64(e.modifierFlags.rawValue)) else { return false }
             handle(.rename)

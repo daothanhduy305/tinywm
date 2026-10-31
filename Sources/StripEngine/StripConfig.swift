@@ -33,6 +33,10 @@ public struct StripConfig: Equatable, Sendable {
     public var overviewFloating = OverviewFloating.vertical
     /// Bound actions only; an unbound action has no entry.
     public var bindings = StripActions.defaultBindings
+    /// The overview's rename key, from `bind overview-rename`. It works only in the overview, so it
+    /// shares its chord with a global action freely. Nil when unbound.
+    public var overviewRename: MetaKeyBindings.Chord? = Self.defaultRename
+    public static let defaultRename: MetaKeyBindings.Chord? = .init(keyCode: KeyNames.codes["r"]!, shift: false, option: false)
     /// Chords that run a shell command or press other keys, from `run` and `send` lines.
     public var commands: [CustomCommand] = []
     public var rules = WindowRules()
@@ -112,6 +116,10 @@ public struct StripConfig: Equatable, Sendable {
                         continue
                     }
                     try apply(setting: name, value, to: &config)
+                case .bind("overview-rename", let key):
+                    config.overviewRename = try chord(key, meta: config.meta)
+                case .unbind("overview-rename"):
+                    config.overviewRename = nil
                 case .bind(let action, let key):
                     try requireAction(action)
                     config.bindings[action] = try chord(key, meta: config.meta)
@@ -341,6 +349,7 @@ public struct StripConfig: Equatable, Sendable {
         for spec in StripActions.all {
             lines.append("bind \(spec.name) = \(describe(spec.chord, meta: .rightCommand))")
         }
+        lines.append("bind overview-rename = \(describe(defaultRename!, meta: .rightCommand)) # renames the selected window, in the overview only")
         return lines
     }
 
