@@ -149,6 +149,12 @@ final class WindowLifecycle {
             Log.note("place", "\(Log.name(id)) returns to its slot from before it hid: \(slot)")
             return displays.engine(holding: id)?.frame(of: id)
         }
+        if recognition.placement == .tiled, let bundle = windows.bundleID(of: id),
+           quitWhileLocked.contains(where: { lockedDescriptors[$0]?.bundleID == bundle }) {
+            Log.note("place", "\(Log.name(id)) held until the lock hold ends; its app relaunched during the lock")
+            relaunched.append((id, judged))
+            return nil
+        }
         if persistence.hold(id, frame: judged.frame, recognition: recognition) {
             Log.note("place", "\(Log.name(id)) held for the layout restore as \(recognition.placement)")
             return nil
@@ -238,8 +244,23 @@ final class WindowLifecycle {
             forget(id)
         }
         tracker.onAppQuit = { [unowned self] pid in
-            Log.note("tracker", "app \(pid) quit; removing \(Log.names(windows.ids(ofPID: pid)))")
-            for id in windows.ids(ofPID: pid) { forget(id) }
+            var ids = windows.ids(ofPID: pid)
+            // During the lock its windows keep their slots for the app's next launch.
+            if screenLocked || lockRelease != nil {
+                let kept = ids.filter { lockedDescriptors[$0]?.bundleID != nil && displays.engine(holding: $0) != nil }
+                    .sorted { a, b in
+                        let (sa, sb) = (displays.slot(of: a)?.slot, displays.slot(of: b)?.slot)
+                        return (sa?.workspace ?? .max, sa?.column ?? .max) < (sb?.workspace ?? .max, sb?.column ?? .max)
+                    }
+                if !kept.isEmpty {
+                    Log.note("tracker", "app \(pid) quit during the lock; \(Log.names(kept)) keep their slots for its relaunch")
+                    heldWhileLocked.formUnion(kept)
+                    quitWhileLocked += kept
+                    ids.removeAll(where: kept.contains)
+                }
+            }
+            Log.note("tracker", "app \(pid) quit; removing \(Log.names(ids))")
+            for id in ids { forget(id) }
         }
         tracker.onAppExcluded = { [unowned self] pid in
             let ids = windows.ids(ofPID: pid)
@@ -498,6 +519,12 @@ final class WindowLifecycle {
     private var lockRelease: DispatchWorkItem?
     /// Time after the unlock for apps to hand back their windows' new elements.
     private let lockReturnWait = 5.0
+    /// Each window's app and title as the lock began. An app that quits blanks its titles first.
+    private var lockedDescriptors: [String: WindowDescriptor] = [:]
+    /// Windows whose app quit during the lock, as an app updating itself does. They keep their
+    /// slots, and the app's new windows, held in `relaunched`, take them when the hold ends.
+    private var quitWhileLocked: [String] = []
+    private var relaunched: [(id: String, judged: WindowArrivals.Judged)] = []
 
     private func installLocks() {
         // The screen wakes at the lock screen, before the user is in, so only an unlock or a
@@ -520,7 +547,13 @@ final class WindowLifecycle {
         screenLocked = locked
         lockRelease?.cancel()
         lockRelease = nil
-        guard !locked else { return }
+        guard !locked else {
+            for id in windows.allIDs where lockedDescriptors[id] == nil {
+                lockedDescriptors[id] = WindowDescriptor(windowNumber: nil, bundleID: windows.bundleID(of: id),
+                                                         title: windows.cachedTitle(of: id) ?? "", pid: 0)
+            }
+            return
+        }
         scheduleLockRelease()
     }
 
@@ -546,6 +579,24 @@ final class WindowLifecycle {
     private func releaseLockHold() {
         guard !screenLocked else { return }
         lockRelease = nil
+        // Each relaunched app's new windows take its old windows' slots, matched as a restore
+        // matches windows to the saved layout.
+        let slots = quitWhileLocked.compactMap { id in lockedDescriptors[id].map { (id, $0) } }
+        let waiting = relaunched.filter { windows.element(of: $0.id) != nil }
+        quitWhileLocked = []
+        relaunched = []
+        lockedDescriptors = [:]
+        let live = waiting.map {
+            LiveWindow(id: $0.id, descriptor: WindowDescriptor(windowNumber: nil, bundleID: windows.bundleID(of: $0.id),
+                                                               title: windows.cachedTitle(of: $0.id) ?? "", pid: 0))
+        }
+        let matched = LayoutMatcher.assign(slots: slots, windows: live)
+        for (new, old) in matched where heldWhileLocked.contains(old) {
+            Log.note("place", "\(Log.name(new)) takes the slot of \(Log.name(old)), whose app quit during the lock")
+            displays.windowReplaced(old, by: new)
+            forget(old)
+        }
+        for w in waiting where matched[w.id] == nil { _ = place(w.id, w.judged) }
         let gone = heldWhileLocked
         heldWhileLocked = []
         Log.note("tracker", "lock hold ends; \(gone.isEmpty ? "every window came back" : "gone for good: \(Log.names(Array(gone)))")")

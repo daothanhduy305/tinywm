@@ -19,8 +19,8 @@ public enum LayoutMatcher {
     /// Titles at least this alike (0 to 1) count as the same window.
     public static let similarityThreshold = 0.5
 
-    public static func assign(slots: [(LayoutSlot, WindowDescriptor)], windows: [LiveWindow]) -> [String: LayoutSlot] {
-        var result: [String: LayoutSlot] = [:]
+    public static func assign<Slot>(slots: [(Slot, WindowDescriptor)], windows: [LiveWindow]) -> [String: Slot] {
+        var result: [String: Slot] = [:]
         var freeSlots = Array(slots.indices)
         var freeWindows = Array(windows.indices)
 

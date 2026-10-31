@@ -412,6 +412,12 @@ later switch finds them.
 The matching and rebuilding live in `StripModel/LayoutRestore.swift` and are covered by
 `PersistenceTests`.
 
+While the screen is locked, windows that go keep their slots until a few seconds after the unlock.
+An app that quits during the lock, as one updating itself does, keeps its windows' slots too. Its
+new windows wait, and when the hold ends they take those slots, matched by app and title as a
+restore matches them. Each window's app and title are noted as the lock begins, since a quitting
+app blanks its titles. New windows no slot claims join the usual way.
+
 When a tiled window closes, its column width is kept for its app in the user defaults. The
 app's next window opens at that width. Apps tinywm has not seen yet use `default-width`.
 

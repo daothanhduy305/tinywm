@@ -139,6 +139,20 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
         let r = LayoutMatcher.assign(slots: s, windows: [live("w1", desc(2, "app.a", "Same")), live("w2", desc(3, "app.a", "Same"))])
         #expect(r == ["w1": s[0].0])
     }
+
+    /// A browser that relaunched during a screen lock: its new windows take the old windows' slots.
+    @Test func relaunchedWindowsTakeOldWindowIDs() {
+        let b = "company.thebrowser.dia"
+        let old = [("w5", desc(nil, b, "Cook: Servers")), ("w2", desc(nil, b, "Ebolo: mmonad/zmosh: Sessions")),
+                   ("w6", desc(nil, b, "Cook: Nezuko")), ("w4", desc(nil, b, "OL: 2026-10-28 - Obsidian"))]
+        let r = LayoutMatcher.assign(slots: old, windows: [
+            live("w29", desc(nil, b, "Cook: New Tab")), live("w30", desc(nil, b, "Ebolo: mmonad/zmosh: Sessions")),
+            live("w31", desc(nil, b, "OL: Obsidian")), live("w32", desc(nil, b, "Cook: Nezuko")),
+        ])
+        #expect(r["w30"] == "w2")
+        #expect(r["w32"] == "w6")
+        #expect(Set(r.keys) == ["w29", "w30", "w31", "w32"])
+    }
 }
 
 @Suite struct LayoutPlanTests {
