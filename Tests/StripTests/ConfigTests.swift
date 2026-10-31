@@ -41,6 +41,16 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
 }
 
 @Suite struct ConfigParsingTests {
+    @Test func pinchOverviewDefaultsOnAndParses() {
+        #expect(StripConfig().pinchOverview)
+        let off = StripConfig.parse("pinch-overview = off")
+        #expect(off.issues.isEmpty)
+        #expect(!off.config.pinchOverview)
+        #expect(StripConfig.parse("pinch-overview = on").config.pinchOverview)
+        #expect(StripConfig.parse("pinch-overview = maybe").issues.count == 1)
+        #expect(StripConfig.defaultLines.contains { $0.hasPrefix("pinch-overview = on #") })
+    }
+
     @Test func validLinesOverrideOnlyWhatTheyName() {
         let r = StripConfig.parse("""
         gap = 12

@@ -9,7 +9,7 @@ enum SystemSetup {
     static func trackpadSettings() -> [String: Int] {
         var merged: [String: Int] = [:]
         for domain in ["com.apple.AppleMultitouchTrackpad", "com.apple.driver.AppleBluetoothMultitouch.trackpad"] {
-            for (key, value) in read(SwipeClash.gestures.map(\.key), in: domain) {
+            for (key, value) in read((SwipeClash.gestures + SwipeClash.pinchGestures).map(\.key), in: domain) {
                 merged[key] = max(merged[key] ?? 0, value)
             }
         }

@@ -18,6 +18,7 @@ public struct StripConfig: Equatable, Sendable {
     /// Trackpad swipes on or off, and how many fingers they use.
     public var swipe = true
     public var swipeFingers = 3
+    public var pinchOverview = true
     /// Focus or move past the strip's first or last column continues onto the display on that side.
     public var focusCrossesDisplays = false
     /// Whether the layout is saved and brought back when tinywm starts.
@@ -228,6 +229,8 @@ public struct StripConfig: Equatable, Sendable {
             config.focusBorder = try onOff(value, for: name)
         case "swipe":
             config.swipe = try onOff(value, for: name)
+        case "pinch-overview":
+            config.pinchOverview = try onOff(value, for: name)
         case "focus-crosses-displays":
             config.focusCrossesDisplays = try onOff(value, for: name)
         case "swipe-fingers":
@@ -352,6 +355,7 @@ public struct StripConfig: Equatable, Sendable {
             "focus-border = on",
             "swipe = on",
             "swipe-fingers = \(d.swipeFingers) # 3 or 4",
+            "pinch-overview = on # pinch with thumb and three or four fingers",
             "focus-crosses-displays = off",
             "restore-layout = on",
             "peek-cover = off",

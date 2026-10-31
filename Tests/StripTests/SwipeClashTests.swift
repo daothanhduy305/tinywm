@@ -2,6 +2,21 @@ import Testing
 @testable import StripEngine
 
 @Suite struct SwipeClashTests {
+    @Test func fiveFingerPinchClashes() {
+        let s = ["TrackpadFiveFingerPinchGesture": 1]
+        #expect(SwipeClash.pinchClashes(settings: s) == ["five-finger pinch for Launchpad and Show Desktop"])
+        #expect(SwipeClash.clashes(fingers: 4, settings: s).isEmpty)
+        #expect(SwipeClash.pinchClashes(settings: ["TrackpadFiveFingerPinchGesture": 0]).isEmpty)
+    }
+
+    @Test func pinchClashesAreSeparateFromSwipes() {
+        let s = ["TrackpadFourFingerPinchGesture": 1]
+        #expect(SwipeClash.pinchClashes(settings: s) == ["four-finger pinch for Launchpad and Show Desktop"])
+        #expect(SwipeClash.clashes(fingers: 4, settings: s).isEmpty)
+        #expect(SwipeClash.pinchClashes(settings: ["TrackpadFourFingerPinchGesture": 0]).isEmpty)
+        #expect(SwipeClash.pinchClashes(settings: [:]).isEmpty)
+    }
+
     @Test func threeFingerSystemGesturesClashWithThreeFingerSwipes() {
         let s = ["TrackpadThreeFingerHorizSwipeGesture": 2, "TrackpadFourFingerVertSwipeGesture": 2]
         #expect(SwipeClash.clashes(fingers: 3, settings: s) == ["three-finger swipe between pages or full-screen apps"])

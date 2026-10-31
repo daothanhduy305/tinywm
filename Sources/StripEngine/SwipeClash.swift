@@ -13,6 +13,15 @@ public enum SwipeClash {
         ("TrackpadFourFingerVertSwipeGesture", 4, "four-finger swipe for Mission Control and App Exposé"),
     ]
 
+    public static let pinchGestures: [(key: String, fingers: Int, label: String)] = [
+        ("TrackpadFourFingerPinchGesture", 4, "four-finger pinch for Launchpad and Show Desktop"),
+        ("TrackpadFiveFingerPinchGesture", 5, "five-finger pinch for Launchpad and Show Desktop"),
+    ]
+
+    public static func pinchClashes(settings: [String: Int]) -> [String] {
+        pinchGestures.filter { (settings[$0.key] ?? 0) != 0 }.map(\.label)
+    }
+
     /// Labels of the system gestures that clash with tinywm swiping with `fingers` fingers.
     /// `settings` holds each key's value; built-in and Bluetooth trackpads should be merged first.
     public static func clashes(fingers: Int, settings: [String: Int]) -> [String] {

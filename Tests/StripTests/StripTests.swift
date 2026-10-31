@@ -779,6 +779,20 @@ final class CountingWindows: WindowSystem {
 }
 
 @Suite struct SwipeRecognizerTests {
+    @Test func aPinchDoesNotBeginASwipe() {
+        var r = SwipeRecognizer()
+        r.fingers = 4
+        func four(_ spread: Double, x: Double = 0.5) -> [(x: Double, y: Double)] {
+            [(x - spread, 0.5), (x + spread, 0.5), (x, 0.5 - spread), (x, 0.5 + spread)]
+        }
+        #expect(r.feed(four(0.3), at: 0).isEmpty)
+        #expect(r.feed(four(0.2, x: 0.54), at: 0.01).isEmpty)
+        #expect(r.feed(four(0.1, x: 0.56), at: 0.02).isEmpty)
+        #expect(r.feed([], at: 0.03).isEmpty)
+        #expect(r.feed(four(0.1), at: 0.04).isEmpty)
+        #expect(r.feed(four(0.1, x: 0.55), at: 0.05).first == .began(.horizontal))
+    }
+
     func three(_ x: Double, _ y: Double = 0.5) -> [(x: Double, y: Double)] {
         [(x - 0.1, y), (x, y), (x + 0.1, y)]
     }

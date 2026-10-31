@@ -21,7 +21,7 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     private let displaysMenu = NSMenu()
     private let liveItem = NSMenuItem(title: "Show Live Window Pictures (Screen Recording)", action: nil, keyEquivalent: "")
     private let errorsItem = NSMenuItem(title: "Config Errors", action: nil, keyEquivalent: "")
-    private let swipeWarningItem = NSMenuItem(title: "⚠︎ Trackpad Swipe Clashes with macOS", action: nil, keyEquivalent: "")
+    private let swipeWarningItem = NSMenuItem(title: "⚠︎ Trackpad Gesture Clashes with macOS", action: nil, keyEquivalent: "")
     private let loginItem = LoginMenuItem()
 
     init(livePictures: Bool) {
@@ -75,13 +75,15 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         errorsItem.submenu = disabledItems(issues.map(\.description))
     }
 
-    /// Warns that macOS reacts to the same fingers as tinywm's swipes, through the gestures listed.
-    func showSwipeClashes(_ clashes: [String], fingers: Int) {
-        swipeWarningItem.isHidden = clashes.isEmpty
-        guard !clashes.isEmpty else { return }
+    /// Lists the macOS gestures that clash with tinywm's swipes or pinch.
+    func showSwipeClashes(_ clashes: [String], fingers: Int, pinches: [String]) {
+        swipeWarningItem.isHidden = clashes.isEmpty && pinches.isEmpty
+        guard !swipeWarningItem.isHidden else { return }
         let other = fingers == 3 ? 4 : 3
-        let menu = disabledItems(clashes.map { "macOS uses \($0)" }
-            + ["Turn it off there, or set swipe-fingers = \(other) in the config"])
+        var hints: [String] = []
+        if !clashes.isEmpty { hints.append("Turn it off there, or set swipe-fingers = \(other) in the config") }
+        if !pinches.isEmpty { hints.append("Turn off the macOS pinch, or set pinch-overview = off in the config") }
+        let menu = disabledItems((clashes + pinches).map { "macOS uses \($0)" } + hints)
         menu.addItem(.separator())
         menu.addItem(item("Open Trackpad Settings…", #selector(trackpadSettingsChosen)))
         swipeWarningItem.submenu = menu

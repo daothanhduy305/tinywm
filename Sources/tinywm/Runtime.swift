@@ -19,6 +19,7 @@ final class Runtime {
     private(set) var config = StripConfig()
     private(set) var swipeEnabled = true
     private(set) var recognizer = SwipeRecognizer()
+    private var pinch = PinchRecognizer()
 
     private let menu: StatusMenu
     private let configFile: ConfigFile
@@ -201,6 +202,7 @@ final class Runtime {
     private func applyConfig(_ parsed: StripConfig.Parsed) {
         Log.note("config", "reloaded; \(parsed.issues.count) issues")
         config = parsed.config
+        pinch = PinchRecognizer()
         menu.showIssues(parsed.issues)
         commands.reload()
         metaKey.setMode(config.meta)
@@ -259,10 +261,12 @@ final class Runtime {
         for (id, engine) in displays.engines { overlays[id]?.pictures.viewport = engine.viewport }
     }
 
-    /// Shows a menu warning when a macOS gesture reacts to the same fingers as tinywm's swipes.
+    /// Shows a menu warning when a macOS gesture clashes with tinywm's swipes or pinch.
     func refreshSwipeWarning() {
-        let clashes = swipeEnabled ? SwipeClash.clashes(fingers: recognizer.fingers, settings: SystemSetup.trackpadSettings()) : []
-        menu.showSwipeClashes(clashes, fingers: recognizer.fingers)
+        let settings = SystemSetup.trackpadSettings()
+        let clashes = swipeEnabled ? SwipeClash.clashes(fingers: recognizer.fingers, settings: settings) : []
+        let pinches = config.pinchOverview ? SwipeClash.pinchClashes(settings: settings) : []
+        menu.showSwipeClashes(clashes, fingers: recognizer.fingers, pinches: pinches)
     }
 
     // MARK: Displays
@@ -442,6 +446,12 @@ final class Runtime {
     /// up or down steps one workspace, with content following the fingers' direction.
     private func startSwipes() {
         touches.onFrame = { [unowned self] contacts, t in
+            if config.pinchOverview, let event = pinch.feed(contacts, at: t), !dragger.isActive,
+               (event == .pinchIn && !overview.isOpen) || (event == .spreadOut && overview.isOpen),
+               let engine = displays.active(pointer: Screens.pointer()) {
+                if swipeAxis != nil { handle(.cancelled) }
+                overview.toggle(engine, displays: displays)
+            }
             guard swipeEnabled else { return }
             for event in recognizer.feed(contacts, at: t) { handle(event) }
             if swipeAxis != nil {
@@ -464,8 +474,10 @@ final class Runtime {
             swipeEngine = displays.underPointer(Screens.pointer())
             if axis == .horizontal { swipeEngine?.beginSwipe() }
         case .moved(let dx, let dy):
+            guard swipeAxis != nil else { return }
             if swipeAxis == .horizontal { swipeEngine?.swipe(by: dx) } else { verticalTravel += dy }
         case .ended(let velocity):
+            guard swipeAxis != nil else { return }
             let lag = swipeFrames > 1 ? Int((swipeDelays.most - swipeDelays.least) * 1000) : 0
             Log.note("swipe", "\(swipeFrames) frames, worst lag \(lag) ms")
             if swipeAxis == .horizontal {

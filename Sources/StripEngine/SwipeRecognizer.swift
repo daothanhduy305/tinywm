@@ -21,6 +21,7 @@ public struct SwipeRecognizer: Sendable {
     public var axisRatio = 1.2
 
     private var origin: (x: Double, y: Double)?
+    private var originSpread = 0.0
     private var last: (x: Double, y: Double, t: Double)?
     private var axis: Axis?
     /// Recent samples along the axis, to estimate the lift-off velocity.
@@ -33,15 +34,19 @@ public struct SwipeRecognizer: Sendable {
         guard touches.count == fingers else { return finish(at: t) }
         let x = touches.map(\.x).reduce(0, +) / Double(touches.count)
         let y = touches.map(\.y).reduce(0, +) / Double(touches.count)
+        let spread = touches.map { (($0.x - x) * ($0.x - x) + ($0.y - y) * ($0.y - y)).squareRoot() }
+            .reduce(0, +) / Double(touches.count)
         guard let o = origin, let l = last else {
             origin = (x, y)
+            originSpread = spread
             last = (x, y, t)
             return []
         }
         var events: [Event] = []
         if axis == nil {
             let dx = x - o.x, dy = y - o.y
-            guard (dx * dx + dy * dy).squareRoot() >= startDistance else { return [] }
+            let distance = (dx * dx + dy * dy).squareRoot()
+            guard distance >= startDistance, abs(spread - originSpread) <= distance else { return [] }
             if abs(dx) >= axisRatio * abs(dy) { axis = .horizontal }
             else if abs(dy) >= axisRatio * abs(dx) { axis = .vertical }
             else { return [] }

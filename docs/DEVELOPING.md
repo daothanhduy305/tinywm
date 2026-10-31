@@ -129,6 +129,7 @@ width-presets = 0.333, 0.5, 0.667
 focus-border = on
 swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
+pinch-overview = on # pinch with thumb and three or four fingers; spread closes it
 restore-layout = on # save the layout and restore it at start
 peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
@@ -361,6 +362,10 @@ springs with it over the picture's part on screen, fading in as the window slide
 out as it comes back. The card's panel shows again under the pictures as they fade.
 
 ## Trackpad swipes
+
+Pinch with your thumb and three or four fingers to open the overview, and spread them to close it.
+Turn off macOS's four- and five-finger pinches, or set `pinch-overview = off` to leave them to macOS.
+Pinch works even with `swipe = off`.
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or
 down swipe changes workspace. When the main thread falls behind, contact frames waiting for it
