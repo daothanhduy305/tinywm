@@ -360,6 +360,54 @@ public final class StripEngine {
         swipeScroll = strip.scroll
     }
 
+    private var verticalTravel: Double?
+
+    public func beginVerticalSwipe() {
+        verticalTravel = 0
+    }
+
+    /// Fingers moving up pull the current workspace up and bring the one below into view.
+    public func swipeVertical(by dy: Double) {
+        guard let travel = verticalTravel else { return }
+        verticalTravel = travel + dy
+        _ = presenter?.preview(frames: verticalSwipeFrames(), focused: strip.focusedWindow)
+    }
+
+    private func verticalSwipeFrames() -> [String: Rect] {
+        let travel = verticalTravel ?? 0
+        let direction = travel > 0 ? 1 : -1
+        let neighbour = workspaces.active + direction
+        let hasNeighbour = workspaces.strips.indices.contains(neighbour)
+        let offset = -travel * swipeScale * viewport.height * (hasNeighbour ? 1 : 0.3)
+        var frames = stripFrames(strip, metrics, clamp: false)
+        if hasNeighbour {
+            for (id, var frame) in stripFrames(workspaces.strips[neighbour], metrics, clamp: false) {
+                frame.y += Double(direction) * viewport.height
+                frames[id] = frame
+            }
+        }
+        return frames.mapValues { r in
+            var frame = r
+            frame.y += offset
+            return frame
+        }
+    }
+
+    public func endVerticalSwipe(velocity _: Double) {
+        guard let travel = verticalTravel else { return }
+        // As with strip swipes, changed targets make even a return to the same layout spring back.
+        let frames = verticalSwipeFrames()
+        for id in strip.allWindows { targetFrames[id] = frames[id] }
+        verticalTravel = nil
+        let direction = travel > 0 ? 1 : -1
+        if abs(travel) > 0.08, workspaces.strips.indices.contains(workspaces.active + direction) {
+            switchWorkspace(by: direction)
+        } else {
+            apply()
+        }
+        presenter?.endPreview()
+    }
+
     /// Moves the strip with the fingers. `dx` is trackpad travel; fingers moving left pull the
     /// strip left, showing what lies to the right.
     public func swipe(by dx: Double) {

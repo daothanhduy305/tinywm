@@ -54,7 +54,6 @@ final class Runtime {
     private var coveringOverlays = 0
     private var swipeAxis: SwipeRecognizer.Axis?
     private var swipeEngine: StripEngine?
-    private var verticalTravel = 0.0
     /// Contact frames handled during the swipe, and the least and most time between a frame and
     /// its handling. Contact times use their own clock, so only the spread is a delay.
     private var swipeFrames = 0
@@ -470,28 +469,29 @@ final class Runtime {
         switch event {
         case .began(let axis):
             swipeAxis = axis
-            verticalTravel = 0
             swipeFrames = 0
             swipeDelays = (.infinity, -.infinity)
             swipeEngine = displays.underPointer(Screens.pointer())
             if axis == .horizontal { swipeEngine?.beginSwipe() }
+            else { swipeEngine?.beginVerticalSwipe() }
         case .moved(let dx, let dy):
             guard swipeAxis != nil else { return }
-            if swipeAxis == .horizontal { swipeEngine?.swipe(by: dx) } else { verticalTravel += dy }
+            if swipeAxis == .horizontal { swipeEngine?.swipe(by: dx) }
+            else { swipeEngine?.swipeVertical(by: dy) }
         case .ended(let velocity):
             guard swipeAxis != nil else { return }
             let lag = swipeFrames > 1 ? Int((swipeDelays.most - swipeDelays.least) * 1000) : 0
             Log.note("swipe", "\(swipeFrames) frames, worst lag \(lag) ms")
             if swipeAxis == .horizontal {
                 swipeEngine?.endSwipe(velocity: velocity)
-            } else if abs(verticalTravel) > 0.08 {
-                // Fingers moving up push the stack up, bringing the workspace below into view.
-                swipeEngine?.switchWorkspace(by: verticalTravel > 0 ? 1 : -1)
+            } else {
+                swipeEngine?.endVerticalSwipe(velocity: velocity)
             }
             swipeAxis = nil
             swipeEngine = nil
         case .cancelled:
             if swipeAxis == .horizontal { swipeEngine?.endSwipe(velocity: 0) }
+            else if swipeAxis == .vertical { swipeEngine?.endVerticalSwipe(velocity: 0) }
             swipeAxis = nil
             swipeEngine = nil
         }

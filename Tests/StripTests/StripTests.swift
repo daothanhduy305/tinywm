@@ -897,6 +897,36 @@ final class CountingWindows: WindowSystem {
         #expect(e.strip.scroll == 0)
         #expect(p.endedPreviews == 1)
     }
+
+    @Test(arguments: [0.04, 0.08, 0.1, -0.04, -0.1])
+    func verticalSwipesPreviewBothWorkspacesAndRespectTheThreshold(travel: Double) {
+        let (e, w, p) = make()
+        e.switchWorkspace(by: travel > 0 ? 1 : -1)
+        w.focusedWindow = "next"; e.windowAdded("next")
+        e.switchWorkspace(by: travel > 0 ? -1 : 1)
+        let original = e.workspaces.active
+        let direction = travel > 0 ? 1 : -1
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: travel)
+        let offset = -travel * e.swipeScale * screen.height
+        #expect(p.previews.last?["a"]?.y == offset)
+        #expect(p.previews.last?["next"]?.y == Double(direction) * screen.height + offset)
+        e.endVerticalSwipe(velocity: 0)
+        #expect(e.workspaces.active == original + (abs(travel) > 0.08 ? direction : 0))
+        #expect(e.strip.focusedWindow == (abs(travel) > 0.08 ? "next" : "a"))
+        #expect(p.endedPreviews == 1)
+        #expect(p.begun.last?.moves["a"]?.from.y == offset)
+
+        // The empty end workspace has no neighbour beyond it.
+        e.switchWorkspace(by: direction)
+        if abs(travel) <= 0.08 { e.switchWorkspace(by: direction) }
+        let end = e.workspaces.active
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: Double(direction) * 0.2)
+        #expect(p.previews.last?.isEmpty == true)
+        e.endVerticalSwipe(velocity: 0)
+        #expect(e.workspaces.active == end)
+    }
 }
 
 @MainActor

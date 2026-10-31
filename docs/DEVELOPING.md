@@ -372,8 +372,10 @@ Set `pinch-fingers = 4` to use your thumb and three fingers instead.
 Turn off macOS's matching pinch, change `pinch-fingers`, or set `pinch-overview = off` to leave it to macOS.
 Pinch works even with `swipe = off`.
 
-A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or
-down swipe changes workspace. When the main thread falls behind, contact frames waiting for it
+A sideways swipe drags the strip under your fingers and settles on the nearest column.
+An up or down swipe drags the workspaces under your fingers. Travel past 0.08 of the trackpad
+changes workspace on release. A shorter swipe springs back. Past either end, the workspace
+moves with resistance and springs back. When the main thread falls behind, contact frames waiting for it
 are merged, so the strip jumps to the fingers instead of replaying old frames. While that many fingers are down, an event tap keeps the scroll
 and gesture events macOS makes from them away from apps, so the app under the pointer does not
 scroll or go back. Scrolls stay blocked until one begins in a new touch, so the scroll macOS

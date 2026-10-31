@@ -169,7 +169,8 @@ final class PictureMotion: StripPresenter {
         var start: [String: NSRect] = [:]
         var startScale: [String: CGFloat] = [:]
         for (id, m) in glides {
-            if active, let p = layers[id]?.presentation() {
+            if active, let layer = layers[id] {
+                let p = phase == .previewing ? layer : layer.presentation() ?? layer
                 start[id] = unscaled(p)
                 startScale[id] = scale(of: p)
             } else {
