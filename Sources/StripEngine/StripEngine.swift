@@ -463,9 +463,12 @@ public final class StripEngine {
             let (lefts, _) = m.columnOffsets(next)
             let left = lefts[f] - settings.gap, right = lefts[f] + m.width(of: next.columns[f]) + settings.gap
             if left < target - 0.5 || right > target + viewport.width + 0.5 {
-                // The focused column left the screen, so focus follows the column the swipe settled on.
-                next.focusedColumn = lefts.firstIndex { abs(max(0, $0 - settings.gap) - target) < 0.5 }
-                    ?? lefts.indices.min { abs(lefts[$0] - target) < abs(lefts[$1] - target) }
+                // The focused column left the screen, so focus follows the first column wholly on it,
+                // which at the strip's right end is the last column, not the one cut off at the left.
+                next.focusedColumn = lefts.indices.first {
+                    lefts[$0] - settings.gap >= target - 0.5
+                        && lefts[$0] + m.width(of: next.columns[$0]) + settings.gap <= target + viewport.width + 0.5
+                } ?? lefts.indices.min { abs(lefts[$0] - target) < abs(lefts[$1] - target) }
             }
         }
         workspaces.current = next

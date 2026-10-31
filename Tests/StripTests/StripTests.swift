@@ -881,6 +881,23 @@ final class CountingWindows: WindowSystem {
         #expect(w.focusedWindow == "c")
     }
 
+    @Test func swipingToTheEndFocusesTheNarrowLastColumn() {
+        let w = CountingWindows()
+        var s = StripSettings(); s.defaultWidth = 0.9; s.gap = 0
+        let e = StripEngine(windows: w, viewport: screen, settings: s)
+        e.presenter = FakePresenter()
+        w.focusedWindow = "a"; e.windowAdded("a")
+        e.settings.defaultWidth = 0.3
+        w.focusedWindow = "b"; e.windowAdded("b")
+        e.focusColumn(0)
+        e.beginSwipe()
+        e.swipe(by: -0.5)
+        e.endSwipe(velocity: 0)
+        #expect(e.strip.scroll == 200) // b right-aligned, a cut off at the left
+        #expect(e.strip.focusedWindow == "b")
+        #expect(w.focusedWindow == "b")
+    }
+
     @Test func withCenterFocusASwipeCentresAColumnAndFocusesIt() {
         let (e, w, _) = make()
         e.settings.scrollMode = .center
