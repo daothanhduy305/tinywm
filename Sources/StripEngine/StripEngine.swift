@@ -369,8 +369,24 @@ public final class StripEngine {
     /// Fingers moving up pull the current workspace up and bring the one below into view.
     public func swipeVertical(by dy: Double) {
         guard let travel = verticalTravel else { return }
-        verticalTravel = travel + dy
-        _ = presenter?.preview(frames: verticalSwipeFrames(), focused: strip.focusedWindow)
+        let offset = travel + dy
+        verticalTravel = offset
+        let neighbour = workspaces.active + (offset > 0 ? 1 : -1)
+        var focused = strip.focusedWindow
+        var ring: (rect: Rect, opacity: Double)?
+        if workspaces.strips.indices.contains(neighbour) {
+            let next = workspaces.strips[neighbour]
+            let progress = min(1, abs(offset) * swipeScale)
+            if let id = focused, next.focusedWindow == nil,
+               let rect = stripFrames(strip, metrics, clamp: false)[id] {
+                ring = (rect, 1 - progress)
+            } else if focused == nil, let id = next.focusedWindow,
+                      let rect = stripFrames(next, metrics, clamp: false)[id] {
+                focused = id
+                ring = (rect, progress)
+            }
+        }
+        _ = presenter?.preview(frames: verticalSwipeFrames(), focused: focused, ring: ring)
     }
 
     private func verticalSwipeFrames() -> [String: Rect] {

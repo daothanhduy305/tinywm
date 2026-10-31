@@ -343,6 +343,7 @@ When a layout changes, pictures of the windows glide to their new places. The re
 are written once, a moment after the pictures go up. The pictures fade after the windows land.
 The focus ring does not travel with the windows. During a swipe it stays where it is;
 when the strip lands it sits where the focused window lands and only resizes.
+The ring fades with the movement when swiping or switching to or from an empty workspace.
 A window moved by a command (move, stack, pop out, to another workspace or display) shrinks a little, slides over the other
 pictures to its new place while they slide too, then grows back. A full-width one that keeps its place shrinks and
 grows where it is while its neighbour passes behind it.

@@ -23,8 +23,9 @@ public protocol StripPresenter: AnyObject {
     /// Called when a window written without motion reached its frame, as on startup or a retile.
     func wrote(_ id: String)
     /// Draws the strip at `frames` right now, without animation, while fingers drag it.
+    /// `ring` overrides the stationary border with a window rect and opacity.
     /// Returns false when pictures are unavailable.
-    func preview(frames: [String: Rect], focused: String?) -> Bool
+    func preview(frames: [String: Rect], focused: String?, ring: (rect: Rect, opacity: Double)?) -> Bool
     /// Ends a drag preview that no motion took over, e.g. a swipe that settled where it began.
     func endPreview()
     /// Moves the pictures to `frames` with the motion springs, without writing any window.
@@ -34,6 +35,9 @@ public protocol StripPresenter: AnyObject {
 }
 
 public extension StripPresenter {
+    func preview(frames: [String: Rect], focused: String?) -> Bool {
+        preview(frames: frames, focused: focused, ring: nil)
+    }
     func arrange(frames: [String: Rect]) -> Bool { preview(frames: frames, focused: nil) }
     func wrote(_ id: String) {}
 }

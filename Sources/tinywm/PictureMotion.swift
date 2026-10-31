@@ -193,6 +193,7 @@ final class PictureMotion: StripPresenter {
             pictures.show(id, on: layer, growingTo: current.targetSizes[id])
         }
         // The ring sits at the destination and only resizes, unless it follows a lifted window.
+        let ringOpacity: Float = ring.isHidden ? 0 : (phase == .previewing ? ring.opacity : ring.presentation()?.opacity ?? ring.opacity)
         var ringTo: NSRect?
         if showRing(), let focused, let end = moves[focused]?.to ?? still[focused] {
             ringTo = outset(local(end))
@@ -207,9 +208,14 @@ final class PictureMotion: StripPresenter {
                 ring.position = NSPoint(x: ringTo.midX, y: ringTo.midY)
             }
             ring.isHidden = false
+        } else if showRing(), ringOpacity > 0 {
+            ring.frame = ring.presentation()?.frame ?? ring.frame
+            ring.removeAllAnimations()
         } else {
+            ring.removeAllAnimations()
             ring.isHidden = true
         }
+        ring.opacity = ringOpacity
         CATransaction.commit()
         // The first frame on screen must already show the pictures, never an empty panel.
         CATransaction.flush()
@@ -274,6 +280,13 @@ final class PictureMotion: StripPresenter {
             ringTarget = ringTo
             ringOwner = focused
         }
+        CATransaction.setDisableActions(true)
+        ring.opacity = ringTo == nil ? 0 : 1
+        if !ring.isHidden, ringOpacity != ring.opacity {
+            let opacity = spring("opacity", NSNumber(value: ringOpacity), NSNumber(value: ring.opacity))
+            longest = max(longest, opacity.duration)
+            ring.add(opacity, forKey: "opacity")
+        }
         CATransaction.commit()
         snapshots.beginLive(shown, rate: motionRate)
         Log.note("motion", "\(label) begins \(moves.count) moves, \(shown.count) shown, \(pictures.coverMode ? "covers" : "pictures"); "
@@ -287,7 +300,7 @@ final class PictureMotion: StripPresenter {
         return motion
     }
 
-    func preview(frames: [String: Rect], focused: String?) -> Bool {
+    func preview(frames: [String: Rect], focused: String?, ring: (rect: Rect, opacity: Double)?) -> Bool {
         guard pictures.available else { return false }
         token += 1 // a fade or settle still pending from an earlier motion no longer applies
         // Once a drag is on screen, each frame only moves the pictures. Contact frames come
@@ -299,6 +312,7 @@ final class PictureMotion: StripPresenter {
                 layers[id]?.removeAllAnimations()
                 layers[id]?.frame = local(r)
             }
+            previewRing(frames: frames, focused: focused, override: ring)
             CATransaction.commit()
             return true
         }
@@ -318,19 +332,7 @@ final class PictureMotion: StripPresenter {
             if isNew || !active { pictures.show(id, on: layer) }
             layer.frame = local(r)
         }
-        if showRing(), let focused, let r = frames[focused] {
-            styleRing()
-            ring.removeAllAnimations()
-            if let ringTarget, ringOwner == focused { ring.frame = ringTarget }
-            else {
-                ring.frame = outset(local(r))
-                ringTarget = ring.frame
-                ringOwner = focused
-            }
-            ring.isHidden = false
-        } else {
-            ring.isHidden = true
-        }
+        previewRing(frames: frames, focused: focused, override: ring)
         CATransaction.commit()
         CATransaction.flush()
         if phase == .idle || phase == .fading { onActive(true) }
@@ -346,6 +348,23 @@ final class PictureMotion: StripPresenter {
             panel.animator().alphaValue = Self.coveringAlpha
         }
         return true
+    }
+
+    private func previewRing(frames: [String: Rect], focused: String?, override: (rect: Rect, opacity: Double)?) {
+        if showRing(), let focused, let r = override?.rect ?? frames[focused] {
+            styleRing()
+            ring.removeAllAnimations()
+            if override == nil, let ringTarget, ringOwner == focused { ring.frame = ringTarget }
+            else {
+                ring.frame = outset(local(r))
+                ringTarget = ring.frame
+                ringOwner = focused
+            }
+            ring.opacity = Float(override?.opacity ?? 1)
+            ring.isHidden = false
+        } else {
+            ring.isHidden = true
+        }
     }
 
     func arrange(frames: [String: Rect]) -> Bool {
@@ -405,6 +424,7 @@ final class PictureMotion: StripPresenter {
 
     private func settled(_ motion: Int) {
         guard motion == token else { return }
+        if ring.opacity == 0 { ring.isHidden = true }
         current.settledAt = CACurrentMediaTime()
         Log.note("motion", "\(label) settled after \(ms(since: current.began)) ms")
         let waiting = current.deferred

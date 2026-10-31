@@ -495,7 +495,12 @@ final class FakePresenter: StripPresenter {
     func landed(_ id: String, token: Int) { landedIDs.append(id) }
     var previews: [[String: Rect]] = []
     var endedPreviews = 0
-    func preview(frames: [String: Rect], focused: String?) -> Bool { previews.append(frames); return accept }
+    var previewRings: [(rect: Rect, opacity: Double)?] = []
+    func preview(frames: [String: Rect], focused: String?, ring: (rect: Rect, opacity: Double)?) -> Bool {
+        previews.append(frames)
+        previewRings.append(ring)
+        return accept
+    }
     func endPreview() { endedPreviews += 1 }
     func writesIssued(_ ids: Set<String>, token: Int) { issued = ids }
     var wroteIDs: [String] = []
@@ -896,6 +901,27 @@ final class CountingWindows: WindowSystem {
         e.endSwipe(velocity: 0)
         #expect(e.strip.scroll == 0)
         #expect(p.endedPreviews == 1)
+    }
+
+    @Test func verticalSwipeFadesTheRingAtItsLandingSpotAcrossAnEmptyWorkspace() {
+        let (e, _, p) = make()
+        let rect = stripFrames(e.strip, e.metrics, clamp: false)["a"]
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: 0.2)
+        #expect(p.previewRings.last??.rect == rect)
+        #expect(abs((p.previewRings.last??.opacity ?? -1) - 0.7) < 0.001)
+        e.swipeVertical(by: 1)
+        #expect(p.previewRings.last??.opacity == 0)
+        e.endVerticalSwipe(velocity: 0)
+        #expect(e.strip.focusedWindow == nil)
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: -0.2)
+        #expect(p.previewRings.last??.rect == rect)
+        #expect(abs((p.previewRings.last??.opacity ?? -1) - 0.3) < 0.001)
+        e.swipeVertical(by: -1)
+        #expect(p.previewRings.last??.opacity == 1)
+        e.swipeVertical(by: 1.2)
+        #expect(abs(p.previewRings.last??.opacity ?? -1) < 0.001)
     }
 
     @Test(arguments: [0.04, 0.08, 0.1, -0.04, -0.1])
