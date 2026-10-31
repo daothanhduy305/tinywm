@@ -225,8 +225,8 @@ public func overviewLayout(
 /// Every workspace's floating windows on a shelf at the right or bottom edge of the screen, which
 /// does not pan. Pictures keep their proportions and are all `shelfSize` wide (vertical) or tall
 /// (horizontal), each with its label under it. Pictures stay centred on a plate spanning the available
-/// height or width, inset by `shelfEdge`. The vertical plate starts below `style.top`. Fullscreen
-/// windows come last, with workspace -1. Nil when floating windows stay in place or there is none to show.
+/// height or width, inset by `shelfEdge`. Fullscreen windows come last, with workspace -1. Nil when
+/// floating windows stay in place or there is none to show.
 func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Rect], fullScreen: [String: Rect] = [:],
                    screen: Size) -> OverviewRow? {
     guard style.floating != .off else { return nil }
@@ -239,18 +239,17 @@ func overviewShelf(_ ws: Workspaces, _ style: OverviewStyle, floats: [String: Re
     if style.floating == .vertical {
         let heights = shown.map { $0.2.height / $0.2.width * style.shelfSize }
         let total = heights.reduce(0) { $0 + $1 + label } + gaps
-        let room = screen.height - style.top - 2 * (style.shelfEdge + pad)
+        let room = screen.height - 2 * (style.shelfEdge + pad)
         let s = min(1, room / total)
         let w = style.shelfSize * s
         let x = screen.width - style.shelfEdge - pad - w
-        var y = style.top + (screen.height - style.top - total * s) / 2
+        var y = (screen.height - total * s) / 2
         for (k, (id, workspace, _)) in shown.enumerated() {
             windows.append(OverviewWindow(id: id, workspace: workspace, column: 0, index: k,
                                           rect: Rect(x: x, y: y, width: w, height: heights[k] * s)))
             y += (heights[k] + label + style.shelfGap) * s
         }
-        let plate = Rect(x: x - pad, y: style.top + style.shelfEdge, width: w + 2 * pad,
-                         height: screen.height - style.top - 2 * style.shelfEdge)
+        let plate = Rect(x: x - pad, y: style.shelfEdge, width: w + 2 * pad, height: screen.height - 2 * style.shelfEdge)
         return OverviewRow(workspace: -1, isActive: false, rect: plate, windows: windows)
     }
     let widths = shown.map { $0.2.width / $0.2.height * style.shelfSize }

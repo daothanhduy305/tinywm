@@ -253,7 +253,7 @@ private func sample(active: Int = 1) -> Workspaces {
         #expect(shelf.windows.allSatisfy { $0.rect.width == style.shelfSize })
         #expect(abs(layout.window("f")!.rect.height - 200.0 / 300 * style.shelfSize) < 1e-9)
         #expect(shelf.rect.maxX == display.width - style.shelfEdge)
-        #expect(shelf.rect.y == style.top + style.shelfEdge)
+        #expect(shelf.rect.y == style.shelfEdge)
         #expect(shelf.rect.maxY == display.height - style.shelfEdge)
         #expect(abs((shelf.windows.first!.rect.y + shelf.windows.last!.rect.maxY + style.labelGap) / 2 - shelf.rect.center.y) < 1e-9)
         let edge = Point(x: shelf.rect.center.x, y: shelf.rect.y + 1)
