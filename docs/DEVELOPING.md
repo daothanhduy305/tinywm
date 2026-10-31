@@ -110,6 +110,20 @@ Pushing a tag like `v0.2.0` runs `.github/workflows/release.yml`. It tests, buil
 `scripts/release-free.sh 0.2.0` builds the same zip locally. `scripts/release.sh` is the notarized
 route and needs a paid Apple Developer ID.
 
+## Preferences
+
+Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
+Gestures and Rules. Changes write to the config file and apply at once. Your comments and
+other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
+Use **Edit Config…** in the menu-bar menu to edit the file yourself.
+Launch at login uses the macOS login item.
+
+`ConfigEdit.swift` in StripEngine edits text without macOS types. It keeps trailing comments,
+uses the last active setting, and removes earlier active duplicates. Repeating rules and commands
+use file line numbers. `ConfigFile.write` reads fresh text, writes through symlinks, and reloads.
+The app watches the file before Accessibility is granted. Runtime and Preferences both observe it.
+SwiftUI stays in the tinywm target, hosted by an NSWindow.
+
 ## tinywm configuration
 
 tinywm reads `~/.config/tinywm/config` (or `$XDG_CONFIG_HOME/tinywm/config`). The file is
@@ -132,8 +146,6 @@ swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
 pinch-overview = on # pinch opens the overview; spread closes it
 pinch-fingers = 5   # 4 or 5, thumb included
-restore-layout = on # save the layout and restore it at start
-peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
 overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview
@@ -350,14 +362,12 @@ pictures to its new place while they slide too, then grows back. A full-width on
 grows where it is while its neighbour passes behind it.
 
 macOS cannot hide a single window, so columns off the screen wait just past its edge with a
-thin sliver showing. A column partly on screen would spill onto a display next to it, so it is
-narrowed to the part on screen. With less than 100 points showing, it hides instead.
-`stripFrames` places them. A narrowed window that refuses its width does not resize its column.
-With `peek-cover = on` the column hides and a card stands in for its part on screen. The card
-shows the window's picture as it would sit on the strip, so a column cut at the left edge
-shows its right part. The picture is retaken every second while the card shows. Without a
-picture, as with live pictures off, the card is dark with the app's icon and the window's
-title. Clicking the card focuses the window.
+thin sliver showing. When a column partly on screen would spill onto a display beside it,
+its window hides past the edge too. A card stands in for its part on screen.
+`stripFrames` places the windows. The card shows the window's picture as it would sit on the
+strip, so a column cut at the left edge shows its right part. The picture is retaken every
+second while the card shows. Without a picture, as with live pictures off, the card is dark
+with the app's icon and the window's title. Clicking the card focuses the window.
 `blockedPeeks` gives the cards' frames, `StripEngine.peekStrip` the windows' frames on the
 strip, and `PeekCards` draws them.
 During motion a window with a picture needs no card: its picture moves to its place on the
@@ -404,7 +414,7 @@ windows left over take its slots left over, in saved order, so a relaunched brow
 all changed still gets its places.
 Each display's workspaces are rebuilt and normalised, written once without motion, and windows
 that no slot claimed join the usual way. Displays that are unplugged or switched off keep their
-saved layout in the file. With `restore-layout = off` the file is neither read nor written.
+saved layout in the file. The layout is always saved and restored.
 
 Each display setup keeps its own layout. A setup is the set of attached displays, by UUID; their
 arrangement and resolution do not count, and turning tiling off for one is not a new setup. When

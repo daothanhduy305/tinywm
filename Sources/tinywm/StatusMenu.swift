@@ -6,6 +6,7 @@ import WindowKit
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     var toggleLivePictures: () -> Void = {}
+    var showPreferences: () -> Void = {}
     var showWelcome: () -> Void = {}
     var retileAll: () -> Void = {}
     var editConfig: () -> Void = {}
@@ -30,6 +31,9 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         statusItem.button?.imagePosition = .imageLeft
         statusItem.button?.title = ""
         let menu = NSMenu()
+        let preferences = item("Preferences…", #selector(preferencesChosen))
+        preferences.keyEquivalent = ","
+        menu.addItem(preferences)
         let shortcuts = NSMenuItem(title: "Shortcuts", action: nil, keyEquivalent: "")
         shortcuts.submenu = shortcutsMenu
         menu.addItem(shortcuts)
@@ -50,9 +54,6 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         menu.addItem(item("Retile All Windows", #selector(retileChosen)))
         menu.addItem(item("Edit Config…", #selector(editChosen)))
         menu.addItem(item("Reload Config", #selector(reloadChosen)))
-        let note = NSMenuItem(title: "Keys, meta key and layout live in the config file", action: nil, keyEquivalent: "")
-        note.isEnabled = false
-        menu.addItem(note)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit tinywm", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         menu.delegate = self
@@ -132,6 +133,7 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     }
 
     @objc private func livePicturesChosen() { toggleLivePictures() }
+    @objc private func preferencesChosen() { showPreferences() }
     @objc private func welcomeChosen() { showWelcome() }
     @objc private func retileChosen() { retileAll() }
     @objc private func editChosen() { editConfig() }

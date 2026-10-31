@@ -16,8 +16,6 @@ final class LayoutPersistence {
     private let windows: AXWindows
     private let displays: StripDisplays
     private let url: URL
-    /// Whether saving and restoring are on, read afresh each time so the config can switch them.
-    var enabled: () -> Bool = { true }
     /// True while windows found at startup are still being read. The restore waits for them,
     /// since an app can take a while to answer.
     var reading: () -> Bool = { false }
@@ -56,7 +54,7 @@ final class LayoutPersistence {
 
     /// Call before the first window scan. Windows are held until `settle` has passed.
     func beginRestore() {
-        guard enabled(), load() != nil else { ready = true; return }
+        guard load() != nil else { ready = true; return }
         holding = true
         // Counted from the first check, so the settle time does not count against the read limit.
         var start: Double?
@@ -96,7 +94,7 @@ final class LayoutPersistence {
         let pending = held.filter { windows.element(of: $0.live.id) != nil }
         Log.note("restore", "matching \(pending.count) windows against the saved layout")
         held = []
-        if enabled(), let saved = load() {
+        if let saved = load() {
             // The layout made for this display setup, else each display's last layout.
             let key = displays.setupKey
             names = displays.restore(saved.setups?[key].map { SavedLayout(displays: $0) } ?? saved, pending: pending)
@@ -148,7 +146,7 @@ final class LayoutPersistence {
     /// `wait` blocks until the file is written, for a save just before tinywm quits.
     func saveNow(wait: Bool = false) {
         pendingSave?.cancel()
-        guard ready, enabled() else { return }
+        guard ready else { return }
         let describe = { [self] (id: String) in descriptor(of: id) }
         let current = displays.engines.mapValues { SavedWorkspaces($0.workspaces, describe: describe) }
         var setups = displays.setups.mapValues { $0.mapValues { SavedWorkspaces($0, describe: describe) } }

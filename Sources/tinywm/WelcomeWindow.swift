@@ -7,7 +7,7 @@ import StripEngine
 final class WelcomeWindow: NSObject, NSWindowDelegate {
     static let seenKey = "welcomeSeen"
 
-    var editConfig: () -> Void = {}
+    var showPreferences: () -> Void = {}
     /// Whether swipes are on, and with how many fingers, as the config says.
     var swipe: () -> (enabled: Bool, fingers: Int) = { (true, 3) }
     /// How to move around with the keys the config binds.
@@ -94,8 +94,8 @@ final class WelcomeWindow: NSObject, NSWindowDelegate {
         let keyTitle = Self.label("The meta key", font: .boldSystemFont(ofSize: 13))
         moveText.font = .systemFont(ofSize: 13)
         moveText.textColor = .secondaryLabelColor
-        let edit = NSButton(title: "Edit Config…", target: self, action: #selector(openConfig))
-        let keys = hstack([NSStackView(views: [keyTitle, moveText].map { $0 as NSView }, vertical: true, spacing: 2), edit])
+        let preferences = NSButton(title: "Preferences…", target: self, action: #selector(openPreferences))
+        let keys = hstack([NSStackView(views: [keyTitle, moveText].map { $0 as NSView }, vertical: true, spacing: 2), preferences])
 
         let setupTitle = Self.label("Check your setup", font: .systemFont(ofSize: 15, weight: .semibold))
         setUp(swipeButton, "Open Settings…", #selector(openTrackpadSettings))
@@ -237,7 +237,7 @@ final class WelcomeWindow: NSObject, NSWindowDelegate {
         NSApp.terminate(nil)
     }
 
-    @objc private func openConfig() { editConfig() }
+    @objc private func openPreferences() { showPreferences() }
 
     @objc private func openTrackpadSettings() { SystemSetup.openTrackpadSettings() }
 

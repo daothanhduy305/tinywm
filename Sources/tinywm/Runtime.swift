@@ -131,7 +131,6 @@ final class Runtime {
         displays.onWidthsChanged = { UserDefaults.standard.set($0, forKey: Defaults.appWidths) }
         release.beforeRelease = { [unowned self] in persistence.saveNow(wait: true) }
         release.install()
-        persistence.enabled = { [unowned self] in config.restoreLayout }
 
         lifecycle.focusMoved = { [unowned self] in updateHighlight() }
         lifecycle.retileAll = { [unowned self] in retileAll() }
@@ -142,8 +141,7 @@ final class Runtime {
         let first = configFile.load()
         config = first.config
         pinch.fingers = config.pinchFingers
-        menu.showIssues(first.issues)
-        configFile.onChange = { [unowned self] in applyConfig($0) }
+        configFile.onChange.append { [unowned self] in applyConfig($0) }
         applyFocusBorder()
         swipeEnabled = config.swipe
         recognizer.fingers = config.swipeFingers
@@ -165,7 +163,6 @@ final class Runtime {
         metaKey.commandTab = config.overviewOnCommandTab
         overview.floating = config.overviewFloating
         metaKey.start()
-        configFile.watch()
         startSwipes()
         persistence.reading = { [unowned self] in tracker.isProbing || arrivals.isJudging }
         arrivals.waitsForMouse = { [unowned self] in !persistence.isRestoring }
@@ -203,7 +200,6 @@ final class Runtime {
         config = parsed.config
         pinch = PinchRecognizer()
         pinch.fingers = config.pinchFingers
-        menu.showIssues(parsed.issues)
         commands.reload()
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab

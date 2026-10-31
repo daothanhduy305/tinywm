@@ -90,19 +90,51 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(r.config.bindings["focus-right"] == key("l"))
     }
 
-    @Test func restoreLayoutDefaultsOnAndParses() {
-        #expect(StripConfig().restoreLayout)
-        #expect(StripConfig.parse("restore-layout = off").config.restoreLayout == false)
-        #expect(StripConfig.parse("restore-layout = on").config.restoreLayout)
+    @Test func oldRestoreLayoutSettingsAreValidatedAndIgnored() {
+        for value in ["on", "off"] {
+            let parsed = StripConfig.parse("restore-layout = \(value)")
+            #expect(parsed.issues.isEmpty)
+            #expect(parsed.config == StripConfig())
+        }
         let bad = StripConfig.parse("restore-layout = sometimes")
-        #expect(bad.issues.count == 1)
-        #expect(bad.config.restoreLayout)
+        #expect(bad.issues.map(\.message) == ["restore-layout must be on or off, not 'sometimes'"])
+        #expect(bad.config == StripConfig())
+        #expect(!StripConfig.defaultLines.contains { $0.hasPrefix("restore-layout") })
+        #expect(!StripConfig.template.contains("restore-layout"))
+        #expect(!(StripConfig.addingMissingDefaults(to: "gap = 12") ?? "").contains("restore-layout"))
     }
 
-    @Test func peekCoverDefaultsOffAndParses() {
-        #expect(!StripConfig().peekCover)
-        #expect(StripConfig.parse("peek-cover = on").config.applied(to: StripSettings()).peekCovers)
-        #expect(StripConfig.parse("peek-cover = maybe").issues.count == 1)
+    @Test func oldPeekCoverSettingsAreValidatedAndIgnored() {
+        #expect(StripConfig().applied(to: StripSettings()).peekCovers)
+        for value in ["on", "off"] {
+            let parsed = StripConfig.parse("peek-cover = \(value)")
+            #expect(parsed.issues.isEmpty)
+            #expect(parsed.config == StripConfig())
+            #expect(parsed.config.applied(to: StripSettings()).peekCovers)
+        }
+        let bad = StripConfig.parse("peek-cover = maybe")
+        #expect(bad.issues.map(\.message) == ["peek-cover must be on or off, not 'maybe'"])
+        #expect(bad.config == StripConfig())
+        #expect(!StripConfig.defaultLines.contains { $0.hasPrefix("peek-cover") })
+        #expect(!StripConfig.template.contains("peek-cover"))
+        #expect(!(StripConfig.addingMissingDefaults(to: "gap = 12") ?? "").contains("peek-cover"))
+    }
+
+    @Test @MainActor func appliedConfigEnablesCoversForNewDisplayEngines() {
+        #expect(!StripSettings().peekCovers)
+        var configured: [Bool] = []
+        let displays = StripDisplays(windows: FakeWindows(), configure: { engine, _ in
+            configured.append(engine.settings.peekCovers)
+        }, discard: { _ in })
+        displays.settings = StripConfig.parse("peek-cover = off").config.applied(to: displays.settings)
+        let frame = Rect(x: 0, y: 0, width: 1200, height: 800)
+        let first = TiledDisplay(id: "A", frame: frame, visible: frame)
+        displays.update([first])
+        #expect(configured == [true])
+        let next = Rect(x: 1200, y: 0, width: 1200, height: 800)
+        displays.update([first, TiledDisplay(id: "B", frame: next, visible: next)])
+        #expect(configured == [true, true])
+        #expect(displays.engines.values.allSatisfy { $0.settings.peekCovers })
     }
 
     @Test func centerFocusDefaultsOffAndParses() {

@@ -21,8 +21,6 @@ width-presets = 0.5, 0.7, 0.9
 # swipe = on
 swipe-fingers = 4
 # focus-crosses-displays = off
-# restore-layout = on
-peek-cover = on
 # center-focus = off
 # overview-as-mission-control = off
 

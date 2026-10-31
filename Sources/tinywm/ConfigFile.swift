@@ -9,7 +9,7 @@ import WindowCore
 /// survives that, and the cost is one `stat` call.
 @MainActor
 final class ConfigFile {
-    var onChange: (StripConfig.Parsed) -> Void = { _ in }
+    var onChange: [(StripConfig.Parsed) -> Void] = []
 
     private struct Signature: Equatable {
         var file: UInt
@@ -30,6 +30,7 @@ final class ConfigFile {
 
     /// Reports every later change. Call `load` first for the initial read.
     func watch() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
@@ -54,7 +55,18 @@ final class ConfigFile {
         return parsed
     }
 
-    func reload() { onChange(load()) }
+    func reload() {
+        let parsed = load()
+        for observer in onChange { observer(parsed) }
+    }
+
+    func write(_ edit: (String) -> String) throws {
+        createIfMissing()
+        let url = Self.url.resolvingSymlinksInPath()
+        let text = try String(contentsOf: url, encoding: .utf8)
+        try edit(text).write(to: url, atomically: true, encoding: .utf8)
+        reload()
+    }
 
     private func poll() {
         if Self.signature() != signature { reload() }

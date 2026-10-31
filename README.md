@@ -73,6 +73,14 @@ The welcome window also checks the macOS settings that get in the way: trackpad 
 Stage Manager, tiling at screen edges, click wallpaper to reveal desktop, other window managers
 and Open at Login. Reopen it any time from the menu-bar icon (**Welcome…**).
 
+## Preferences
+
+Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
+Gestures and Rules. Changes write to the config file and apply at once. Your comments and
+other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
+Use **Edit Config…** in the menu-bar menu to edit the file yourself.
+Launch at login uses the macOS login item.
+
 ## Default keys
 (All of these are configurable)
 
@@ -100,7 +108,7 @@ windows make room, and a slot shows exactly where it will land: between two colu
 below a window in a stack, or on another display. Let go to drop it there, or press Esc to
 cancel. A floating window simply moves.
 
-Prefer ⌃⌥ over right ⌘, or different keys? Change anything in the config.
+Prefer ⌃⌥ over right ⌘, or different keys? Choose them in Preferences or edit the config.
 
 ## Make it yours
 
@@ -135,9 +143,8 @@ every option with a short explanation, and adds new ones, commented, when tinywm
 - **Open at Login** is in the menu-bar icon and the welcome window. It works from the installed
   app, not from `swift run`.
 - Quitting tinywm puts every window back where it was.
-- tinywm remembers your layout and restores it after a restart, as long as the apps keep their
+- tinywm always saves your layout and restores it after a restart, as long as the apps keep their
   windows open. After a reboot it matches reopened windows by app and title, as far as it can.
-  Turn this off with `restore-layout = off` in the config.
 - macOS can't hide single windows, so windows on other workspaces wait just off screen.
 - Floating windows (meta+T, `float` rules, fixed-size windows) keep their own frame and show
   in the overview. Meta+V focuses them one after another and then returns to the strip.

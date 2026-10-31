@@ -25,10 +25,6 @@ public struct StripConfig: Equatable, Sendable {
     public var pinchFingers = 5
     /// Focus or move past the strip's first or last column continues onto the display on that side.
     public var focusCrossesDisplays = false
-    /// Whether the layout is saved and brought back when tinywm starts.
-    public var restoreLayout = true
-    /// Whether a column that would reach another display hides behind a card instead of narrowing.
-    public var peekCover = false
     /// Whether scrolling to a column centres it, as far as the strip's ends allow.
     public var centerFocus = false
     /// Whether ⌘Tab opens the overview instead of the macOS app switcher.
@@ -58,7 +54,7 @@ public struct StripConfig: Equatable, Sendable {
         s.gap = gap
         s.defaultWidth = defaultWidth
         s.widthPresets = widthPresets
-        s.peekCovers = peekCover
+        s.peekCovers = true
         s.scrollMode = centerFocus ? .center : .fit
         return s
     }
@@ -67,7 +63,7 @@ public struct StripConfig: Equatable, Sendable {
 
     private struct Failure: Error { let message: String }
 
-    private enum Statement {
+    enum Statement {
         case setting(String, String)
         case bind(String, String)
         case unbind(String)
@@ -181,7 +177,7 @@ public struct StripConfig: Equatable, Sendable {
         return issues
     }
 
-    private static func statement(_ raw: String) throws -> Statement? {
+    static func statement(_ raw: String) throws -> Statement? {
         var s = Substring(raw)
         if let hash = s.firstIndex(of: "#") { s = s[..<hash] }
         let line = s.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -257,13 +253,9 @@ public struct StripConfig: Equatable, Sendable {
                 throw Failure(message: "swipe-fingers must be 3 or 4, not '\(value)'")
             }
             config.swipeFingers = n
-        case "restore-layout":
-            config.restoreLayout = try onOff(value, for: name)
-        case "learn-minimum-widths", "learn-maximum-widths":
-            // No longer used: a column fits a window that refuses its width. Still accepted so old configs load.
+        case "restore-layout", "peek-cover", "learn-minimum-widths", "learn-maximum-widths":
+            // Old configs still load; layouts restore, peeks use cards, and columns fit refused widths.
             _ = try onOff(value, for: name)
-        case "peek-cover":
-            config.peekCover = try onOff(value, for: name)
         case "center-focus":
             config.centerFocus = try onOff(value, for: name)
         case "overview-as-mission-control":
@@ -389,8 +381,6 @@ public struct StripConfig: Equatable, Sendable {
             "pinch-overview = on # pinch opens the overview; spread closes it",
             "pinch-fingers = \(d.pinchFingers) # 4 or 5, thumb included",
             "focus-crosses-displays = off",
-            "restore-layout = on",
-            "peek-cover = off",
             "center-focus = off",
             "overview-as-mission-control = off",
             "overview-floating = \(d.overviewFloating.rawValue) # vertical, horizontal or off: where the overview shelves floating windows",
@@ -410,8 +400,9 @@ public struct StripConfig: Equatable, Sendable {
     }
 
     /// `gap` for `gap = 8`, and `bind focus-left` for `bind focus-left = h` or `unbind focus-left`.
-    private static func key(of line: Substring) -> String {
-        let words = (line.split(separator: "=", maxSplits: 1).first ?? "").split(whereSeparator: \.isWhitespace)
+    static func key(of line: Substring) -> String {
+        let content = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0].lowercased()
+        let words = (content.split(separator: "=", maxSplits: 1).first ?? "").split(whereSeparator: \.isWhitespace)
         return (words.first == "unbind" ? ["bind"] + words.dropFirst() : words).joined(separator: " ")
     }
 
@@ -460,7 +451,7 @@ public struct StripConfig: Equatable, Sendable {
         return out
     }
 
-    private static func format(_ v: Double) -> String {
+    public static func format(_ v: Double) -> String {
         v == v.rounded() ? String(Int(v)) : String(v)
     }
 }

@@ -8,6 +8,7 @@ import StripEngine
 final class TinyWMApp: NSObject, NSApplicationDelegate {
     private let configFile = ConfigFile()
     private let welcome = WelcomeWindow()
+    private lazy var preferences = PreferencesWindow(configFile: configFile)
     private var menu: StatusMenu!
     /// Nil until Accessibility access is granted.
     private var runtime: Runtime?
@@ -16,6 +17,10 @@ final class TinyWMApp: NSObject, NSApplicationDelegate {
         UserDefaults.standard.register(defaults: [Defaults.livePictures: true])
         menu = StatusMenu(livePictures: UserDefaults.standard.bool(forKey: Defaults.livePictures))
         menu.toggleLivePictures = { [unowned self] in toggleLivePictures() }
+        menu.showPreferences = { [unowned self] in preferences.show() }
+        configFile.onChange.append { [unowned self] in menu.showIssues($0.issues) }
+        menu.showIssues(configFile.load().issues)
+        configFile.watch()
         menu.showWelcome = { [unowned self] in welcome.show() }
         menu.editConfig = { [unowned self] in configFile.edit() }
         menu.reloadConfig = { [unowned self] in configFile.reload() }
@@ -24,7 +29,7 @@ final class TinyWMApp: NSObject, NSApplicationDelegate {
         menu.toggleDisplay = { [unowned self] id in runtime?.toggleDisplay(id) }
         menu.willOpen = { [unowned self] in runtime?.refreshSwipeWarning() }
 
-        welcome.editConfig = { [unowned self] in configFile.edit() }
+        welcome.showPreferences = { [unowned self] in preferences.show() }
         welcome.swipe = { [unowned self] in
             guard let runtime else { return (true, SwipeRecognizer().fingers) }
             return (runtime.swipeEnabled, runtime.recognizer.fingers)

@@ -2,7 +2,7 @@ import AppKit
 import QuartzCore
 import WindowCore
 
-/// Cards standing in for columns hidden beside another display, as `peek-cover = on` asks.
+/// Cards standing in for columns hidden beside another display.
 /// A card shows the part of the window's picture that would be on screen at its place on the
 /// strip, or a dark card with the app's icon and the window's title when there is no picture.
 /// Clicking a card focuses its window.
