@@ -140,8 +140,7 @@ final class WindowLifecycle {
         }
         if let old = tabReplaced(by: id, at: judged.frame) {
             Log.note("place", "\(Log.name(id)) is another tab of \(Log.name(old)); it takes that tab's place")
-            displays.windowReplaced(old, by: id)
-            forget(old)
+            replace(old, by: id)
             return displays.engine(holding: id)?.frame(of: id)
         }
         if let number = windows.number(of: id), let slot = hiddenSlots.removeValue(forKey: number),
@@ -240,8 +239,7 @@ final class WindowLifecycle {
             guard !screenLocked, let id = windows.knownID(for: element), displays.engine(holding: id) != nil,
                   let tab = tabShown(replacing: id) else { return }
             Log.note("place", "\(Log.name(id)) hid as \(Log.name(tab)) showed; that tab takes its place")
-            displays.windowReplaced(id, by: tab)
-            forget(id)
+            replace(id, by: tab)
         }
         tracker.onAppQuit = { [unowned self] pid in
             var ids = windows.ids(ofPID: pid)
@@ -268,6 +266,17 @@ final class WindowLifecycle {
             restore(ids)
             for id in ids { forget(id) }
         }
+    }
+
+    /// Gives `new` the place of `old`, and its name, then drops `old`. Each tab of a window is a
+    /// window of its own, so a name given to one follows whichever tab shows.
+    private func replace(_ old: String, by new: String) {
+        if let name = persistence.names.removeValue(forKey: old) {
+            persistence.names[new] = name
+            persistence.changed()
+        }
+        displays.windowReplaced(old, by: new)
+        forget(old)
     }
 
     /// Takes a window off every strip and drops what is known about it.
@@ -593,8 +602,7 @@ final class WindowLifecycle {
         let matched = LayoutMatcher.assign(slots: slots, windows: live)
         for (new, old) in matched where heldWhileLocked.contains(old) {
             Log.note("place", "\(Log.name(new)) takes the slot of \(Log.name(old)), whose app quit during the lock")
-            displays.windowReplaced(old, by: new)
-            forget(old)
+            replace(old, by: new)
         }
         for w in waiting where matched[w.id] == nil { _ = place(w.id, w.judged) }
         let gone = heldWhileLocked

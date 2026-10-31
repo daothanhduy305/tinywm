@@ -19,7 +19,7 @@ under the screen, and workspaces stack vertically, as in niri.
 - `TinyWMApp` in `main.swift` starts the app. It shows the menu and the welcome window, then waits for Accessibility access.
 - `Runtime` holds everything that needs that access. The app builds it once, when access is granted.
 - `WindowLifecycle` handles what the system reports about windows: arrivals, moves, focus, hides, removals and screen locks.
-  A new native tab takes the place of the tab it hides, with the same column and width.
+  A new native tab takes the place of the tab it hides, with the same column, width and overview name.
   A focused window that closes stays on the strip for half a second. Ghostty closes a tab's
   window before it shows the next tab, and that tab then takes the column and keeps focus.
 - `WindowTracker` asks the window server about each window several times a second. Most apps
