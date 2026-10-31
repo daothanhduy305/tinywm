@@ -41,6 +41,16 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
 }
 
 @Suite struct ConfigParsingTests {
+    @Test func focusBorderColorParsesHex() {
+        #expect(StripConfig().focusBorderColor == RGBA(r: 22 / 255.0, g: 1, b: 250 / 255.0))
+        #expect(StripConfig.parse("focus-border-color = ff0000").config.focusBorderColor == RGBA(r: 1, g: 0, b: 0))
+        #expect(StripConfig.parse("focus-border-color = 00ff0080").config.focusBorderColor == RGBA(r: 0, g: 1, b: 0, a: 128 / 255.0))
+        let bad = StripConfig.parse("focus-border-color = cyan")
+        #expect(bad.issues.map(\.message) == ["focus-border-color must be hex rrggbb or rrggbbaa, not 'cyan'"])
+        #expect(bad.config.focusBorderColor == StripConfig().focusBorderColor)
+        #expect(StripConfig.defaultLines.contains("focus-border-color = 16fffa # hex rrggbb or rrggbbaa, no #"))
+    }
+
     @Test func pinchFingersDefaultsToFiveAndParses() {
         #expect(StripConfig().pinchFingers == 5)
         let four = StripConfig.parse("pinch-fingers = 4")

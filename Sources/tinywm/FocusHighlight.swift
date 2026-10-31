@@ -11,7 +11,7 @@ final class FocusHighlight {
         var borderWidth: CGFloat = 5
         var cornerRadius: CGFloat = 12
         var glowRadius: CGFloat = 0
-        /// A bright cyan that stands out against both light and dark windows.
+        /// Set from `focus-border-color` in the config.
         var color = NSColor(srgbRed: 0.085, green: 1.0, blue: 0.979, alpha: 1)
     }
 

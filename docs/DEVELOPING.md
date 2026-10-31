@@ -127,6 +127,7 @@ gap = 8
 default-width = 0.333
 width-presets = 0.333, 0.5, 0.667
 focus-border = on
+focus-border-color = 16fffa # hex rrggbb or rrggbbaa (aa is opacity); no #, which starts a comment
 swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
 pinch-overview = on # pinch opens the overview; spread closes it

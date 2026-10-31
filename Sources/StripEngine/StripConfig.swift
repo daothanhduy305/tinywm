@@ -1,5 +1,6 @@
 import Foundation
 import StripModel
+import WindowCore
 
 public struct ConfigIssue: Equatable, Sendable, CustomStringConvertible {
     /// The file's line, or 0 for an issue with the whole file.
@@ -15,6 +16,8 @@ public struct StripConfig: Equatable, Sendable {
     public var defaultWidth = StripSettings().defaultWidth
     public var widthPresets = [0.333, 0.5, 0.667]
     public var focusBorder = true
+    /// The focus border's colour, a bright cyan that stands out against both light and dark windows.
+    public var focusBorderColor = RGBA(r: 22 / 255.0, g: 1, b: 250 / 255.0)
     /// Trackpad swipes on or off, and how many fingers they use.
     public var swipe = true
     public var swipeFingers = 3
@@ -236,6 +239,8 @@ public struct StripConfig: Equatable, Sendable {
             config.widthPresets = try parts.map { try number($0.trimmingCharacters(in: .whitespaces), in: 0.05...1, for: name) }
         case "focus-border":
             config.focusBorder = try onOff(value, for: name)
+        case "focus-border-color":
+            config.focusBorderColor = try color(value, for: name)
         case "swipe":
             config.swipe = try onOff(value, for: name)
         case "pinch-overview":
@@ -341,6 +346,16 @@ public struct StripConfig: Equatable, Sendable {
 
     // MARK: Template
 
+    /// `rrggbb` or `rrggbbaa` in hex, without a `#`, which would start a comment.
+    private static func color(_ hex: String, for name: String) throws -> RGBA {
+        guard hex.count == 6 || hex.count == 8, let n = UInt32(hex, radix: 16) else {
+            throw Failure(message: "\(name) must be hex rrggbb or rrggbbaa, not '\(hex)'")
+        }
+        let rgba = hex.count == 6 ? n << 8 | 0xff : n
+        func byte(_ shift: UInt32) -> Double { Double(rgba >> shift & 0xff) / 255 }
+        return RGBA(r: byte(24), g: byte(16), b: byte(8), a: byte(0))
+    }
+
     private static func onOff(_ value: String, for name: String) throws -> Bool {
         switch value.lowercased() {
         case "on", "true", "yes": return true
@@ -368,6 +383,7 @@ public struct StripConfig: Equatable, Sendable {
             "default-width = \(format(d.defaultWidth)) # share of the screen, 0.05 to 1",
             "width-presets = \(d.widthPresets.map(format).joined(separator: ", ")) # shares of the screen the width keys step through",
             "focus-border = on",
+            "focus-border-color = 16fffa # hex rrggbb or rrggbbaa, no #",
             "swipe = on",
             "swipe-fingers = \(d.swipeFingers) # 3 or 4",
             "pinch-overview = on # pinch opens the overview; spread closes it",

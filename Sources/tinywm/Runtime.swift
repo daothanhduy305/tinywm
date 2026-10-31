@@ -114,7 +114,6 @@ final class Runtime {
                 return "\(id) \(app) \(title)"
             }
         }
-        overview.ringStyle = highlight.style
         overview.activate = { [unowned self] id in
             overviewPicking = true
             defer { overviewPicking = false }
@@ -145,7 +144,7 @@ final class Runtime {
         pinch.fingers = config.pinchFingers
         menu.showIssues(first.issues)
         configFile.onChange = { [unowned self] in applyConfig($0) }
-        highlight.showBorder = config.focusBorder
+        applyFocusBorder()
         swipeEnabled = config.swipe
         recognizer.fingers = config.swipeFingers
         scrollTap.shield.enabled = config.swipe
@@ -214,7 +213,7 @@ final class Runtime {
             let settings = config.applied(to: engine.settings)
             if settings != engine.settings { engine.settings = settings }
         }
-        highlight.showBorder = config.focusBorder
+        applyFocusBorder()
         swipeEnabled = config.swipe
         recognizer.fingers = config.swipeFingers
         scrollTap.shield.enabled = config.swipe
@@ -223,6 +222,15 @@ final class Runtime {
         overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta, rename: config.overviewRename)
         showShortcuts()
         lifecycle.applyRules()
+    }
+
+    /// Gives the border, and the rings that stand in for it in motion and in the overview, the configured look.
+    private func applyFocusBorder() {
+        let c = config.focusBorderColor
+        highlight.style.color = NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: c.a)
+        highlight.showBorder = config.focusBorder
+        overview.ringStyle = highlight.style
+        for o in overlays.values { o.pictures.ringStyle = highlight.style }
     }
 
     private func showShortcuts() {
