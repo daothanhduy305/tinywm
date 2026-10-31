@@ -8,22 +8,19 @@ import StripEngine
 final class TinyWMApp: NSObject, NSApplicationDelegate {
     private let configFile = ConfigFile()
     private let welcome = WelcomeWindow()
-    private lazy var preferences = PreferencesWindow(configFile: configFile)
+    private lazy var preferences = PreferencesWindow(configFile: configFile) { [unowned self] in runtime?.setLivePictures($0) }
     private var menu: StatusMenu!
     /// Nil until Accessibility access is granted.
     private var runtime: Runtime?
 
     func applicationDidFinishLaunching(_: Notification) {
         UserDefaults.standard.register(defaults: [Defaults.livePictures: true])
-        menu = StatusMenu(livePictures: UserDefaults.standard.bool(forKey: Defaults.livePictures))
-        menu.toggleLivePictures = { [unowned self] in toggleLivePictures() }
+        menu = StatusMenu()
         menu.showPreferences = { [unowned self] in preferences.show() }
         configFile.onChange.append { [unowned self] in menu.showIssues($0.issues) }
         menu.showIssues(configFile.load().issues)
         configFile.watch()
         menu.showWelcome = { [unowned self] in welcome.show() }
-        menu.editConfig = { [unowned self] in configFile.edit() }
-        menu.reloadConfig = { [unowned self] in configFile.reload() }
         menu.retileAll = { [unowned self] in runtime?.retileAll() }
         menu.canRetile = { [unowned self] in runtime != nil }
         menu.toggleDisplay = { [unowned self] id in runtime?.toggleDisplay(id) }
@@ -57,16 +54,6 @@ final class TinyWMApp: NSObject, NSApplicationDelegate {
 
     private func start() {
         runtime = Runtime(menu: menu, configFile: configFile)
-    }
-
-    /// By default each window shows as a live picture while it moves, which records the
-    /// windows. Turned off, each window shows as a card with its app's icon and title, so
-    /// tinywm never records the screen. The choice takes effect at the next motion.
-    private func toggleLivePictures() {
-        let live = !UserDefaults.standard.bool(forKey: Defaults.livePictures)
-        UserDefaults.standard.set(live, forKey: Defaults.livePictures)
-        menu.setLivePictures(live)
-        runtime?.setLivePictures(live)
     }
 }
 

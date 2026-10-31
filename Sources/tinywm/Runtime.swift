@@ -152,9 +152,7 @@ final class Runtime {
         displays.settings = config.applied(to: displays.settings)
         displays.update(Screens.infos())
         menu.showDisplays(disabled: displays.disabled)
-        commands.registered = { [unowned self] in showShortcuts() }
         commands.install(on: hotkeys)
-        metaKey.onChange = { [unowned self] in showShortcuts() }
         dragger.clock = MacClock()
         dragger.presenter = dragOverlay
         metaKey.dragger = dragger
@@ -216,7 +214,6 @@ final class Runtime {
         scrollTap.shield.fingers = config.swipeFingers
         refreshSwipeWarning()
         overview.keys = OverviewKeys(bindings: config.bindings, meta: config.meta, rename: config.overviewRename)
-        showShortcuts()
         lifecycle.applyRules()
     }
 
@@ -227,13 +224,6 @@ final class Runtime {
         highlight.showBorder = config.focusBorder
         overview.ringStyle = highlight.style
         for o in overlays.values { o.pictures.ringStyle = highlight.style }
-    }
-
-    private func showShortcuts() {
-        let registry = ShortcutRegistry.shared
-        menu.showShortcuts(registry.entries) { [unowned self] action in
-            registry.shortcut(for: action).map(metaKey.display) ?? "none"
-        }
     }
 
     // MARK: Menu choices

@@ -12,6 +12,7 @@ final class PreferencesModel {
     var text = ""
     var error: String?
     var config: StripConfig { parsed.config }
+    var livePictures: (Bool) -> Void = { _ in }
 
     init(file: ConfigFile) {
         self.file = file
@@ -95,8 +96,10 @@ final class PreferencesWindow {
     private let window: NSWindow
     private let model: PreferencesModel
 
-    init(configFile: ConfigFile) {
+    /// `livePictures` hears the Show live window pictures switch.
+    init(configFile: ConfigFile, livePictures: @escaping (Bool) -> Void) {
         model = PreferencesModel(file: configFile)
+        model.livePictures = livePictures
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 850, height: 650),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
         window.title = "tinywm Preferences"
@@ -119,7 +122,7 @@ final class PreferencesWindow {
 }
 
 private enum PreferencesPage: String, CaseIterable, Identifiable {
-    case general = "General", keys = "Key bindings", gestures = "Gestures", rules = "Rules"
+    case general = "General", keys = "Key bindings", gestures = "Gestures", rules = "Rules", about = "About"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -127,6 +130,7 @@ private enum PreferencesPage: String, CaseIterable, Identifiable {
         case .keys: "keyboard"
         case .gestures: "hand.draw"
         case .rules: "macwindow.on.rectangle"
+        case .about: "info.circle"
         }
     }
     var color: Color {
@@ -135,6 +139,7 @@ private enum PreferencesPage: String, CaseIterable, Identifiable {
         case .keys: .blue
         case .gestures: .purple
         case .rules: .orange
+        case .about: .teal
         }
     }
 }
@@ -165,6 +170,7 @@ struct PreferencesView: View {
                 case .keys: PreferencesKeys(model: model)
                 case .gestures: gestures
                 case .rules: PreferencesRules(model: model)
+                case .about: PreferencesAbout()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -223,7 +229,10 @@ struct PreferencesView: View {
                     Text("Where the overview lines up floating windows, or Off to leave them out.").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Section { PreferencesLogin() }
+            Section {
+                PreferencesLivePictures(changed: model.livePictures)
+                PreferencesLogin()
+            }
         }.formStyle(.grouped)
     }
 
@@ -252,6 +261,30 @@ struct PreferencesView: View {
         }.formStyle(.grouped)
             .onAppear { trackpad = SystemSetup.trackpadSettings() }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in trackpad = SystemSetup.trackpadSettings() }
+    }
+}
+
+/// The app's icon, name and version. A `swift run` build has no bundle version.
+private struct PreferencesAbout: View {
+    private let info = Bundle.main.infoDictionary ?? [:]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().frame(width: 96, height: 96)
+                .accessibilityHidden(true)
+            Text("tinywm").font(.title.bold())
+            Text(version).foregroundStyle(.secondary).textSelection(.enabled)
+            Text("A scrolling window manager for macOS.").padding(.top, 4)
+            Link("github.com/daothanhduy305/tinywm", destination: URL(string: "https://github.com/daothanhduy305/tinywm")!)
+        }
+        .padding()
+    }
+
+    private var version: String {
+        guard let short = info["CFBundleShortVersionString"] as? String else { return "Development build" }
+        let build = info["CFBundleVersion"] as? String
+        return build.map { "Version \(short) (\($0))" } ?? "Version \(short)"
     }
 }
 
@@ -550,6 +583,20 @@ private struct PreferencesFlow: Layout {
             x += size.width + 6
         }
         return (CGSize(width: usedWidth, height: y + rowHeight), positions)
+    }
+}
+
+/// Kept in the user defaults, not the config: it is about this Mac's Screen Recording grant.
+private struct PreferencesLivePictures: View {
+    let changed: (Bool) -> Void
+    @AppStorage(Defaults.livePictures) private var live = true
+    var body: some View {
+        VStack(alignment: .leading) {
+            Toggle("Show live window pictures", isOn: $live)
+                .onChange(of: live) { _, on in changed(on) }
+            Text("Moving windows show as live pictures, which needs Screen Recording. Off, they show as cards with the app's icon and title.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 

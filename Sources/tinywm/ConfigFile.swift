@@ -99,15 +99,4 @@ final class ConfigFile {
             Log.note("config", "could not add new defaults to \(url.path): \(error)")
         }
     }
-
-    /// Creates the file from the template if needed and opens it in the default text editor.
-    func edit() {
-        createIfMissing()
-        addMissingDefaults()
-        // The file has no extension, so ask `open` for the default text editor.
-        let open = Process()
-        open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        open.arguments = ["-t", Self.url.path]
-        do { try open.run() } catch { Log.note("config", "could not open \(Self.url.path) in a text editor: \(error)") }
-    }
 }

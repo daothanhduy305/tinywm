@@ -76,9 +76,9 @@ and Open at Login. Reopen it any time from the menu-bar icon (**Welcome…**).
 ## Preferences
 
 Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures and Rules. Changes write to the config file and apply at once. Your comments and
+Gestures, Rules and About (version). Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
-Use **Edit Config…** in the menu-bar menu to edit the file yourself.
+You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
 
 ## Default keys
@@ -112,7 +112,7 @@ Prefer ⌃⌥ over right ⌘, or different keys? Choose them in Preferences or e
 
 ## Make it yours
 
-Choose **Edit Config…** from the menu bar icon. A few lines go a long way:
+Open `~/.config/tinywm/config` in any editor. A few lines go a long way:
 
 ```
 default-width = 0.5            # new windows take half the screen
@@ -138,9 +138,9 @@ every option with a short explanation, and adds new ones, commented, when tinywm
 - tinywm only asks for what it needs: Accessibility to move windows, and Screen Recording
   for live window pictures. Nothing leaves your Mac.
 - By default, moving windows show as live pictures, which need Screen Recording. To record
-  nothing, turn off **Show Live Window Pictures (Screen Recording)** in the menu-bar icon.
+  nothing, turn off **Show live window pictures** in Preferences.
   Moving windows then show as cards with the app's icon and the window's title.
-- **Open at Login** is in the menu-bar icon and the welcome window. It works from the installed
+- **Open at Login** is in Preferences and the welcome window. It works from the installed
   app, not from `swift run`.
 - Quitting tinywm puts every window back where it was.
 - tinywm always saves your layout and restores it after a restart, as long as the apps keep their

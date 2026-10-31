@@ -13,7 +13,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BUNDLE_ID="${TINYWM_BUNDLE_ID:-dev.tinywm}"
-VERSION="${TINYWM_VERSION:-0.1.0}"
+# Without TINYWM_VERSION, the latest vX.Y.Z tag names the version.
+TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+VERSION="${TINYWM_VERSION:-${TAG#v}}"
+VERSION="${VERSION:-0.1.0}"
 IDENTITY="${TINYWM_SIGN_IDENTITY:-}"
 if [ -z "$IDENTITY" ] && security find-certificate -c "tinywm self-signed" >/dev/null 2>&1; then
     IDENTITY="tinywm self-signed"

@@ -33,29 +33,3 @@ enum LoginItem {
         }
     }
 }
-
-/// The status-menu entry for Open at Login, checked while the login item is on.
-@MainActor
-final class LoginMenuItem: NSObject {
-    let item = NSMenuItem(title: "Open at Login", action: nil, keyEquivalent: "")
-
-    override init() {
-        super.init()
-        item.action = #selector(clicked)
-        item.target = self
-        refresh()
-    }
-
-    func refresh() {
-        let state = LoginItem.state
-        item.isEnabled = state != .unavailable
-        item.state = state.isChecked ? .on : .off
-        item.toolTip = state == .unavailable ? LoginItem.unavailableNote
-            : state == .needsApproval ? "Allow tinywm in System Settings → Login Items" : nil
-    }
-
-    @objc private func clicked() {
-        LoginItem.toggle()
-        refresh()
-    }
-}

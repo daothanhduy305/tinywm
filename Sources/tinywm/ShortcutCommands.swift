@@ -9,8 +9,6 @@ import WindowKit
 /// overview, closing a window, and the config's own commands.
 @MainActor
 final class ShortcutCommands {
-    /// Called after the shortcuts change, so the menu can list them.
-    var registered: () -> Void = {}
     /// The config in force, read afresh each time so a reload applies at once.
     var config: () -> StripConfig = { StripConfig() }
 
@@ -64,7 +62,6 @@ final class ShortcutCommands {
             }
             registerCommands()
         }
-        registered()
     }
 
     /// Takes the keys of a freshly read config.
@@ -73,7 +70,6 @@ final class ShortcutCommands {
             registry.setDefaultShortcuts(Self.shortcuts(for: config()))
             registerCommands()
         }
-        registered()
     }
 
     private func runAction(_ name: String, _ act: (StripEngine) -> Void) {

@@ -58,9 +58,9 @@ while live pictures are on.
 
 ## Cover mode
 
-By default ScreenCaptureKit is off: moving windows show as cards with the app's icon and the
-window's title. **Show Live Window Pictures (Screen Recording)** in the status menu records the
-windows instead. The choice is stored in UserDefaults under `liveWindowPictures` and applies
+By default moving windows show as live pictures through ScreenCaptureKit. Turn off **Show live
+window pictures** in Preferences to show cards with the app's icon and the window's title
+instead. The choice is stored in UserDefaults under `liveWindowPictures` and applies
 from the next motion.
 
 - `ScreenCaptureSnapshots.inert` stops every capture and drops every picture. No capture runs,
@@ -114,9 +114,9 @@ route and needs a paid Apple Developer ID.
 ## Preferences
 
 Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures and Rules. Changes write to the config file and apply at once. Your comments and
+Gestures, Rules and About (version). Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
-Use **Edit Config…** in the menu-bar menu to edit the file yourself.
+You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
 tinywm's own windows (Preferences, Welcome) float and appear on the overview's shelf.
 
@@ -129,10 +129,10 @@ SwiftUI stays in the tinywm target, hosted by an NSWindow.
 ## tinywm configuration
 
 tinywm reads `~/.config/tinywm/config` (or `$XDG_CONFIG_HOME/tinywm/config`). The file is
-optional: without it, or for any line you leave out, the defaults below apply. Choose **Edit
-Config…** in the status menu to create it from a commented template and open it. The file
-reloads by itself when you save it, or on **Reload Config**. When a newer tinywm brings a setting
-or binding the file does not mention, at launch or on **Edit Config…** it adds it at the end,
+optional: without it, or for any line you leave out, the defaults below apply. Preferences
+creates it from a commented template on the first change. The file reloads by itself when you
+save it. When a newer tinywm brings a setting or binding the file does not mention, at launch it
+adds it at the end,
 commented, showing the default. A line that cannot be read is
 skipped, and **Config Errors** in the menu lists it with its line number.
 

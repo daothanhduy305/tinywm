@@ -15,9 +15,6 @@ import WindowKit
 /// the meta key held on a managed window, and the rest of that click, never reach the app.
 @MainActor
 final class MetaKey {
-    /// Set when the modifier choice changes; the shortcut menu redraws from it.
-    var onChange: () -> Void = {}
-
     private(set) var mode = MetaModifier.rightCommand
     private var bindings = MetaKeyBindings()
     private var tap: CFMachPort?
@@ -50,7 +47,6 @@ final class MetaKey {
         guard m != mode else { return }
         mode = m
         apply()
-        onChange()
     }
 
     /// Right ⌘ mode reads keys through the tap and switches the ⌃⌥ system hotkeys off. The tap
@@ -71,11 +67,6 @@ final class MetaKey {
     /// The action of each chord, run through the registry so rebinding keeps working.
     private func run(_ action: String) {
         ShortcutRegistry.shared.entries.first { $0.action == action }?.handler()
-    }
-
-    /// How a shortcut reads in menus for the current meta key.
-    func display(_ s: Shortcut) -> String {
-        MetaKeyBindings.display(keyName: Shortcut.keyName(s.keyCode), modifiers: s.modifiers, mode: mode)
     }
 
     // MARK: Event tap
