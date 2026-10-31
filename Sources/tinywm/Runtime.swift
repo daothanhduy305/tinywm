@@ -10,6 +10,8 @@ enum Defaults {
     static let disabledDisplays = "disabledDisplays"
     static let livePictures = "liveWindowPictures"
     static let appWidths = "appWidths"
+    /// Set after the first launch. The name dates from the old welcome window.
+    static let welcomeSeen = "welcomeSeen"
 }
 
 /// tinywm while it runs: everything that needs Accessibility access, built at once when access

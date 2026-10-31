@@ -16,7 +16,7 @@ under the screen, and workspaces stack vertically, as in niri.
 
 ## The app target
 
-- `TinyWMApp` in `main.swift` starts the app. It shows the menu and the welcome window, then waits for Accessibility access.
+- `TinyWMApp` in `main.swift` starts the app. It shows the menu, opens Preferences on About the first time or while Accessibility is missing, then waits for that access.
 - `Runtime` holds everything that needs that access. The app builds it once, when access is granted.
 - `WindowLifecycle` handles what the system reports about windows: arrivals, moves, focus, hides, removals and screen locks.
   A new native tab takes the place of the tab it hides, with the same column, width and overview name.
@@ -114,11 +114,11 @@ route and needs a paid Apple Developer ID.
 ## Preferences
 
 Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures, Rules and About (version). Changes write to the config file and apply at once. Your comments and
+Gestures, Rules and About. About shows the version, the permissions and the macOS settings that get in the way. Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
 You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
-tinywm's own windows (Preferences, Welcome) float and appear on the overview's shelf.
+tinywm's own windows (Preferences) float and appear on the overview's shelf.
 
 `ConfigEdit.swift` in StripEngine edits text without macOS types. It keeps trailing comments,
 uses the last active setting, and removes earlier active duplicates. Repeating rules and commands

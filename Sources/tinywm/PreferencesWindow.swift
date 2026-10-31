@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import SwiftUI
 import Observation
 import StripEngine
@@ -13,6 +14,7 @@ final class PreferencesModel {
     var error: String?
     var config: StripConfig { parsed.config }
     var livePictures: (Bool) -> Void = { _ in }
+    var page: PreferencesPage? = .general
 
     init(file: ConfigFile) {
         self.file = file
@@ -114,14 +116,15 @@ final class PreferencesWindow {
         window.center()
     }
 
-    func show() {
+    func show(_ page: PreferencesPage? = nil) {
+        if let page { model.page = page }
         model.refresh()
         NSApp.activate()
         window.makeKeyAndOrderFront(nil)
     }
 }
 
-private enum PreferencesPage: String, CaseIterable, Identifiable {
+enum PreferencesPage: String, CaseIterable, Identifiable {
     case general = "General", keys = "Key bindings", gestures = "Gestures", rules = "Rules", about = "About"
     var id: String { rawValue }
     var symbol: String {
@@ -146,11 +149,10 @@ private enum PreferencesPage: String, CaseIterable, Identifiable {
 
 struct PreferencesView: View {
     @Bindable var model: PreferencesModel
-    @State private var page: PreferencesPage? = .general
 
     var body: some View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
-            List(PreferencesPage.allCases, selection: $page) { category in
+            List(PreferencesPage.allCases, selection: $model.page) { category in
                 HStack(spacing: 8) {
                     Image(systemName: category.symbol)
                         .font(.system(size: 12, weight: .medium))
@@ -165,7 +167,7 @@ struct PreferencesView: View {
             .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
-                switch page ?? .general {
+                switch model.page ?? .general {
                 case .general: general
                 case .keys: PreferencesKeys(model: model)
                 case .gestures: gestures
@@ -174,10 +176,10 @@ struct PreferencesView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle((page ?? .general).rawValue)
+            .navigationTitle((model.page ?? .general).rawValue)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text((page ?? .general).rawValue).font(.headline)
+                    Text((model.page ?? .general).rawValue).font(.headline)
                 }
             }
         }
@@ -264,27 +266,114 @@ struct PreferencesView: View {
     }
 }
 
-/// The app's icon, name and version. A `swift run` build has no bundle version.
+/// The app's icon, name and version, the permissions tinywm asks for, and the macOS settings
+/// that work against it. Settings Preferences already has, such as Open at Login, stay there.
 private struct PreferencesAbout: View {
     private let info = Bundle.main.infoDictionary ?? [:]
+    private let screenRecordingAtLaunch = CGPreflightScreenCaptureAccess()
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 96, height: 96)
-                .accessibilityHidden(true)
-            Text("tinywm").font(.title.bold())
-            Text(version).foregroundStyle(.secondary).textSelection(.enabled)
-            Text("A scrolling window manager for macOS.").padding(.top, 4)
-            Link("github.com/daothanhduy305/tinywm", destination: URL(string: "https://github.com/daothanhduy305/tinywm")!)
+        // Permissions and settings change in other apps, so look again every second.
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            Form {
+                Section {
+                    VStack(spacing: 6) {
+                        Image(nsImage: NSApp.applicationIconImage)
+                            .resizable().frame(width: 80, height: 80)
+                            .accessibilityHidden(true)
+                        Text("tinywm").font(.title.bold())
+                        Text(version).foregroundStyle(.secondary).textSelection(.enabled)
+                        Text("Your windows sit side by side on a strip that scrolls past your screen, and a key moves you along it.")
+                            .multilineTextAlignment(.center).padding(.top, 4)
+                        Link("github.com/daothanhduy305/tinywm", destination: URL(string: "https://github.com/daothanhduy305/tinywm")!)
+                    }.frame(maxWidth: .infinity)
+                }
+                permissions
+                setup
+            }.formStyle(.grouped)
         }
-        .padding()
+    }
+
+    private var permissions: some View {
+        let access = AXIsProcessTrusted()
+        let record = CGPreflightScreenCaptureAccess()
+        let restart = Onboarding.needsRestart(screenRecordingAtLaunch: screenRecordingAtLaunch,
+                                              screenRecordingNow: record, inBundle: LoginItem.inBundle)
+        return Section("Permissions") {
+            row("Accessibility", "To move and size your windows. Needed.",
+                SetupCheck.Result(ok: access, status: access ? "Granted" : "Not granted yet")) {
+                if !access { Button("Grant…") { Self.grantAccessibility() } }
+            }
+            row("Screen Recording", "To show what is in your windows while they slide. Nothing leaves your Mac.",
+                SetupCheck.Result(ok: record, status: restart ? "Granted. Restart tinywm to use it." : record ? "Granted" : "Not granted")) {
+                if !record { Button("Grant…") { Self.grantScreenRecording() } }
+                if restart { Button("Restart tinywm") { Self.restart() } }
+            }
+        }
+    }
+
+    private var setup: some View {
+        let settings = SystemSetup.windowManagerSettings()
+        return Section("Check your setup") {
+            check("Stage Manager", "Stage Manager moves and shrinks windows, which fights the strip.",
+                  SetupCheck.stageManager(settings: settings))
+            if SystemSetup.hasEdgeTiling {
+                check("Tiling at screen edges", "macOS resizes a window you drag to a screen edge, which pulls it out of the strip.",
+                      SetupCheck.edgeTiling(settings: settings))
+            }
+            check("Click wallpaper to reveal desktop", "macOS moves every window off screen when you click the desktop.",
+                  SetupCheck.clickWallpaper(settings: settings))
+            row("Other window managers", "Two window managers fight over the same windows.",
+                SetupCheck.otherWindowManagers(bundleIDs: SystemSetup.runningBundleIDs(), processNames: SystemSetup.processNames())) {}
+        }
+    }
+
+    private func check(_ title: String, _ why: String, _ result: SetupCheck.Result) -> some View {
+        row(title, why, result) {
+            if !result.ok { Button("Open Settings…") { SystemSetup.openDesktopSettings() } }
+        }
+    }
+
+    private func row(_ title: String, _ why: String, _ result: SetupCheck.Result, @ViewBuilder buttons: () -> some View) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(why).font(.caption).foregroundStyle(.secondary)
+                Text(result.status).font(.caption.weight(.medium)).foregroundStyle(result.ok ? .green : .orange)
+            }
+            Spacer()
+            buttons()
+        }
     }
 
     private var version: String {
         guard let short = info["CFBundleShortVersionString"] as? String else { return "Development build" }
         let build = info["CFBundleVersion"] as? String
         return build.map { "Version \(short) (\($0))" } ?? "Version \(short)"
+    }
+
+    private static func grantAccessibility() {
+        // The literal is the value of kAXTrustedCheckOptionPrompt, which Swift 6 flags as mutable global state.
+        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+    }
+
+    private static func grantScreenRecording() {
+        _ = CGRequestScreenCaptureAccess()
+        open("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+    }
+
+    private static func open(_ url: String) {
+        if let url = URL(string: url) { NSWorkspace.shared.open(url) }
+    }
+
+    /// Relaunches after a short pause so the old instance has put windows back before the new one takes them.
+    private static func restart() {
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relaunch.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", Bundle.main.bundleURL.path]
+        try? relaunch.run()
+        NSApp.terminate(nil)
     }
 }
 

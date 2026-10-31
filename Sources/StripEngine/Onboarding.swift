@@ -1,26 +1,5 @@
-/// What the first-run window shows, decided from permission flags so it can be tested without AppKit.
+/// Permission rules for the About page, kept free of AppKit so they can be tested.
 public enum Onboarding {
-    public enum Step: Equatable {
-        /// Nothing works until Accessibility is granted.
-        case needsAccessibility
-        /// Tiling runs; Screen Recording only adds smooth motion.
-        case canStart
-        case allSet
-    }
-
-    public static func step(accessibility: Bool, screenRecording: Bool) -> Step {
-        guard accessibility else { return .needsAccessibility }
-        return screenRecording ? .allSet : .canStart
-    }
-
-    public static func shouldShowOnLaunch(seenBefore: Bool) -> Bool { !seenBefore }
-
-    public static func primaryButtonTitle(_ step: Step) -> String {
-        step == .needsAccessibility ? "Start tinywm" : "Done"
-    }
-
-    public static func primaryButtonEnabled(_ step: Step) -> Bool { step != .needsAccessibility }
-
     /// macOS applies a new Screen Recording grant only to processes started afterwards.
     public static func needsRestart(screenRecordingAtLaunch: Bool, screenRecordingNow: Bool, inBundle: Bool) -> Bool {
         inBundle && screenRecordingNow && !screenRecordingAtLaunch

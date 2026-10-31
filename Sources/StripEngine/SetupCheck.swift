@@ -1,4 +1,4 @@
-/// The macOS settings and other apps that work against tinywm, as the welcome window lists them.
+/// The macOS settings and other apps that work against tinywm, as the About page lists them.
 public enum SetupCheck {
     public struct Result: Equatable, Sendable {
         public var ok: Bool
@@ -8,15 +8,6 @@ public enum SetupCheck {
             self.ok = ok
             self.status = status
         }
-    }
-
-    public static func swipes(enabled: Bool, fingers: Int, settings: [String: Int]) -> Result {
-        guard enabled else { return Result(ok: true, status: "Swipes are off in the config") }
-        let clashes = SwipeClash.clashes(fingers: fingers, settings: settings)
-        guard !clashes.isEmpty else { return Result(ok: true, status: "Free for tinywm") }
-        let other = fingers == 3 ? 4 : 3
-        let them = clashes.count == 1 ? "it" : "them"
-        return Result(ok: false, status: "macOS also uses \(list(clashes)). Turn \(them) off, or set swipe-fingers = \(other) in the config.")
     }
 
     /// The `com.apple.WindowManager` key that is on while Stage Manager runs.
@@ -77,25 +68,6 @@ public enum SetupCheck {
         }.map(\.name)
         guard !running.isEmpty else { return Result(ok: true, status: "None running") }
         return Result(ok: false, status: "\(list(running)) \(running.count == 1 ? "is" : "are") running. Quit \(running.count == 1 ? "it" : "them") so windows stay where tinywm puts them.")
-    }
-
-    public static func login(_ state: LoginItemState) -> Result {
-        switch state {
-        case .on: Result(ok: true, status: "On")
-        case .off: Result(ok: false, status: "Off")
-        case .needsApproval: Result(ok: false, status: "Waiting for your OK in System Settings → Login Items")
-        case .unavailable: Result(ok: false, status: "Available in the installed app")
-        }
-    }
-
-    /// The title of the Open at Login button, or nil when the button has nothing to do.
-    public static func loginButtonTitle(_ state: LoginItemState) -> String? {
-        switch state.action {
-        case .register: "Turn On"
-        case .unregister: "Turn Off"
-        case .openSettings: "Open Settings…"
-        case .none: nil
-        }
     }
 
     private static func list(_ items: [String]) -> String {

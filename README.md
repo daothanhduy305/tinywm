@@ -64,19 +64,19 @@ This puts the app in `~/Applications`.
 
 ## Get started
 
-When tinywm first opens, a welcome window walks you through the permissions:
+When tinywm first opens, Preferences opens on **About** and lists the permissions:
 
 - **Accessibility** is required. tinywm uses it to move and resize windows.
 - **Screen Recording** is optional. It is only for live window pictures while windows move.
 
-The welcome window also checks the macOS settings that get in the way: trackpad gestures,
-Stage Manager, tiling at screen edges, click wallpaper to reveal desktop, other window managers
-and Open at Login. Reopen it any time from the menu-bar icon (**Welcome…**).
+About also checks the macOS settings that get in the way: Stage Manager, tiling at screen
+edges, click wallpaper to reveal desktop and other window managers. It opens again at launch
+while Accessibility is missing. Trackpad clashes are on the Gestures page.
 
 ## Preferences
 
 Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures, Rules and About (version). Changes write to the config file and apply at once. Your comments and
+Gestures, Rules and About. Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
 You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
@@ -140,7 +140,7 @@ every option with a short explanation, and adds new ones, commented, when tinywm
 - By default, moving windows show as live pictures, which need Screen Recording. To record
   nothing, turn off **Show live window pictures** in Preferences.
   Moving windows then show as cards with the app's icon and the window's title.
-- **Open at Login** is in Preferences and the welcome window. It works from the installed
+- **Open at Login** is in Preferences. It works from the installed
   app, not from `swift run`.
 - Quitting tinywm puts every window back where it was.
 - tinywm always saves your layout and restores it after a restart, as long as the apps keep their
@@ -157,8 +157,8 @@ every option with a short explanation, and adds new ones, commented, when tinywm
   System Settings a wide one, gets a column as wide as the window. A new width or screen asks again.
 - **Password fields pause the meta key.** macOS blocks keyboard shortcuts from other apps while
   you type a password. Use ⌃⌥ instead if you need tinywm there.
-- **Trackpad swipes clash with macOS gestures** that use the same number of fingers. The welcome
-  window and the menu bar icon warn you and link to Trackpad settings.
+- **Trackpad swipes clash with macOS gestures** that use the same number of fingers. Preferences
+  (Gestures) and the menu bar icon warn you and link to Trackpad settings.
 - **Floating windows are not kept on top.** macOS keeps the active app's windows above every
   other app's, and raising another app's window can make that app take the keyboard. Meta+V
   brings a floating window up by focusing it, and the overview shows all of them.

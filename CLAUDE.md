@@ -39,7 +39,7 @@ Three layers, enforced by target dependencies in `Package.swift`:
 
 Keep macOS types out of layers 1–2; logic belongs there so `StripTests` can cover it.
 
-App target flow: `main.swift` (`TinyWMApp`) shows menu + welcome window and waits for Accessibility; `Runtime` is built once access is granted; `WindowLifecycle` handles window arrivals/moves/focus/removals; `ShortcutCommands` maps shortcuts to actions; `StatusMenu` is the menu bar.
+App target flow: `main.swift` (`TinyWMApp`) shows the menu, opens Preferences → About on first run or without Accessibility, and waits for it; `Runtime` is built once access is granted; `WindowLifecycle` handles window arrivals/moves/focus/removals; `ShortcutCommands` maps shortcuts to actions; `StatusMenu` is the menu bar.
 
 Motion model: on a layout change, pictures (or icon "covers" when Screen Recording is off) of windows animate with springs; real windows are written once shortly after, and pictures fade after they land.
 

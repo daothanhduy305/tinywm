@@ -6,7 +6,6 @@ import WindowKit
 @MainActor
 final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     var showPreferences: () -> Void = {}
-    var showWelcome: () -> Void = {}
     var retileAll: () -> Void = {}
     var toggleDisplay: (String) -> Void = { _ in }
     /// Called as the menu opens, so its items can be brought up to date.
@@ -36,7 +35,6 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         menu.addItem(errorsItem)
         swipeWarningItem.isHidden = true
         menu.addItem(swipeWarningItem)
-        menu.addItem(item("Welcome…", #selector(welcomeChosen)))
         menu.addItem(item("Retile All Windows", #selector(retileChosen)))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit tinywm", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -108,7 +106,6 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
     }
 
     @objc private func preferencesChosen() { showPreferences() }
-    @objc private func welcomeChosen() { showWelcome() }
     @objc private func retileChosen() { retileAll() }
     @objc private func trackpadSettingsChosen() { SystemSetup.openTrackpadSettings() }
     @objc private func displayChosen(_ item: NSMenuItem) {

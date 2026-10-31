@@ -2,12 +2,11 @@ import AppKit
 import ApplicationServices
 import StripEngine
 
-/// Starts tinywm: shows the menu and the welcome window, waits for Accessibility access, then
-/// builds the runtime. Before access is granted only the menu and the welcome window work.
+/// Starts tinywm: shows the menu, opens Preferences on About the first time or while Accessibility
+/// is missing, then builds the runtime once access is granted. Before that only the menu and Preferences work.
 @MainActor
 final class TinyWMApp: NSObject, NSApplicationDelegate {
     private let configFile = ConfigFile()
-    private let welcome = WelcomeWindow()
     private lazy var preferences = PreferencesWindow(configFile: configFile) { [unowned self] in runtime?.setLivePictures($0) }
     private var menu: StatusMenu!
     /// Nil until Accessibility access is granted.
@@ -20,27 +19,16 @@ final class TinyWMApp: NSObject, NSApplicationDelegate {
         configFile.onChange.append { [unowned self] in menu.showIssues($0.issues) }
         menu.showIssues(configFile.load().issues)
         configFile.watch()
-        menu.showWelcome = { [unowned self] in welcome.show() }
         menu.retileAll = { [unowned self] in runtime?.retileAll() }
         menu.canRetile = { [unowned self] in runtime != nil }
         menu.toggleDisplay = { [unowned self] id in runtime?.toggleDisplay(id) }
         menu.willOpen = { [unowned self] in runtime?.refreshSwipeWarning() }
 
-        welcome.showPreferences = { [unowned self] in preferences.show() }
-        welcome.swipe = { [unowned self] in
-            guard let runtime else { return (true, SwipeRecognizer().fingers) }
-            return (runtime.swipeEnabled, runtime.recognizer.fingers)
-        }
-        welcome.moveHint = { [unowned self] in
-            let config = runtime?.config ?? StripConfig()
-            return MoveHint.text(bindings: config.bindings, meta: config.meta)
-        }
-        let welcoming = Onboarding.shouldShowOnLaunch(seenBefore: UserDefaults.standard.bool(forKey: WelcomeWindow.seenKey))
-        if welcoming { welcome.show() }
-        // The welcome window's Grant button asks instead of a bare system prompt here.
-        // The literal is the value of kAXTrustedCheckOptionPrompt, which Swift 6 flags as mutable global state.
-        let options = ["AXTrustedCheckOptionPrompt": !welcoming] as CFDictionary
-        guard AXIsProcessTrustedWithOptions(options) else {
+        // First launch, or no Accessibility yet: About lists the permissions with Grant buttons.
+        let seen = UserDefaults.standard.bool(forKey: Defaults.welcomeSeen)
+        UserDefaults.standard.set(true, forKey: Defaults.welcomeSeen)
+        guard AXIsProcessTrusted() else {
+            preferences.show(.about)
             menu.setTitle(" needs Accessibility")
             Task { @MainActor in
                 while !AXIsProcessTrusted() { try? await Task.sleep(for: .seconds(2)) }
@@ -49,6 +37,7 @@ final class TinyWMApp: NSObject, NSApplicationDelegate {
             }
             return
         }
+        if !seen { preferences.show(.about) }
         start()
     }
 
