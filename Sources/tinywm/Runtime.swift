@@ -143,6 +143,7 @@ final class Runtime {
         configFile.addMissingDefaults()
         let first = configFile.load()
         config = first.config
+        pinch.fingers = config.pinchFingers
         menu.showIssues(first.issues)
         configFile.onChange = { [unowned self] in applyConfig($0) }
         highlight.showBorder = config.focusBorder
@@ -203,6 +204,7 @@ final class Runtime {
         Log.note("config", "reloaded; \(parsed.issues.count) issues")
         config = parsed.config
         pinch = PinchRecognizer()
+        pinch.fingers = config.pinchFingers
         menu.showIssues(parsed.issues)
         commands.reload()
         metaKey.setMode(config.meta)
@@ -265,7 +267,7 @@ final class Runtime {
     func refreshSwipeWarning() {
         let settings = SystemSetup.trackpadSettings()
         let clashes = swipeEnabled ? SwipeClash.clashes(fingers: recognizer.fingers, settings: settings) : []
-        let pinches = config.pinchOverview ? SwipeClash.pinchClashes(settings: settings) : []
+        let pinches = config.pinchOverview ? SwipeClash.pinchClashes(fingers: config.pinchFingers, settings: settings) : []
         menu.showSwipeClashes(clashes, fingers: recognizer.fingers, pinches: pinches)
     }
 

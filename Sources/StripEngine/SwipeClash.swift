@@ -18,8 +18,8 @@ public enum SwipeClash {
         ("TrackpadFiveFingerPinchGesture", 5, "five-finger pinch for Launchpad and Show Desktop"),
     ]
 
-    public static func pinchClashes(settings: [String: Int]) -> [String] {
-        pinchGestures.filter { (settings[$0.key] ?? 0) != 0 }.map(\.label)
+    public static func pinchClashes(fingers: Int, settings: [String: Int]) -> [String] {
+        pinchGestures.filter { $0.fingers == fingers && (settings[$0.key] ?? 0) != 0 }.map(\.label)
     }
 
     /// Labels of the system gestures that clash with tinywm swiping with `fingers` fingers.

@@ -41,6 +41,18 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
 }
 
 @Suite struct ConfigParsingTests {
+    @Test func pinchFingersDefaultsToFiveAndParses() {
+        #expect(StripConfig().pinchFingers == 5)
+        let four = StripConfig.parse("pinch-fingers = 4")
+        #expect(four.issues.isEmpty)
+        #expect(four.config.pinchFingers == 4)
+        #expect(StripConfig.parse("pinch-fingers = 5").config.pinchFingers == 5)
+        let bad = StripConfig.parse("pinch-fingers = 3")
+        #expect(bad.issues.map(\.message) == ["pinch-fingers must be 4 or 5, not '3'"])
+        #expect(bad.config.pinchFingers == 5)
+        #expect(StripConfig.defaultLines.contains("pinch-fingers = 5 # 4 or 5, thumb included"))
+    }
+
     @Test func pinchOverviewDefaultsOnAndParses() {
         #expect(StripConfig().pinchOverview)
         let off = StripConfig.parse("pinch-overview = off")

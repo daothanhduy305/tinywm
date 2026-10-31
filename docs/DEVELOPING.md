@@ -129,7 +129,8 @@ width-presets = 0.333, 0.5, 0.667
 focus-border = on
 swipe = on          # trackpad swipes on or off
 swipe-fingers = 3   # 3 or 4
-pinch-overview = on # pinch with thumb and three or four fingers; spread closes it
+pinch-overview = on # pinch opens the overview; spread closes it
+pinch-fingers = 5   # 4 or 5, thumb included
 restore-layout = on # save the layout and restore it at start
 peek-cover = off                # on: a column beside another display hides behind a card showing its picture, not narrowed
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
@@ -364,8 +365,9 @@ out as it comes back. The card's panel shows again under the pictures as they fa
 
 ## Trackpad swipes
 
-Pinch with your thumb and three or four fingers to open the overview, and spread them to close it.
-Turn off macOS's four- and five-finger pinches, or set `pinch-overview = off` to leave them to macOS.
+Pinch with your thumb and four fingers to open the overview, and spread them to close it.
+Set `pinch-fingers = 4` to use your thumb and three fingers instead.
+Turn off macOS's matching pinch, change `pinch-fingers`, or set `pinch-overview = off` to leave it to macOS.
 Pinch works even with `swipe = off`.
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column; an up or

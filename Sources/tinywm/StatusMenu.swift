@@ -82,7 +82,7 @@ final class StatusMenu: NSObject, NSMenuDelegate, NSMenuItemValidation {
         let other = fingers == 3 ? 4 : 3
         var hints: [String] = []
         if !clashes.isEmpty { hints.append("Turn it off there, or set swipe-fingers = \(other) in the config") }
-        if !pinches.isEmpty { hints.append("Turn off the macOS pinch, or set pinch-overview = off in the config") }
+        if !pinches.isEmpty { hints.append("Turn off the macOS pinch, change pinch-fingers, or set pinch-overview = off in the config") }
         let menu = disabledItems((clashes + pinches).map { "macOS uses \($0)" } + hints)
         menu.addItem(.separator())
         menu.addItem(item("Open Trackpad Settings…", #selector(trackpadSettingsChosen)))

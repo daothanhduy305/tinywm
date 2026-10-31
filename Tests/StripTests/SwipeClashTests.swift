@@ -4,17 +4,19 @@ import Testing
 @Suite struct SwipeClashTests {
     @Test func fiveFingerPinchClashes() {
         let s = ["TrackpadFiveFingerPinchGesture": 1]
-        #expect(SwipeClash.pinchClashes(settings: s) == ["five-finger pinch for Launchpad and Show Desktop"])
+        #expect(SwipeClash.pinchClashes(fingers: 5, settings: s) == ["five-finger pinch for Launchpad and Show Desktop"])
+        #expect(SwipeClash.pinchClashes(fingers: 4, settings: s).isEmpty)
         #expect(SwipeClash.clashes(fingers: 4, settings: s).isEmpty)
-        #expect(SwipeClash.pinchClashes(settings: ["TrackpadFiveFingerPinchGesture": 0]).isEmpty)
+        #expect(SwipeClash.pinchClashes(fingers: 5, settings: ["TrackpadFiveFingerPinchGesture": 0]).isEmpty)
     }
 
     @Test func pinchClashesAreSeparateFromSwipes() {
         let s = ["TrackpadFourFingerPinchGesture": 1]
-        #expect(SwipeClash.pinchClashes(settings: s) == ["four-finger pinch for Launchpad and Show Desktop"])
+        #expect(SwipeClash.pinchClashes(fingers: 5, settings: s).isEmpty)
+        #expect(SwipeClash.pinchClashes(fingers: 4, settings: s) == ["four-finger pinch for Launchpad and Show Desktop"])
         #expect(SwipeClash.clashes(fingers: 4, settings: s).isEmpty)
-        #expect(SwipeClash.pinchClashes(settings: ["TrackpadFourFingerPinchGesture": 0]).isEmpty)
-        #expect(SwipeClash.pinchClashes(settings: [:]).isEmpty)
+        #expect(SwipeClash.pinchClashes(fingers: 4, settings: ["TrackpadFourFingerPinchGesture": 0]).isEmpty)
+        #expect(SwipeClash.pinchClashes(fingers: 4, settings: [:]).isEmpty)
     }
 
     @Test func threeFingerSystemGesturesClashWithThreeFingerSwipes() {

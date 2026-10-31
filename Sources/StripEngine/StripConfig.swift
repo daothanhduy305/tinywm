@@ -19,6 +19,7 @@ public struct StripConfig: Equatable, Sendable {
     public var swipe = true
     public var swipeFingers = 3
     public var pinchOverview = true
+    public var pinchFingers = 5
     /// Focus or move past the strip's first or last column continues onto the display on that side.
     public var focusCrossesDisplays = false
     /// Whether the layout is saved and brought back when tinywm starts.
@@ -239,6 +240,11 @@ public struct StripConfig: Equatable, Sendable {
             config.swipe = try onOff(value, for: name)
         case "pinch-overview":
             config.pinchOverview = try onOff(value, for: name)
+        case "pinch-fingers":
+            guard let n = Int(value), n == 4 || n == 5 else {
+                throw Failure(message: "pinch-fingers must be 4 or 5, not '\(value)'")
+            }
+            config.pinchFingers = n
         case "focus-crosses-displays":
             config.focusCrossesDisplays = try onOff(value, for: name)
         case "swipe-fingers":
@@ -364,7 +370,8 @@ public struct StripConfig: Equatable, Sendable {
             "focus-border = on",
             "swipe = on",
             "swipe-fingers = \(d.swipeFingers) # 3 or 4",
-            "pinch-overview = on # pinch with thumb and three or four fingers",
+            "pinch-overview = on # pinch opens the overview; spread closes it",
+            "pinch-fingers = \(d.pinchFingers) # 4 or 5, thumb included",
             "focus-crosses-displays = off",
             "restore-layout = on",
             "peek-cover = off",

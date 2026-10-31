@@ -1,27 +1,21 @@
-/// Turns four- or five-finger pinches and spreads into one event per touch.
+/// Turns pinches and spreads with exactly `fingers` contacts into one event per touch.
 /// The 0.8 ratio catches measured pinches at 0.70–0.77; swipes stay at or above 0.85.
 public struct PinchRecognizer: Sendable {
     public enum Event: Equatable, Sendable { case pinchIn, spreadOut }
 
-    public var fingers = 4...5
+    public var fingers = 5
     public var ratio = 0.8
 
     private var origin: Double?
-    private var count = 0
     private var fired = false
 
     public init() {}
 
     public mutating func feed(_ touches: [(x: Double, y: Double)], at t: Double) -> Event? {
-        guard fingers.contains(touches.count) else {
+        guard touches.count == fingers else {
             origin = nil
-            count = 0
             fired = false
             return nil
-        }
-        if count != touches.count {
-            origin = nil
-            count = touches.count
         }
         guard !fired else { return nil }
         let x = touches.map(\.x).reduce(0, +) / Double(touches.count)
