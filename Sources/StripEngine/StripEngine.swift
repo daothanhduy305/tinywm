@@ -28,6 +28,7 @@ public final class StripEngine {
     /// Called after every change, for UI such as the menu-bar minimap.
     public var observers: [(StripEngine) -> Void] = []
     /// Whether the last change moved any window, so UI that follows motion can skip a focus-only change.
+    /// A tab taking another tab's place is not motion.
     public private(set) var moved = false
     /// With `peekCovers`, where a card stands in for each hidden window's part on screen.
     public private(set) var peeks: [String: Rect] = [:]
@@ -38,6 +39,8 @@ public final class StripEngine {
     private var refusals: [String: (asked: Double, took: Double)] = [:]
     /// Set by a command that moves the focused window, so its picture lifts while it travels.
     private var liftNext = false
+    /// Set while a tab takes another tab's place, so the change does not count as motion.
+    private var replacing = false
     /// Each window's place on the strip as last laid out, past the screen's edges too.
     private var stripPlaces: [String: Rect] = [:]
     /// Where the workspace a window is carried to showed its windows before it arrived.
@@ -214,6 +217,8 @@ public final class StripEngine {
         targetFrames[old] = nil
         parked.remove(old)
         floatHomes[old] = nil
+        replacing = true
+        defer { replacing = false }
         changeWorkspaces(raise: false) {
             $0.remove(new)
             if let w = $0.workspace(of: old) { $0.strips[w].replace(old, with: new) }
@@ -935,7 +940,7 @@ public final class StripEngine {
                 }
             }
         }
-        moved = !moves.isEmpty || !direct.isEmpty
+        moved = !replacing && (!moves.isEmpty || !direct.isEmpty)
         for o in observers { o(self) }
     }
 

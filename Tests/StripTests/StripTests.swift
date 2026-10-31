@@ -262,6 +262,14 @@ final class FakeWindows: WindowSystem {
         #expect(f.frames["t"]?.width == 1000)
     }
 
+    @Test func aTabSwapIsNotMotion() {
+        let (e, f) = make()
+        for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
+        f.focusedWindow = "t"
+        e.windowReplaced("b", by: "t")
+        #expect(!e.moved)
+    }
+
     @Test func aTabShownBeforeTheOldOneHidLeavesItsOwnColumn() {
         let (e, f) = make()
         for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
