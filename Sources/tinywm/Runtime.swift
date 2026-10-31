@@ -363,6 +363,9 @@ final class Runtime {
         let id = info.id
         let screen: () -> NSScreen? = { Screens.screen(id: id) }
         let pictures = PictureMotion(pictures: self.pictures, windows: windows)
+        pictures.isFloating = { [weak engine] id in
+            engine?.workspaces.strips.contains { $0.floating.contains(id) } ?? false
+        }
         pictures.screen = screen
         pictures.viewport = info.visible
         pictures.ringStyle = highlight.style

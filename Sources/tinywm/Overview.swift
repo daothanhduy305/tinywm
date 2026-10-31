@@ -531,7 +531,9 @@ final class Overview {
         var longest: CFTimeInterval = 0
         CATransaction.begin()
         // A fullscreen window on another Space fades where it is, unless it was picked.
-        let fading = away.subtracting([id].compactMap { $0 })
+        var fading = away.subtracting([id].compactMap { $0 })
+        // Picking a window raises its app over the floats, so their pictures fade instead of landing on top.
+        if let id { fading.formUnion(floats.keys.filter { $0 != id }) }
         for (wid, layer) in holders {
             guard !fading.contains(wid), let t = targets[wid] ?? real[wid] else { continue }
             longest = max(longest, move(layer, to: CGPoint(x: t.center.x, y: t.center.y),

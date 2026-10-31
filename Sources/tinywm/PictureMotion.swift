@@ -23,6 +23,7 @@ final class PictureMotion: StripPresenter {
     /// The focus border's look, and whether it is on. The ring in the pictures matches it.
     var ringStyle = FocusHighlight.Style()
     var showRing: () -> Bool = { true }
+    var isFloating: (String) -> Bool = { _ in false }
 
     private let snapshots: ScreenCaptureSnapshots
     /// Shows each window's picture, or its cover in cover mode.
@@ -112,6 +113,7 @@ final class PictureMotion: StripPresenter {
         root.masksToBounds = true
         root.backgroundColor = NSColor(white: 0.12, alpha: 1).cgColor
         backdrop.contentsGravity = .resizeAspectFill
+        backdrop.zPosition = -2
         root.addSublayer(backdrop)
         ring.zPosition = 10
         ring.isHidden = true
@@ -187,7 +189,7 @@ final class PictureMotion: StripPresenter {
             layer.removeAllAnimations()
             layer.frame = start[id] ?? local(still[id]!)
             // The lifted picture travels over the others.
-            layer.zPosition = id == lifted ? 1 : 0
+            layer.zPosition = id == lifted ? 1 : (isFloating(id) && id != focused ? -1 : 0)
             // The picture shows at its own size and is clipped, never stretched. A window that
             // changes size gets live pictures at its new size as soon as it has relaid out.
             pictures.show(id, on: layer, growingTo: current.targetSizes[id])
@@ -311,6 +313,7 @@ final class PictureMotion: StripPresenter {
             for (id, r) in frames {
                 layers[id]?.removeAllAnimations()
                 layers[id]?.frame = local(r)
+                layers[id]?.zPosition = isFloating(id) && id != focused ? -1 : 0
             }
             previewRing(frames: frames, focused: focused, override: ring)
             CATransaction.commit()
@@ -331,6 +334,7 @@ final class PictureMotion: StripPresenter {
             layer.removeAllAnimations()
             if isNew || !active { pictures.show(id, on: layer) }
             layer.frame = local(r)
+            layer.zPosition = isFloating(id) && id != focused ? -1 : 0
         }
         previewRing(frames: frames, focused: focused, override: ring)
         CATransaction.commit()
@@ -654,6 +658,7 @@ final class PictureMotion: StripPresenter {
 
     private func makeLayer(_ id: String) -> WindowLayer {
         let layer = WindowLayer()
+        layer.zPosition = isFloating(id) ? -1 : 0
         root.addSublayer(layer)
         layers[id] = layer
         return layer

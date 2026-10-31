@@ -393,6 +393,8 @@ final class WindowLifecycle {
     }
 
     private func focused(_ element: AXUIElement, pid: pid_t) {
+        // tinywm's own panels move its key window while another app is in front; only a real activation counts.
+        if pid == getpid(), !AXWindows.isFrontmost(pid) { return }
         guard let id = windows.knownID(for: element) else { return windows.noteFocusMoved() }
         if refocusesAsked(id, pid: pid) { return }
         windows.noteFocused(id)
