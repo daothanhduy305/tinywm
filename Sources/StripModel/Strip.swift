@@ -8,8 +8,6 @@ public struct Column: Codable, Equatable, Sendable {
     public var focused: Int
     /// Share of the usable width, so 0.5 means two such columns fill the screen.
     public var width: Double
-    /// The width to return to when full width is toggled off.
-    public var widthBeforeFull: Double?
 
     public init(id: String, windows: [String], width: Double, focused: Int = 0) {
         self.id = id; self.windows = windows; self.width = width; self.focused = focused

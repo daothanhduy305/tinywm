@@ -654,7 +654,7 @@ public final class StripEngine {
         lift { $0.popOut(columnID: id) }
     }
     public func cycleWidth(backward: Bool = false) { resize { $0.cycleWidth(settings.widthPresets, backward: backward) } }
-    public func toggleFullWidth() { resize { $0.toggleFullWidth() } }
+    public func fullWidth() { resize { $0.setWidth(1) } }
     public func halfWidth() { resize { $0.setWidth(0.5) } }
     public func wider() { resize { $0.nudgeWidth(by: settings.nudge) } }
     public func narrower() { resize { $0.nudgeWidth(by: -settings.nudge) } }
@@ -719,7 +719,6 @@ public final class StripEngine {
             if let src, src != w { ws.strips[src].remove(id) }
             ws.strips[w].place(id, at: target, width: width, columnID: columnID)
             if incoming != nil, let c = ws.strips[w].column(of: id) {
-                if ws.strips[w].columns[c].width != width { ws.strips[w].columns[c].widthBeforeFull = nil }
                 ws.strips[w].columns[c].width = width
             }
             if let focused, let c = ws.strips[w].column(of: focused) {

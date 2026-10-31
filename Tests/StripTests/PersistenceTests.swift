@@ -16,7 +16,7 @@ private func live(_ id: String, _ d: WindowDescriptor) -> LiveWindow { LiveWindo
 private func saved(_ columns: [[WindowDescriptor]], floating: [WindowDescriptor] = [], focusedColumn: Int? = 0,
                    scroll: Double = 0, widths: [Double]? = nil) -> SavedWorkspaces {
     let cols = columns.enumerated().map {
-        SavedColumn(windows: $1, focused: 0, width: widths?[$0] ?? 0.5, widthBeforeFull: nil)
+        SavedColumn(windows: $1, focused: 0, width: widths?[$0] ?? 0.5)
     }
     let empty = SavedStrip(columns: [], focusedColumn: nil, scroll: 0, floating: [])
     let mid = SavedStrip(columns: cols, focusedColumn: focusedColumn, scroll: scroll, floating: floating)
@@ -191,7 +191,7 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
     @Test func aWorkspaceThatLostEveryWindowDisappears() {
         let empty = SavedStrip(columns: [], focusedColumn: nil, scroll: 0, floating: [])
         func strip(_ n: UInt32) -> SavedStrip {
-            SavedStrip(columns: [SavedColumn(windows: [desc(n)], focused: 0, width: 0.5, widthBeforeFull: nil)],
+            SavedStrip(columns: [SavedColumn(windows: [desc(n)], focused: 0, width: 0.5)],
                        focusedColumn: 0, scroll: 0, floating: [])
         }
         let file = layout(["A": SavedWorkspaces(strips: [empty, strip(1), strip(2), empty], active: 2)])

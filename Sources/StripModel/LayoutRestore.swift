@@ -156,8 +156,7 @@ extension SavedLayout {
                     }
                     guard !ids.isEmpty else { continue }
                     serial += 1
-                    var column = Column(id: "r\(serial)", windows: ids, width: max(0.05, c.width), focused: focused)
-                    column.widthBeforeFull = c.widthBeforeFull
+                    let column = Column(id: "r\(serial)", windows: ids, width: max(0.05, c.width), focused: focused)
                     let index = strip.columns.count
                     strip.columns.append(column)
                     let want = s.focusedColumn ?? 0

@@ -20,7 +20,6 @@ public struct SavedColumn: Codable, Equatable, Sendable {
     public var windows: [WindowDescriptor]
     public var focused: Int
     public var width: Double
-    public var widthBeforeFull: Double?
 }
 
 public struct SavedStrip: Codable, Equatable, Sendable {
@@ -50,7 +49,7 @@ public struct SavedWorkspaces: Codable, Equatable, Sendable {
                 let focusedWindow = c.windows.indices.contains(c.focused) ? c.windows[c.focused] : c.windows.first
                 let focused = named.filter { $0.1 != nil }.firstIndex { $0.0 == focusedWindow } ?? 0
                 if s.focusedColumn == i { focusedColumn = columns.count }
-                columns.append(SavedColumn(windows: kept, focused: focused, width: c.width, widthBeforeFull: c.widthBeforeFull))
+                columns.append(SavedColumn(windows: kept, focused: focused, width: c.width))
             }
             out.append(SavedStrip(
                 columns: columns, focusedColumn: focusedColumn ?? (columns.isEmpty ? nil : 0), scroll: s.scroll,

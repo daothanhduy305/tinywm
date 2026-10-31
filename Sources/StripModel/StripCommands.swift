@@ -146,31 +146,16 @@ extension Strip {
     public mutating func cycleWidth(_ presets: [Double], backward: Bool = false) {
         guard let f = focusedColumn, let next = nextWidthPreset(after: columns[f].width, presets, backward: backward) else { return }
         columns[f].width = next
-        columns[f].widthBeforeFull = nil
-    }
-
-    /// Full width on, or back to the width it had before.
-    public mutating func toggleFullWidth() {
-        guard let f = focusedColumn else { return }
-        if let before = columns[f].widthBeforeFull {
-            columns[f].width = before
-            columns[f].widthBeforeFull = nil
-        } else {
-            columns[f].widthBeforeFull = columns[f].width
-            columns[f].width = 1
-        }
     }
 
     public mutating func setWidth(_ width: Double) {
         guard let f = focusedColumn else { return }
         columns[f].width = width
-        columns[f].widthBeforeFull = nil
     }
 
     public mutating func nudgeWidth(by delta: Double) {
         guard let f = focusedColumn else { return }
         columns[f].width = min(1, max(0.1, columns[f].width + delta))
-        columns[f].widthBeforeFull = nil
     }
 
     /// Takes the focused window off the strip, or puts a floating window back beside the focused column.

@@ -149,10 +149,10 @@ private func strip(_ widths: [Double], focus: Int? = 0) -> Strip {
         #expect(s.columns[0].width == 2.0 / 3)
         s.cycleWidth([1.0 / 3, 0.5, 2.0 / 3])
         #expect(s.columns[0].width == 1.0 / 3)
-        s.toggleFullWidth()
+        s.setWidth(1)
         #expect(s.columns[0].width == 1)
-        s.toggleFullWidth()
-        #expect(s.columns[0].width == 1.0 / 3)
+        s.setWidth(1)
+        #expect(s.columns[0].width == 1)
         s.nudgeWidth(by: -1)
         #expect(s.columns[0].width == 0.1)
         s.setWidth(0.5)
@@ -253,7 +253,7 @@ final class FakeWindows: WindowSystem {
         let (e, f) = make()
         for id in ["a", "b", "c"] { f.focusedWindow = id; e.windowAdded(id) }
         f.focusedWindow = "b"; e.windowFocused("b")
-        e.toggleFullWidth()
+        e.fullWidth()
         f.focusedWindow = "t"
         e.windowReplaced("b", by: "t")
         #expect(e.strip.columns.map(\.windows) == [["a"], ["t"], ["c"]])
@@ -265,7 +265,7 @@ final class FakeWindows: WindowSystem {
     @Test func aTabShownBeforeTheOldOneHidLeavesItsOwnColumn() {
         let (e, f) = make()
         for id in ["a", "b"] { f.focusedWindow = id; e.windowAdded(id) }
-        e.toggleFullWidth()
+        e.fullWidth()
         f.focusedWindow = "t"; e.windowAdded("t")
         e.windowReplaced("b", by: "t")
         #expect(e.strip.columns.map(\.windows) == [["a"], ["t"]])
@@ -557,7 +557,7 @@ final class CountingWindows: WindowSystem {
 
     @Test func aFullWidthWindowMovedIsLiftedInPlace() {
         let (e, _, p, clock) = make()
-        e.toggleFullWidth()
+        e.fullWidth()
         clock.advance(by: 1)
         let frame = e.frame(of: "c")!
         e.move(.left)
@@ -567,7 +567,7 @@ final class CountingWindows: WindowSystem {
 
     @Test func theWindowsALiftedOnePassesTravelAlongTheStrip() {
         let (e, _, p, clock) = make()
-        e.toggleFullWidth()
+        e.fullWidth()
         clock.advance(by: 1)
         e.move(.left)
         // b was just left of the screen and ends just right of it, crossing under c.
@@ -579,7 +579,7 @@ final class CountingWindows: WindowSystem {
     @Test func aWorkspaceAWindowIsCarriedToComesInAsItWasThenMakesRoom() {
         let (e, _, p, clock) = make()
         e.moveToWorkspace(by: 1)
-        e.toggleFullWidth()
+        e.fullWidth()
         e.switchWorkspace(by: -1)
         clock.advance(by: 1)
         e.moveToWorkspace(by: 1)
@@ -751,14 +751,6 @@ final class CountingWindows: WindowSystem {
         return (e, f)
     }
 
-    @Test func fullWidthOffReturnsToTheSameView() {
-        let (e, _) = make()
-        e.toggleFullWidth()
-        #expect(e.strip.scroll == 1000)
-        e.toggleFullWidth()
-        #expect(e.strip.scroll == 500)
-    }
-
     @Test func cyclingBackToTheOriginalWidthReturnsToTheSameView() {
         let (e, _) = make()
         e.cycleWidth() // 2/3
@@ -776,7 +768,7 @@ final class CountingWindows: WindowSystem {
 
     @Test func movingFocusAwayForgetsTheView() {
         let (e, _) = make()
-        e.toggleFullWidth()
+        e.fullWidth()
         e.focus(.left)
         e.focus(.right)
         #expect(e.strip.viewBeforeGrow == nil)
