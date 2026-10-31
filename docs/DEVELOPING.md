@@ -385,6 +385,7 @@ Turn off macOS's matching pinch, change `pinch-fingers`, or set `pinch-overview 
 Pinch works even with `swipe = off`.
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column.
+A quick flick carries on and moves at least one column the way the fingers went.
 An up or down swipe drags the workspaces under your fingers. Travel past 0.08 of the trackpad
 changes workspace on release. A shorter swipe springs back. Past either end, the workspace
 moves with resistance and springs back. When the main thread falls behind, contact frames waiting for it

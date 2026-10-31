@@ -859,7 +859,23 @@ final class CountingWindows: WindowSystem {
         let (e, _, _) = make()
         e.beginSwipe()
         e.swipe(by: -0.1)
-        e.endSwipe(velocity: -4) // 150 points dragged, projected 900 further
+        e.endSwipe(velocity: -4) // 150 points dragged, projected 1800 further
+        #expect(e.strip.scroll == 1000)
+    }
+
+    @Test func aShortFlickMovesOneColumn() {
+        let (e, _, _) = make()
+        e.beginSwipe()
+        e.swipe(by: -0.05)
+        e.endSwipe(velocity: -0.6) // 75 points dragged, projected 270 further, nearest 500
+        #expect(e.strip.scroll == 500)
+    }
+
+    @Test func aFlickNeverSnapsBack() {
+        let (e, _, _) = make()
+        e.beginSwipe()
+        e.swipe(by: -0.34)
+        e.endSwipe(velocity: -0.5) // 510 points dragged, projected to 735: nearest is 500, behind the fingers
         #expect(e.strip.scroll == 1000)
     }
 

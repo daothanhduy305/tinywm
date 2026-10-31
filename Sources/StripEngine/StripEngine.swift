@@ -354,7 +354,10 @@ public final class StripEngine {
     /// How far a swipe across the whole trackpad moves the strip, in screen widths.
     public var swipeScale = 1.5
     /// How far ahead the lift-off velocity carries the strip before it snaps, in seconds.
-    public var swipeProjection = 0.15
+    public var swipeProjection = 0.3
+    /// Lift-off speed, in trackpad units per second, at which a swipe counts as a flick and
+    /// moves at least one column the way the fingers went.
+    public var flickVelocity = 0.5
 
     public func beginSwipe() {
         swipeScroll = strip.scroll
@@ -441,7 +444,9 @@ public final class StripEngine {
         swipeScroll = nil
         let projected = scroll - velocity * swipeScale * viewport.width * swipeProjection
         let points = snapPoints(strip, metrics, mode: settings.scrollMode)
-        let target = points.min { abs($0 - projected) < abs($1 - projected) } ?? 0
+        // A flick only lands ahead of where the strip is, never back against the fingers.
+        let ahead = abs(velocity) < flickVelocity ? [] : points.filter { velocity < 0 ? $0 > scroll + 0.5 : $0 < scroll - 0.5 }
+        let target = (ahead.isEmpty ? points : ahead).min { abs($0 - projected) < abs($1 - projected) } ?? 0
 
         // Motion starts from where the pictures are now, not from the old real frames.
         var shown = strip
