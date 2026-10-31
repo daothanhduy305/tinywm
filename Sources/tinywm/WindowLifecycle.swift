@@ -658,7 +658,8 @@ final class WindowLifecycle {
     private func isTiled(_ id: String) -> Bool { displays.engine(holding: id)?.frame(of: id) != nil }
 
     private func recognition(_ id: String, _ facts: WindowFacts, log: Bool = true) -> Recognition {
-        let r = rules().recognize(facts)
+        var r = rules().recognize(facts)
+        if windows.pid(of: id) == getpid(), r.placement != .unmanaged { r.placement = .floating }
         if log { Log.note("rules", "\(Log.name(id)): \(r.placement), tileable=\(facts.isTileable) dockable=\(facts.isDockable) "
             + "allowsFocus=\(r.allowsFocus) bundle=\(facts.bundleID ?? "nil")") }
         return r

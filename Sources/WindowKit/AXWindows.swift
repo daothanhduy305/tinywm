@@ -194,7 +194,7 @@ public enum AX {
     }
 }
 
-/// Carries an Accessibility element between threads. AX calls are safe from any thread.
+/// Carries an Accessibility element between threads. Our own app's AX calls need the main thread.
 private struct ElementBox: @unchecked Sendable {
     let element: AXUIElement?
 }
@@ -417,8 +417,9 @@ public final class AXWindows: WindowSystem {
 
     private func runNudge(_ id: String) {
         guard let rect = nudgeTargets.removeValue(forKey: id),
-              let w = tracked[id], let queue = queues[w.pid] else { return }
+              let w = tracked[id] else { return }
         let ref = w.ref
+        let queue = queue(for: w.pid)
         queue.async { AX.nudge(ref.element, rect) }
     }
 
@@ -460,6 +461,8 @@ public final class AXWindows: WindowSystem {
     }
 
     private func queue(for pid: pid_t) -> DispatchQueue {
+        // AppKit answers our own AX calls on the calling thread.
+        if pid == getpid() { return .main }
         if let queue = queues[pid] { return queue }
         let queue = DispatchQueue(label: "ax.\(pid)")
         queues[pid] = queue

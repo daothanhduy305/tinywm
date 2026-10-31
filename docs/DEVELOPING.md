@@ -117,6 +117,7 @@ Gestures and Rules. Changes write to the config file and apply at once. Your com
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
 Use **Edit Config…** in the menu-bar menu to edit the file yourself.
 Launch at login uses the macOS login item.
+tinywm's own windows (Preferences, Welcome) float and appear on the overview's shelf.
 
 `ConfigEdit.swift` in StripEngine edits text without macOS types. It keeps trailing comments,
 uses the last active setting, and removes earlier active duplicates. Repeating rules and commands

@@ -48,7 +48,7 @@ enum FrameSink {
     }
 }
 
-/// An Accessibility element handed to a background task. AX calls are safe from any thread.
+/// An Accessibility element handed to a background task. Our own app's AX calls need the main thread.
 private struct AXBox: @unchecked Sendable {
     let element: AXUIElement
 }
@@ -286,7 +286,7 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
         }
     }
 
-    /// One snapshot of one window. Its size is read off the main thread: the app answers
+    /// One snapshot of one window. Other apps' sizes are read off the main thread: the app answers
     /// late while it redraws, and the main thread must keep drawing the motion meanwhile.
     private func capture(_ id: String, now: CFTimeInterval) {
         guard let element = windows.element(of: id), let pid = windows.pid(of: id) else { return }
@@ -299,7 +299,8 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
                 arrived(id)
                 runPump()
             }
-            guard let window = await target(of: id, box, pid), let frame = await Self.frame(of: box),
+            guard let window = await target(of: id, box, pid),
+                  let frame = pid == getpid() ? windows.frameOf(id) : await Self.frame(of: box),
                   frame.width > 0, frame.height > 0 else { return }
             let scale = backingScale(for: frame)
             let size = CGSize(width: (frame.width * scale).rounded(), height: (frame.height * scale).rounded())
@@ -321,7 +322,9 @@ public final class ScreenCaptureSnapshots: SnapshotProvider {
     /// handles of all known windows are kept from that list.
     private func target(of id: String, _ box: AXBox, _ pid: pid_t) async -> SCWindow? {
         if let known = targets[id] { return known }
-        if numbers[id] == nil { numbers[id] = await Self.number(of: box, pid: pid) }
+        if numbers[id] == nil {
+            numbers[id] = pid == getpid() ? WindowNumbers.windowID(of: box.element, pid: pid) : await Self.number(of: box, pid: pid)
+        }
         guard numbers[id] != nil,
               let content = try? await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         else { return nil }

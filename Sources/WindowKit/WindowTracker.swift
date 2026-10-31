@@ -101,7 +101,7 @@ public final class WindowTracker {
         })
     }
 
-    /// Whether the app's windows may be managed: an app with windows, not us, not excluded.
+    /// Whether the app's windows may be managed: an app with windows, not excluded.
     /// Accessory apps count too; some, like Steam's helper, own an app's main window.
     /// macOS's own prompts: permission requests, password and Touch ID sheets, and the warning
     /// before opening a downloaded app. Each must stay where macOS shows it. Tiled or parked on a
@@ -115,7 +115,7 @@ public final class WindowTracker {
     ]
 
     public func manageable(_ app: NSRunningApplication) -> Bool {
-        guard app.activationPolicy != .prohibited, app.processIdentifier != getpid(), !app.isTerminated else { return false }
+        guard app.activationPolicy != .prohibited, !app.isTerminated else { return false }
         if let bundleID = app.bundleIdentifier, Self.systemPrompts.contains(bundleID) { return false }
         if isIgnored(app.bundleIdentifier, app.localizedName) { return false }
         return true
@@ -204,6 +204,8 @@ public final class WindowTracker {
             let resolved = Self.realProcesses(of: unwatched.filter { $0.processIdentifier <= 0 }, excluding: watched)
             var lists: [(pid_t, [AXRef])] = []
             for pid in pids {
+                // Our windows are followed by notifications and window-server rescans on main.
+                if pid == getpid() { continue }
                 // A hidden app lists no windows, so they leave the strip and return to their
                 // slots when it is shown again.
                 guard NSRunningApplication(processIdentifier: pid)?.isHidden == false else {
@@ -547,6 +549,8 @@ public final class WindowTracker {
     private var queues: [pid_t: DispatchQueue] = [:]
 
     private func queue(for pid: pid_t) -> DispatchQueue {
+        // AppKit answers our own AX calls on the calling thread.
+        if pid == getpid() { return .main }
         if let queue = queues[pid] { return queue }
         let queue = DispatchQueue(label: "tinywm.track.\(pid)", qos: .userInitiated)
         queues[pid] = queue
