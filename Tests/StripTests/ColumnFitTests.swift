@@ -32,6 +32,8 @@ final class StubbornWindows: WindowSystem {
     var minimums: [String: Double] = [:]
     var maximums: [String: Double] = [:]
     var minHeights: [String: Double] = [:]
+    /// Ignore the next write's size, as an app busy moving to another display does.
+    var busyOnce: Set<String> = []
     /// Report the frame from before the next write, as an app still busy with the change does.
     var staleOnce: Set<String> = []
     /// Points added to a frame that starts left of the screen, as macOS does to a window it would leave almost hidden.
@@ -43,6 +45,10 @@ final class StubbornWindows: WindowSystem {
         let before = frames[id]
         let grow = rect.x < 0 ? growOffLeft : 0
         let took = Rect(x: rect.x - grow, y: rect.y, width: max(min(rect.width, maximums[id] ?? .infinity), minimums[id] ?? 0) + grow, height: max(rect.height, minHeights[id] ?? 0))
+        if busyOnce.remove(id) != nil, let before {
+            frames[id] = Rect(x: rect.x, y: rect.y, width: before.width, height: before.height)
+            return completion(frames[id])
+        }
         frames[id] = took
         if staleOnce.remove(id) != nil, let before { completion(before) } else { completion(took) }
     }
@@ -101,7 +107,7 @@ final class StubbornWindows: WindowSystem {
         d.appOf = { "app.\($0)" }
         d.update([display])
         add(d, w, ["a", "b", "c", "t"])
-        clock.advance(by: 0.3)
+        for _ in 0..<4 { clock.advance(by: 0.3) }
         #expect(w.frames["t"]!.width == 300)
         #expect(abs(w.frames["t"]!.maxX - 1200) < 0.01)
         #expect(abs(w.frames["c"]!.maxX - w.frames["t"]!.x) < 0.01)
@@ -212,6 +218,24 @@ final class StubbornWindows: WindowSystem {
 
 @MainActor
 @Suite struct TallWindowTests {
+    @Test func aWindowBrieflyBusyGetsItsSlotOnTheSecondAsk() {
+        let clock = TestClock()
+        let w = StubbornWindows()
+        let d = StripDisplays(windows: w, configure: { e, _ in e.clock = clock }, discard: { _ in })
+        d.settings.gap = 6
+        d.appOf = { "app.\($0)" }
+        let screen = Rect(x: 0, y: 0, width: 1200, height: 600)
+        d.update([TiledDisplay(id: "A", frame: screen, visible: screen)])
+        w.frames["a"] = Rect(x: 100, y: 100, width: 300, height: 700)
+        w.busyOnce = ["a"]
+        d.windowAdded("a", frame: w.frames["a"])
+        for _ in 0..<6 { clock.advance(by: 0.3) }
+        let a = w.frames["a"]!
+        // Asked twice for the same width; the busy answer to the first ask never fits the column.
+        #expect(w.asked["a"]!.count == 2 && a.width == w.asked["a"]!.first)
+        #expect(abs(a.height - 588) < 0.01)
+    }
+
     @Test func aTallerWindowStaysInsideTheScreen() {
         var m = StripMetrics(viewport: Rect(x: 0, y: -1050, width: 1920, height: 1050), gap: 6)
         m.minHeights = ["a": 1050]

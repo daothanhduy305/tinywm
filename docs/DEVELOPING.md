@@ -467,11 +467,13 @@ app's next window opens at that width. Apps tinywm has not seen yet use `default
 
 A column first asks its window for its share of the screen. If the window takes another width,
 because its app has a minimum or maximum width, the column takes the window's width instead
-(`refused` in `StripEngine`, after a second read 0.3 s later). Nothing is saved per app; the fit
+(`checkFrame` in `StripEngine`). A window still off at a second read 0.3 s later is asked once more
+after a short pause, since an app moving to another display ignores size changes for a moment;
+only a window still off then counts as refusing. Nothing is saved per app; the fit
 lasts until the column's share or the screen changes, and then the window is asked again.
 Windows off the screen or trimmed beside another display never change their column's width.
 
 Heights work the same way for a window alone in its column. Some apps, such as Chromium-based
-browsers on some displays, come back taller than asked. tinywm asks once more, then keeps the
-taller height and moves the window up so it stays on screen, giving up the gaps
-(`checkHeight` in `StripEngine`). Snap-backs after a drag are checked too.
+browsers on some displays, come back taller than asked. After the same second ask, tinywm keeps
+the taller height and moves the window up so it stays on screen, giving up the gaps.
+Snap-backs after a drag are checked too.

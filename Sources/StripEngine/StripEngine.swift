@@ -39,8 +39,8 @@ public final class StripEngine {
     private var refusals: [String: (asked: Double, took: Double)] = [:]
     /// Heights tiled windows took, taller than asked, by window ID. Kept while the slot asks the same height.
     private var heightRefusals: [String: (asked: Double, took: Double)] = [:]
-    /// Windows asked once more for a height they came back taller than.
-    private var heightRetried: Set<String> = []
+    /// Windows asked once more for a frame they came back with another size than.
+    private var frameRetried: Set<String> = []
     /// Set by a command that moves the focused window, so its picture lifts while it travels.
     private var liftNext = false
     /// Set while a tab takes another tab's place, so the change does not count as motion.
@@ -984,53 +984,59 @@ public final class StripEngine {
         for o in observers { o(self) }
     }
 
-    /// Reports a tiled window that took a wider or narrower frame than asked, with the frame a second read
-    /// finds a moment later, since an app still busy with the change can report its old size.
+    /// Checks a tiled window's frame after a write. A window that took another width, or a taller
+    /// height, is read again 0.3 s later, since an app still busy with the change can report its old
+    /// size. Still off, it is asked once more after a pause: an app moving to another display ignores
+    /// or delays size changes for a moment. Off again, the app means it: its column fits the width
+    /// it took, and a window alone in its column keeps its height inside the screen.
     /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
     /// Nor does a trimmed one, which the app may refuse though it takes its column's width.
     /// Also for a slot frame written outside the engine, as a snap-back after a drag.
     public func checkFrame(_ id: String, asked: Rect, took: Rect?) {
-        checkHeight(id, asked: asked, took: took)
-        guard let took, abs(took.width - asked.width) > 2,
-              asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2, !isTrimmed(id) else { return }
+        guard let took, wrongWidth(id, asked, took) || tooTall(id, asked, took) else {
+            frameRetried.remove(id)
+            return
+        }
         let confirm: @MainActor () -> Void = { [weak self] in
             guard let self else { return }
             windows.readFrame(id) { [weak self] again in
-                guard let self, let again,
-                      workspaces.strips.contains(where: { $0.column(of: id) != nil }),
-                      let wanted = targetFrames[id], abs(wanted.width - asked.width) < 0.5 else { return }
-                refused(id, asked: asked.width, took: again.width)
+                guard let self, let again, let wanted = targetFrames[id],
+                      abs(wanted.width - asked.width) < 0.5, abs(wanted.height - asked.height) < 0.5 else { return }
+                let width = wrongWidth(id, asked, again), height = tooTall(id, asked, again)
+                guard width || height else { frameRetried.remove(id); return }
+                if frameRetried.insert(id).inserted {
+                    Log.note("frame", "\(label) \(Log.name(id)) took \(Log.rect(again)) when asked \(Log.rect(asked)); asking again once it settles")
+                    let retry: @MainActor () -> Void = { [weak self] in
+                        guard let self, let now = targetFrames[id],
+                              abs(now.width - asked.width) < 0.5, abs(now.height - asked.height) < 0.5 else { return }
+                        windows.setFrame(id, now) { [weak self] took in self?.checkFrame(id, asked: now, took: took) }
+                    }
+                    if let clock { clock.after(0.5, retry) } else { retry() }
+                    return
+                }
+                frameRetried.remove(id)
+                if height {
+                    heightRefusals[id] = (asked.height, again.height)
+                    Log.note("height", "\(label) \(Log.name(id)) keeps \(Int(again.height)) points when asked for \(Int(asked.height)); its slot keeps it on screen")
+                }
+                if width { refused(id, asked: asked.width, took: again.width) }
+                if height { apply() }
             }
         }
         if let clock { clock.after(0.3, confirm) } else { confirm() }
     }
 
-    /// Handles a tiled window that came back taller than its slot, as Chromium-based browsers do on
-    /// some displays. It is asked once more, since an app busy with a display change can grow it back
-    /// after the write; still taller, its slot takes that height inside the screen, so it never
-    /// hangs off the bottom.
-    private func checkHeight(_ id: String, asked: Rect, took: Rect?) {
-        if let took, took.height <= asked.height + 2 { heightRetried.remove(id) }
-        guard let took, took.height > asked.height + 2, heightRefusals[id] == nil,
-              asked.y >= viewport.y - 2, asked.maxY <= viewport.maxY + 2 else { return }
-        let confirm: @MainActor () -> Void = { [weak self] in
-            guard let self else { return }
-            windows.readFrame(id) { [weak self] again in
-                guard let self, let again, again.height > asked.height + 2,
-                      let c = strip.column(of: id), strip.columns[c].windows.count == 1,
-                      let wanted = targetFrames[id], wanted.isApproximately(asked) else { return }
-                if heightRetried.insert(id).inserted {
-                    Log.note("height", "\(label) \(Log.name(id)) took \(Int(again.height)) points when asked for \(Int(asked.height)); asking again")
-                    windows.setFrame(id, asked) { [weak self] took in self?.checkHeight(id, asked: asked, took: took) }
-                    return
-                }
-                heightRetried.remove(id)
-                heightRefusals[id] = (asked.height, again.height)
-                Log.note("height", "\(label) \(Log.name(id)) keeps \(Int(again.height)) points when asked for \(Int(asked.height)); its slot keeps it on screen")
-                apply()
-            }
-        }
-        if let clock { clock.after(0.3, confirm) } else { confirm() }
+    private func wrongWidth(_ id: String, _ asked: Rect, _ took: Rect) -> Bool {
+        abs(took.width - asked.width) > 2 && asked.x >= viewport.x - 2 && asked.maxX <= viewport.maxX + 2
+            && !isTrimmed(id) && workspaces.strips.contains(where: { $0.column(of: id) != nil })
+    }
+
+    /// Taller than asked, as Chromium-based browsers can be, for a window alone in its column on screen.
+    private func tooTall(_ id: String, _ asked: Rect, _ took: Rect) -> Bool {
+        guard took.height > asked.height + 2, heightRefusals[id] == nil,
+              asked.y >= viewport.y - 2, asked.maxY <= viewport.maxY + 2,
+              let c = strip.column(of: id) else { return false }
+        return strip.columns[c].windows.count == 1
     }
 
     /// Fits the column of a window that took `took` points when asked for its column's share.
