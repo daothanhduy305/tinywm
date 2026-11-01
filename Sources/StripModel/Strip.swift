@@ -56,9 +56,17 @@ public struct StripMetrics: Equatable, Sendable {
     public var minimums: [String: Double]
     /// The widest width in points each window's app accepts, by window ID.
     public var maximums: [String: Double]
+    /// The height in points each window's app insisted on, taller than its slot, by window ID.
+    public var minHeights: [String: Double] = [:]
 
     public init(viewport: Rect, gap: Double, minimums: [String: Double] = [:], maximums: [String: Double] = [:]) {
         self.viewport = viewport; self.gap = gap; self.minimums = minimums; self.maximums = maximums
+    }
+
+    /// Height in points of each window in a column of `count` windows.
+    public func windowHeight(count: Int) -> Double {
+        let n = Double(max(1, count))
+        return max(1, (viewport.height - gap * (n + 1)) / n)
     }
 
     /// Width in points of a column with share `fraction`. Two 0.5 columns plus three gaps fill the screen.

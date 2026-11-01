@@ -30,10 +30,15 @@ public func stripFrames(
         let w = m.width(of: column)
         let x = v.x + lefts[i] - strip.scroll
 
-        let n = Double(column.windows.count)
-        let h = max(1, (v.height - m.gap * (n + 1)) / n)
+        let h = m.windowHeight(count: column.windows.count)
         for (j, window) in column.windows.enumerated() {
             var r = Rect(x: x, y: v.y + m.gap + Double(j) * (h + m.gap), width: w, height: h)
+            // A window that insists on a taller frame gives up its gaps rather than leave the screen.
+            // ponytail: single-window columns only; a stacked one would overlap its neighbour.
+            if column.windows.count == 1, let tall = m.minHeights[window], tall > h {
+                r.height = min(tall, v.height)
+                r.y = max(v.y, min(r.y, v.maxY - r.height))
+            }
             if clamp {
                 if r.maxX <= v.x {
                     r = hideaway.sliver(r, pastRight: false, sliver: sliver)

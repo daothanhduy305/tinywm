@@ -513,7 +513,7 @@ final class WindowLifecycle {
             return
         }
         Log.note("drag", "\(Log.name(id)) snaps back from \(Log.rect(now)) to its slot \(Log.rect(asked))")
-        windows.setFrame(id, asked) { _ in }
+        windows.setFrame(id, asked) { took in engine.checkFrame(id, asked: asked, took: took) }
     }
 
     /// Whether a window's size differs from the one it took on tinywm's last write. A size the

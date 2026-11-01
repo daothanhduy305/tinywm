@@ -373,6 +373,9 @@ public final class AXWindows: WindowSystem {
             let actual = AX.frame(ref.element)
             let took = CACurrentMediaTime() - began
             if took > 0.05 { Log.note("ax", "slow write to \(id): \(Int(took * 1000)) ms") }
+            if let actual, abs(actual.width - rect.width) > 2 || abs(actual.height - rect.height) > 2 {
+                Log.note("ax", "\(id) took \(Log.rect(actual)) when asked \(Log.rect(rect))")
+            }
             DispatchQueue.main.async { MainActor.assumeIsolated {
                     if let actual {
                         self.tracked[id]?.landed = actual

@@ -31,6 +31,7 @@ final class StubbornWindows: WindowSystem {
     var focusedWindow: String?
     var minimums: [String: Double] = [:]
     var maximums: [String: Double] = [:]
+    var minHeights: [String: Double] = [:]
     /// Report the frame from before the next write, as an app still busy with the change does.
     var staleOnce: Set<String> = []
     /// Points added to a frame that starts left of the screen, as macOS does to a window it would leave almost hidden.
@@ -41,7 +42,7 @@ final class StubbornWindows: WindowSystem {
         asked[id, default: []].append(rect.width)
         let before = frames[id]
         let grow = rect.x < 0 ? growOffLeft : 0
-        let took = Rect(x: rect.x - grow, y: rect.y, width: max(min(rect.width, maximums[id] ?? .infinity), minimums[id] ?? 0) + grow, height: rect.height)
+        let took = Rect(x: rect.x - grow, y: rect.y, width: max(min(rect.width, maximums[id] ?? .infinity), minimums[id] ?? 0) + grow, height: max(rect.height, minHeights[id] ?? 0))
         frames[id] = took
         if staleOnce.remove(id) != nil, let before { completion(before) } else { completion(took) }
     }
@@ -206,5 +207,35 @@ final class StubbornWindows: WindowSystem {
         #expect(e.peekStrip.isEmpty)
         #expect(presenter.begun.last?.moves["b"]?.from == card)
         #expect(w.frames["b"] == Rect(x: 360, y: 0, width: 840, height: 600))
+    }
+}
+
+@MainActor
+@Suite struct TallWindowTests {
+    @Test func aTallerWindowStaysInsideTheScreen() {
+        var m = StripMetrics(viewport: Rect(x: 0, y: -1050, width: 1920, height: 1050), gap: 6)
+        m.minHeights = ["a": 1050]
+        var s = Strip()
+        s.columns = [Column(id: "c", windows: ["a"], width: 1)]
+        let r = stripFrames(s, m)["a"]!
+        #expect(r.height == 1050)
+        #expect(r.y == -1050)
+        #expect(r.maxY == 0)
+    }
+
+    @Test func aRefusedHeightIsAskedAgainThenKeptOnScreen() {
+        let w = StubbornWindows()
+        w.minHeights = ["a": 600]
+        let d = StripDisplays(windows: w, configure: { _, _ in }, discard: { _ in })
+        d.settings.gap = 6
+        d.appOf = { "app.\($0)" }
+        let screen = Rect(x: 0, y: 0, width: 1200, height: 600)
+        d.update([TiledDisplay(id: "A", frame: screen, visible: screen)])
+        w.frames["a"] = Rect(x: 100, y: 100, width: 300, height: 300)
+        d.windowAdded("a", frame: w.frames["a"])
+        let a = w.frames["a"]!
+        #expect(a.height == 600)
+        #expect(a.y == 0)
+        #expect(a.maxY <= screen.maxY)
     }
 }

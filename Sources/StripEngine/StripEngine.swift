@@ -37,6 +37,10 @@ public final class StripEngine {
     /// The width each window took when its column asked for another, with the width asked.
     /// Its column takes that width until its share or the screen changes.
     private var refusals: [String: (asked: Double, took: Double)] = [:]
+    /// Heights tiled windows took, taller than asked, by window ID. Kept while the slot asks the same height.
+    private var heightRefusals: [String: (asked: Double, took: Double)] = [:]
+    /// Windows asked once more for a height they came back taller than.
+    private var heightRetried: Set<String> = []
     /// Set by a command that moves the focused window, so its picture lifts while it travels.
     private var liftNext = false
     /// Set while a tab takes another tab's place, so the change does not count as motion.
@@ -134,6 +138,11 @@ public final class StripEngine {
                 for id in column.windows {
                     guard let r = refusals[id], abs(r.asked - share) < 0.5 else { continue }
                     if r.took > r.asked { m.minimums[id] = r.took } else { m.maximums[id] = r.took }
+                }
+                let h = m.windowHeight(count: column.windows.count)
+                if column.windows.count == 1, let id = column.windows.first,
+                   let r = heightRefusals[id], abs(r.asked - h) < 0.5 {
+                    m.minHeights[id] = r.took
                 }
             }
         }
@@ -812,6 +821,11 @@ public final class StripEngine {
                 s.column(of: id).map { abs(share.columnWidth(s.columns[$0].width) - r.asked) < 0.5 } ?? false
             }
         }
+        heightRefusals = heightRefusals.filter { id, r in
+            workspaces.strips.contains { s in
+                s.column(of: id).map { s.columns[$0].windows.count == 1 && abs(share.windowHeight(count: 1) - r.asked) < 0.5 } ?? false
+            }
+        }
         var frames = stripFrames(strip, metrics, trim: !settings.peekCovers, hideaway: hideaway)
         peeks = settings.peekCovers ? blockedPeeks(strip, metrics, hideaway: hideaway) : [:]
         let unclamped = stripFrames(strip, metrics, clamp: false)
@@ -930,7 +944,7 @@ public final class StripEngine {
             Log.note("frame", "\(label) \(Log.name(id)) -> \(Log.rect(r)) at once\(parkedNow.contains(id) ? " (parked)" : "")")
             windows.setFrame(id, r) { [weak self, weak presenter] took in
                 presenter?.wrote(id)
-                self?.checkWidth(id, asked: r, took: took)
+                self?.checkFrame(id, asked: r, took: took)
             }
         }
         for (id, m) in moves {
@@ -952,7 +966,7 @@ public final class StripEngine {
                 for (id, r) in current {
                     self.windows.setFrame(id, r) { [weak self] took in
                         presenter?.landed(id, token: token)
-                        self?.checkWidth(id, asked: r, took: took)
+                        self?.checkFrame(id, asked: r, took: took)
                     }
                 }
                 presenter?.writesIssued(Set(current.keys), token: token)
@@ -962,7 +976,7 @@ public final class StripEngine {
             for (id, r) in finals {
                 windows.setFrame(id, r) { [weak self, weak presenter] took in
                     presenter?.wrote(id)
-                    self?.checkWidth(id, asked: r, took: took)
+                    self?.checkFrame(id, asked: r, took: took)
                 }
             }
         }
@@ -974,7 +988,9 @@ public final class StripEngine {
     /// finds a moment later, since an app still busy with the change can report its old size.
     /// A frame off the screen proves nothing: macOS widens a window it would leave almost hidden.
     /// Nor does a trimmed one, which the app may refuse though it takes its column's width.
-    private func checkWidth(_ id: String, asked: Rect, took: Rect?) {
+    /// Also for a slot frame written outside the engine, as a snap-back after a drag.
+    public func checkFrame(_ id: String, asked: Rect, took: Rect?) {
+        checkHeight(id, asked: asked, took: took)
         guard let took, abs(took.width - asked.width) > 2,
               asked.x >= viewport.x - 2, asked.maxX <= viewport.maxX + 2, !isTrimmed(id) else { return }
         let confirm: @MainActor () -> Void = { [weak self] in
@@ -984,6 +1000,34 @@ public final class StripEngine {
                       workspaces.strips.contains(where: { $0.column(of: id) != nil }),
                       let wanted = targetFrames[id], abs(wanted.width - asked.width) < 0.5 else { return }
                 refused(id, asked: asked.width, took: again.width)
+            }
+        }
+        if let clock { clock.after(0.3, confirm) } else { confirm() }
+    }
+
+    /// Handles a tiled window that came back taller than its slot, as Chromium-based browsers do on
+    /// some displays. It is asked once more, since an app busy with a display change can grow it back
+    /// after the write; still taller, its slot takes that height inside the screen, so it never
+    /// hangs off the bottom.
+    private func checkHeight(_ id: String, asked: Rect, took: Rect?) {
+        if let took, took.height <= asked.height + 2 { heightRetried.remove(id) }
+        guard let took, took.height > asked.height + 2, heightRefusals[id] == nil,
+              asked.y >= viewport.y - 2, asked.maxY <= viewport.maxY + 2 else { return }
+        let confirm: @MainActor () -> Void = { [weak self] in
+            guard let self else { return }
+            windows.readFrame(id) { [weak self] again in
+                guard let self, let again, again.height > asked.height + 2,
+                      let c = strip.column(of: id), strip.columns[c].windows.count == 1,
+                      let wanted = targetFrames[id], wanted.isApproximately(asked) else { return }
+                if heightRetried.insert(id).inserted {
+                    Log.note("height", "\(label) \(Log.name(id)) took \(Int(again.height)) points when asked for \(Int(asked.height)); asking again")
+                    windows.setFrame(id, asked) { [weak self] took in self?.checkHeight(id, asked: asked, took: took) }
+                    return
+                }
+                heightRetried.remove(id)
+                heightRefusals[id] = (asked.height, again.height)
+                Log.note("height", "\(label) \(Log.name(id)) keeps \(Int(again.height)) points when asked for \(Int(asked.height)); its slot keeps it on screen")
+                apply()
             }
         }
         if let clock { clock.after(0.3, confirm) } else { confirm() }

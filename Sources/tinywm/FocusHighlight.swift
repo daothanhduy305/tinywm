@@ -80,7 +80,16 @@ final class FocusHighlight {
 
         if showBorder {
             let pad = style.borderWidth + style.glowRadius
-            let outer = Screens.appKitRect(frame).insetBy(dx: -pad, dy: -pad)
+            let window = Screens.appKitRect(frame)
+            var outer = window.insetBy(dx: -pad, dy: -pad)
+            // A window that fills its screen's height leaves no room for the ring outside it. The ring
+            // then stays on screen, over the window's edge, so it still shows.
+            let center = NSPoint(x: window.midX, y: window.midY)
+            if let visible = NSScreen.screens.first(where: { $0.frame.contains(center) })?.visibleFrame {
+                outer = NSRect(x: outer.minX, y: max(outer.minY, visible.minY),
+                               width: outer.width, height: min(outer.maxY, visible.maxY) - max(outer.minY, visible.minY))
+            }
+            let over = outer.minY > window.minY - pad + 0.5 || outer.maxY < window.maxY + pad - 0.5
             border.setFrame(outer, display: false)
             CATransaction.begin()
             CATransaction.setDisableActions(true)
@@ -96,7 +105,10 @@ final class FocusHighlight {
             ring.shadowRadius = style.glowRadius
             ring.shadowOffset = .zero
             CATransaction.commit()
-            border.order(.below, relativeTo: target)
+            // Over its window, a click that raises the window would hide the ring again, so it goes one level up.
+            // ponytail: it then also shows over other windows covering that screen edge; reorder on clicks if that bites.
+            border.level = over ? .floating : .normal
+            border.order(over ? .above : .below, relativeTo: target)
         } else {
             border.orderOut(nil)
         }

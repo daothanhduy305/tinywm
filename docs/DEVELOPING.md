@@ -470,3 +470,8 @@ because its app has a minimum or maximum width, the column takes the window's wi
 (`refused` in `StripEngine`, after a second read 0.3 s later). Nothing is saved per app; the fit
 lasts until the column's share or the screen changes, and then the window is asked again.
 Windows off the screen or trimmed beside another display never change their column's width.
+
+Heights work the same way for a window alone in its column. Some apps, such as Chromium-based
+browsers on some displays, come back taller than asked. tinywm asks once more, then keeps the
+taller height and moves the window up so it stays on screen, giving up the gaps
+(`checkHeight` in `StripEngine`). Snap-backs after a drag are checked too.
