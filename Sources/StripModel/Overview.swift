@@ -348,11 +348,13 @@ public func overviewEntry(_ layout: OverviewLayout, from id: String, _ d: Direct
 }
 
 /// The window after (positive) or before (negative) `id` in reading order: rows top to bottom,
-/// columns left to right, stacks top to bottom. With `matching`, only those windows count.
+/// columns left to right, stacks top to bottom, wrapping round at either end.
+/// With `matching`, only those windows count.
 public func overviewStep(_ layout: OverviewLayout, from id: String, by delta: Int, matching: Set<String>? = nil) -> String? {
     let all = layout.windows.map(\.id).filter { $0 == id || matching?.contains($0) ?? true }
-    guard let i = all.firstIndex(of: id), all.indices.contains(i + delta) else { return nil }
-    return all[i + delta]
+    // Past either end, wrap round to the other.
+    guard let i = all.firstIndex(of: id), all.count > 1 else { return nil }
+    return all[((i + delta) % all.count + all.count) % all.count]
 }
 
 private func nearest(_ windows: [OverviewWindow], by distance: (OverviewWindow) -> Double) -> String? {

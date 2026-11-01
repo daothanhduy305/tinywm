@@ -178,7 +178,8 @@ private func sample(active: Int = 1) -> Workspaces {
     @Test func stepFollowsReadingOrder() {
         #expect(overviewStep(layout, from: "a", by: 1) == "b")
         #expect(overviewStep(layout, from: "c", by: 1) == "d")
-        #expect(overviewStep(layout, from: "a", by: -1) == nil)
+        #expect(overviewStep(layout, from: "a", by: -1) == "d")
+        #expect(overviewStep(layout, from: "d", by: 1) == "a")
     }
 
     @Test func arrowsSkipWindowsTheSearchDoesNotMatch() {
@@ -201,7 +202,8 @@ private func sample(active: Int = 1) -> Workspaces {
     @Test func stepSkipsWindowsTheSearchDoesNotMatch() {
         #expect(overviewStep(layout, from: "a", by: 1, matching: ["d"]) == "d")
         #expect(overviewStep(layout, from: "d", by: -1, matching: ["a", "d"]) == "a")
-        #expect(overviewStep(layout, from: "d", by: 1, matching: ["a"]) == nil)
+        #expect(overviewStep(layout, from: "d", by: 1, matching: ["a"]) == "a")
+        #expect(overviewStep(layout, from: "d", by: 1, matching: []) == nil)
     }
 
     @Test func hitTestFindsTheWindowUnderThePoint() {

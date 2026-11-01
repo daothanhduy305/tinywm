@@ -75,8 +75,8 @@ while Accessibility is missing. Trackpad clashes are on the Gestures page.
 
 ## Preferences
 
-Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures, Rules and About. Changes write to the config file and apply at once. Your comments and
+Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Overview,
+Key bindings, Gestures, Rules and About. Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
 You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
@@ -100,7 +100,7 @@ Hold **right ⌘** (the "meta" key) and press:
 | T | Float or tile the window · ⇧T sets half width |
 | V | Focus the floating windows, then the strip again |
 | 1 – 9 | Jump to a column |
-| Esc | Overview: type to search, pick a window with the arrows or Tab (the arrows cross to the next display at an edge), then Return; Esc clears the search, then closes it |
+| Esc | Overview: type to search, pick a window with the arrows or Tab (Tab wraps round at the end; the arrows cross to the next display at an edge), then Return; Esc clears the search, then closes it |
 | Q | Close the window |
 
 **Drag with the mouse.** Hold the meta key and drag any window, anywhere inside it. The other

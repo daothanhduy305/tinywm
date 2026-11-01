@@ -116,8 +116,8 @@ route and needs a paid Apple Developer ID.
 
 ## Preferences
 
-Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Key bindings,
-Gestures, Rules and About. About shows the version, the permissions and the macOS settings that get in the way. Changes write to the config file and apply at once. Your comments and
+Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Overview,
+Key bindings, Gestures, Rules and About. About shows the version, the permissions and the macOS settings that get in the way. Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
 You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.

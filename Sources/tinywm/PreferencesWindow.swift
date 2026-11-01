@@ -125,11 +125,12 @@ final class PreferencesWindow {
 }
 
 enum PreferencesPage: String, CaseIterable, Identifiable {
-    case general = "General", keys = "Key bindings", gestures = "Gestures", rules = "Rules", about = "About"
+    case general = "General", overview = "Overview", keys = "Key bindings", gestures = "Gestures", rules = "Rules", about = "About"
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .overview: "square.grid.2x2"
         case .keys: "keyboard"
         case .gestures: "hand.draw"
         case .rules: "macwindow.on.rectangle"
@@ -139,6 +140,7 @@ enum PreferencesPage: String, CaseIterable, Identifiable {
     var color: Color {
         switch self {
         case .general: .gray
+        case .overview: .green
         case .keys: .blue
         case .gestures: .purple
         case .rules: .orange
@@ -169,6 +171,7 @@ struct PreferencesView: View {
             Group {
                 switch model.page ?? .general {
                 case .general: general
+                case .overview: overview
                 case .keys: PreferencesKeys(model: model)
                 case .gestures: gestures
                 case .rules: PreferencesRules(model: model)
@@ -223,6 +226,18 @@ struct PreferencesView: View {
                 PreferencesBorderColor(model: model)
                 toggle("Center active window", "center-focus", \.centerFocus, "Scrolling to a window centres it, as far as the strip's ends allow.")
                 toggle("Continue to the next display", "focus-crosses-displays", \.focusCrossesDisplays, "Focus and move keys go past the strip's last column onto the display beside it.")
+            }
+            Section {
+                PreferencesLivePictures(changed: model.livePictures)
+                PreferencesLogin()
+            }
+        }.formStyle(.grouped)
+    }
+
+    private var overview: some View {
+        Form {
+            PreferencesIssues(model: model)
+            Section {
                 toggle("Show overview with ⌘ + Tab", "overview-as-mission-control", \.overviewOnCommandTab, "Replaces the macOS app switcher.")
                 toggle("Switch when ⌘ is released", "overview-switch-on-release", \.overviewSwitchOnRelease, "Opens on the previous window. On: releasing ⌘ switches to it, like the macOS app switcher. Off: the overview stays open; Return or ⌘Tab again picks.")
                     .disabled(!model.config.overviewOnCommandTab)
@@ -234,10 +249,6 @@ struct PreferencesView: View {
                     }
                     Text("Where the overview lines up floating windows, or Off to leave them out.").font(.caption).foregroundStyle(.secondary)
                 }
-            }
-            Section {
-                PreferencesLivePictures(changed: model.livePictures)
-                PreferencesLogin()
             }
         }.formStyle(.grouped)
     }
