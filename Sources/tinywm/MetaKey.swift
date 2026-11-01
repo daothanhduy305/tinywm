@@ -168,7 +168,8 @@ final class MetaKey {
             return true
         case .keyDown, .keyUp:
             if type == .keyDown { lastKeyDown = (e.keyCode, Date()) }
-            guard mode == .rightCommand, rightCommandDown else { return false }
+            // Preferences is recording a key: let meta + key reach its window.
+            guard mode == .rightCommand, rightCommandDown, !ShortcutRegistry.shared.recording else { return false }
             if type == .keyDown {
                 let flags = CGEventFlags(rawValue: e.flags)
                 if let action = bindings.action(keyCode: e.keyCode, shift: flags.contains(.maskShift),

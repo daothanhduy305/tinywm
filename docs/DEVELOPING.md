@@ -119,6 +119,8 @@ route and needs a paid Apple Developer ID.
 Choose **Preferences…** (⌘,) in the menu-bar menu. The sidebar has General, Overview,
 Key bindings, Gestures, Rules and About. About shows the version, the permissions and the macOS settings that get in the way. Changes write to the config file and apply at once. Your comments and
 other lines stay. Hand edits also appear in Preferences. Reset a binding to restore its default.
+To change a binding, click it and press the key, with or without the meta key. The button
+lights up while it waits. Esc cancels and Delete unbinds.
 You can also edit `~/.config/tinywm/config` yourself.
 Launch at login uses the macOS login item.
 tinywm's own windows (Preferences) float and appear on the overview's shelf.

@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 import StripEngine
+import WindowCore
+import WindowKit
 
 struct PreferencesKeys: View {
     let model: PreferencesModel
@@ -100,34 +102,69 @@ struct PreferencesRecorder: View {
     let meta: MetaModifier
     let recorded: (MetaKeyBindings.Chord?) -> Void
     @State private var monitor: Any?
+    @State private var window: NSWindow?
+    @State private var saved = false
+    @State private var id = UUID()
 
     var body: some View {
-        Button(monitor == nil ? keyLabel(chord, meta: meta) : "Type keys (meta is added)…") {
-            NotificationCenter.default.post(name: Self.startedRecording, object: nil)
-            stop()
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-                MainActor.assumeIsolated {
-                    if event.keyCode == 53 { stop(); return }
-                    if event.keyCode == 51 || event.keyCode == 117 { stop(); recorded(nil); return }
-                    guard KeyNames.name(of: Int(event.keyCode)) != nil else { return }
-                    let flags = event.modifierFlags
-                    let chord = MetaKeyBindings.Chord(keyCode: Int(event.keyCode), shift: flags.contains(.shift),
-                        option: flags.contains(meta == .rightCommand ? .option : .command),
-                        control: meta == .rightCommand && flags.contains(.control))
-                    stop(); recorded(chord)
-                }
-                return nil
-            }
+        Button {
+            stop("restart")
+            start()
+            // Other recorders stop; this one ignores its own note, which may arrive after start.
+            NotificationCenter.default.post(name: Self.startedRecording, object: id)
+        } label: {
+            Text(monitor == nil ? keyLabel(chord, meta: meta) : "Press a key…")
+                .foregroundStyle(saved ? Color.accentColor : .primary)
+                .frame(minWidth: 70)
         }
-        .help("Type the keys (meta is added for you). Esc cancels. Delete unbinds.")
-        .onReceive(NotificationCenter.default.publisher(for: Self.startedRecording)) { _ in stop() }
-        .onDisappear { stop() }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in stop() }
+        // One button whose look changes; swapping button styles would replace the view and end recording.
+        .buttonStyle(.bordered)
+        .tint(monitor == nil ? nil : Color.accentColor)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor, lineWidth: monitor == nil ? 0 : 2))
+        .help("Click, then press the key, with or without the meta key. Esc cancels. Delete unbinds.")
+        .onReceive(NotificationCenter.default.publisher(for: Self.startedRecording)) { note in
+            if note.object as? UUID != id { stop("another recorder") }
+        }
+        .onDisappear { stop("disappear") }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { note in
+            // Only our own window losing focus ends recording; tinywm's other windows come and go.
+            if let window, note.object as? NSWindow === window { stop("window resigned key") }
+        }
     }
 
     private static let startedRecording = Notification.Name("tinywm.preferences.recordKey")
 
-    private func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
+    private func start() {
+        window = NSApp.keyWindow
+        Log.note("prefs", "recorder start, key window \(window?.title ?? "none")")
+        ShortcutRegistry.shared.recording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            MainActor.assumeIsolated {
+                if event.keyCode == 53 { stop("esc"); return }
+                if event.keyCode == 51 || event.keyCode == 117 { stop("delete"); recorded(nil); flash(); return }
+                guard KeyNames.name(of: Int(event.keyCode)) != nil else { NSSound.beep(); return }
+                let flags = event.modifierFlags
+                let chord = MetaKeyBindings.Chord(keyCode: Int(event.keyCode), shift: flags.contains(.shift),
+                    option: flags.contains(meta == .rightCommand ? .option : .command),
+                    control: meta == .rightCommand && flags.contains(.control))
+                stop("recorded"); recorded(chord); flash()
+            }
+            return nil
+        }
+    }
+
+    private func flash() {
+        saved = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { saved = false }
+    }
+
+    private func stop(_ reason: String) {
+        if let monitor {
+            NSEvent.removeMonitor(monitor); ShortcutRegistry.shared.recording = false
+            Log.note("prefs", "recorder stop: \(reason)")
+        }
+        monitor = nil
+    }
 }
 
 private struct PreferencesCommand: View {

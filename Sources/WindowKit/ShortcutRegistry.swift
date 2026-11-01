@@ -21,6 +21,8 @@ public final class ShortcutRegistry {
     private var hotkeys: Hotkeys?
     private var boundIDs: [UInt32] = []
     private var suspended = false
+    /// True while Preferences records a key: the hotkeys are off so the keys reach its window.
+    public var recording = false { didSet { if recording != oldValue { rebind() } } }
     public var listeners: [() -> Void] = []
 
     private init() {}
@@ -91,7 +93,7 @@ public final class ShortcutRegistry {
         guard let hotkeys else { return }
         for id in boundIDs { hotkeys.unregister(id) }
         boundIDs = []
-        guard !suspended else { return }
+        guard !suspended, !recording else { return }
         for e in entries {
             guard let s = e.defaultShortcut,
                   let id = hotkeys.register(key: s.keyCode, modifiers: s.modifiers, e.handler) else { continue }
