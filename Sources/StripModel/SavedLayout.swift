@@ -68,9 +68,11 @@ public struct SavedLayout: Codable, Equatable, Sendable {
     /// Each display setup's layout, by its sorted display UUIDs joined with commas. Nil in files
     /// from before setups were kept.
     public var setups: [String: [String: SavedWorkspaces]]?
+    public var focusHistory: [WindowDescriptor]?
 
-    public init(displays: [String: SavedWorkspaces] = [:], setups: [String: [String: SavedWorkspaces]]? = nil) {
-        self.displays = displays; self.setups = setups
+    public init(displays: [String: SavedWorkspaces] = [:], setups: [String: [String: SavedWorkspaces]]? = nil,
+                focusHistory: [WindowDescriptor]? = nil) {
+        self.displays = displays; self.setups = setups; self.focusHistory = focusHistory
     }
 
     /// Replaces the given displays and setups and keeps the rest, so a display that is unplugged

@@ -29,6 +29,8 @@ public struct StripConfig: Equatable, Sendable {
     public var centerFocus = false
     /// Whether ⌘Tab opens the overview instead of the macOS app switcher.
     public var overviewOnCommandTab = false
+    public var overviewSwitchOnRelease = true
+    public var overviewOnControlUp = false
     /// Where the overview shows floating windows.
     public var overviewFloating = OverviewFloating.vertical
     /// Bound actions only; an unbound action has no entry.
@@ -260,6 +262,10 @@ public struct StripConfig: Equatable, Sendable {
             config.centerFocus = try onOff(value, for: name)
         case "overview-as-mission-control":
             config.overviewOnCommandTab = try onOff(value, for: name)
+        case "overview-switch-on-release":
+            config.overviewSwitchOnRelease = try onOff(value, for: name)
+        case "overview-on-control-up":
+            config.overviewOnControlUp = try onOff(value, for: name)
         case "overview-floating":
             guard let f = OverviewFloating(rawValue: value.lowercased()) else {
                 throw Failure(message: "overview-floating must be vertical, horizontal or off, not '\(value)'")
@@ -383,6 +389,8 @@ public struct StripConfig: Equatable, Sendable {
             "focus-crosses-displays = off",
             "center-focus = off",
             "overview-as-mission-control = off",
+            "overview-switch-on-release = on",
+            "overview-on-control-up = off",
             "overview-floating = \(d.overviewFloating.rawValue) # vertical, horizontal or off: where the overview shelves floating windows",
         ]
     }

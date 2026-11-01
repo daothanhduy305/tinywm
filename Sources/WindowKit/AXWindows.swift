@@ -300,7 +300,7 @@ public final class AXWindows: WindowSystem {
                 self.tracked[id]?.title = reading.title
                 self.tracked[id]?.isFullScreen = seen.isFullScreen
                 if let frame = reading.frame { self.tracked[id]?.frame = frame }
-                if reading.isFocused, self.isCurrent(revision, pid: pid) { self.knownFocus = id }
+                if reading.isFocused, self.isCurrent(revision, pid: pid) { self.recordFocus(id) }
                 completion(reading)
             } }
         }
@@ -314,6 +314,7 @@ public final class AXWindows: WindowSystem {
         heldNudges.remove(id)
         if let ref = tracked.removeValue(forKey: id)?.ref { ids[ref] = nil }
         if knownFocus == id { knownFocus = nil }
+        focusHistory.removeAll { $0 == id }
     }
 
     public func element(of id: String) -> AXUIElement? { tracked[id]?.ref.element }
@@ -470,6 +471,12 @@ public final class AXWindows: WindowSystem {
     }
 
     public private(set) var knownFocus: String?
+    private static let focusHistoryLimit = 20
+    public private(set) var focusHistory: [String] = [] {
+        didSet { if focusHistory != oldValue { onFocusHistoryChanged() } }
+    }
+    public var previousFocus: String? { focusHistory.first { $0 != knownFocus && tracked[$0] != nil } }
+    public var onFocusHistoryChanged: () -> Void = {}
     /// Changes with each focus change the system reports and each focus tinywm asks for. A read
     /// that began before a change answers for a focus that is no longer current.
     public private(set) var focusRevision = 0
@@ -479,8 +486,21 @@ public final class AXWindows: WindowSystem {
 
     /// Records a focus change the system reported.
     public func noteFocused(_ id: String?) {
-        knownFocus = id
+        recordFocus(id)
         focusRevision += 1
+    }
+
+    private func recordFocus(_ id: String?) {
+        guard let id else { return }
+        if focusHistory.first != id {
+            focusHistory = Array(([id] + focusHistory.filter { $0 != id }).prefix(Self.focusHistoryLimit))
+        }
+        knownFocus = id
+    }
+
+    public func restoreFocusHistory(_ history: [String]) {
+        focusHistory = Array(history.prefix(Self.focusHistoryLimit))
+        recordFocus(knownFocus)
     }
 
     /// Records a focus change to a window tinywm does not manage, such as a dialog.
@@ -517,7 +537,7 @@ public final class AXWindows: WindowSystem {
             DispatchQueue.main.async { MainActor.assumeIsolated {
                 let read = FocusRead(window: window, title: title, id: window.flatMap { self.knownID(for: $0.element) },
                                      isCurrent: self.isCurrent(revision, pid: pid))
-                if read.isCurrent, let id = read.id { self.knownFocus = id }
+                if read.isCurrent, let id = read.id { self.recordFocus(id) }
                 completion(read)
             } }
         }

@@ -179,6 +179,20 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
         #expect(try JSONDecoder().decode(WindowDescriptor.self, from: Data(old.utf8)).name == nil)
     }
 
+    @Test func focusHistoryFollowsSavedSlotsAndDropsMissingWindowsAfterRoundTrip() throws {
+        var file = layout(["A": saved([[desc(1, title: "current")]]),
+                           "B": saved([[desc(2, title: "previous")], [desc(3, "app.b", "older")]])])
+        file.focusHistory = [desc(1, title: "current"), desc(2, title: "previous"), desc(3, "app.b", "older")]
+        let restored = try #require(SavedLayout.decoded(from: file.encoded()))
+        let windows = [live("new-current", desc(10, title: "current")),
+                       live("new-previous", desc(20, title: "previous")),
+                       live("new-older", desc(30, "app.b", "older"))]
+        #expect(restored.plan(displays: ["A", "B"], windows: windows).focusHistory == ["new-current", "new-previous", "new-older"])
+        #expect(restored.plan(displays: ["A", "B"], windows: [windows[0], windows[2]]).focusHistory == ["new-current", "new-older"])
+        let old = try #require(SavedLayout.decoded(from: Data(#"{"version":1,"displays":{}}"#.utf8)))
+        #expect(old.focusHistory == nil)
+    }
+
     @Test func unmatchedSlotsAreDroppedAndNewWindowsAreLeftToAppend() {
         let file = layout(["A": saved([[desc(1)], [desc(2)], [desc(3)]], focusedColumn: 2)])
         let plan = file.plan(displays: ["A"], windows: [live("n1", desc(50, "app.z")), live("a", desc(1)), live("n2", desc(51, "app.z")), live("c", desc(3))])

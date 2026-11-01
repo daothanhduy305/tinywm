@@ -48,6 +48,7 @@ final class LayoutPersistence {
         self.windows = windows
         self.displays = displays
         self.url = url
+        windows.onFocusHistoryChanged = { [weak self] in self?.changed() }
     }
 
     // MARK: Restore
@@ -97,7 +98,10 @@ final class LayoutPersistence {
         if let saved = load() {
             // The layout made for this display setup, else each display's last layout.
             let key = displays.setupKey
-            names = displays.restore(saved.setups?[key].map { SavedLayout(displays: $0) } ?? saved, pending: pending)
+            var current = saved
+            current.displays = saved.setups?[key] ?? saved.displays
+            let restored = displays.restore(current, pending: pending)
+            names = restored.names
             // Other setups get their windows now, while every window found at startup is known.
             let live = pending.map(\.live), floating = Set(pending.filter(\.floating).map(\.live.id))
             for (k, s) in saved.setups ?? [:] where k != key {
@@ -105,6 +109,7 @@ final class LayoutPersistence {
                 displays.seed(k, plan.workspaces)
                 names.merge(plan.names) { kept, _ in kept }
             }
+            windows.restoreFocusHistory(saved.plan(displays: saved.displays.keys.sorted(), windows: live).focusHistory)
         } else {
             for p in pending { displays.windowAdded(p.live.id, frame: p.frame, floating: p.floating, takesFocus: p.takesFocus) }
         }
@@ -152,11 +157,13 @@ final class LayoutPersistence {
         var setups = displays.setups.mapValues { $0.mapValues { SavedWorkspaces($0, describe: describe) } }
         setups[displays.setupKey] = current
         let url = url, snapshot = current, kept = setups
-        let write: @Sendable () -> Void = { Self.write(snapshot, setups: kept, to: url) }
+        let focusHistory = windows.focusHistory.compactMap(describe)
+        let write: @Sendable () -> Void = { Self.write(snapshot, setups: kept, focusHistory: focusHistory, to: url) }
         if wait { io.sync(execute: write) } else { io.async(execute: write) }
     }
 
-    private nonisolated static func write(_ current: [String: SavedWorkspaces], setups: [String: [String: SavedWorkspaces]], to url: URL) {
+    private nonisolated static func write(_ current: [String: SavedWorkspaces], setups: [String: [String: SavedWorkspaces]],
+                                         focusHistory: [WindowDescriptor], to url: URL) {
         var saved: SavedLayout?
         do {
             saved = SavedLayout.decoded(from: try Data(contentsOf: url))
@@ -166,7 +173,9 @@ final class LayoutPersistence {
             Log.note("restore", "could not read \(url.path) before saving, so its other displays are lost: \(error)")
         }
         do {
-            let data = try (saved ?? SavedLayout()).merged(with: current, setups: setups).encoded()
+            var merged = (saved ?? SavedLayout()).merged(with: current, setups: setups)
+            merged.focusHistory = focusHistory
+            let data = try merged.encoded()
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
         } catch {

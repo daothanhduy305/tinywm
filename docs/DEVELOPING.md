@@ -150,6 +150,8 @@ pinch-overview = on # pinch opens the overview; spread closes it
 pinch-fingers = 5   # 4 or 5, thumb included
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
+overview-switch-on-release = on  # off: ⌘Tab again confirms instead of releasing ⌘
+overview-on-control-up = off     # on: ⌃↑ opens the overview instead of Mission Control
 overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
@@ -300,9 +302,16 @@ choose Rename…, or press Meta + R, to name the selected window. `bind overview
 moves that key; it works only in the overview, so it can share a key with any other action, and
 `unbind overview-rename` leaves only the menu. Return saves, Esc cancels, and an empty name brings the title back. The
 label then reads `Name (App)`, the minimap shows the name, and the search matches the name, the app
-and the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`,
-⌘Tab with either ⌘ key opens the overview like Meta + Esc, and the macOS app switcher no longer
-shows; ⌘Tab again confirms.
+and the title. Picking a window does not show the minimap. With `overview-as-mission-control = on`
+and `overview-switch-on-release = on` (the default), ⌘Tab opens with the previously focused window
+selected. Its display takes the keys.
+Hold ⌘ and press Tab or ⇧Tab to cycle. Release ⌘ to confirm, or press Esc to cancel.
+A quick tap switches to the previous window, even if its pictures are still loading.
+Closed windows are skipped, so ⌘Tab falls back through the focus history.
+With `overview-switch-on-release = off`, ⌘Tab opens on the current window and ⌘Tab again confirms.
+Holding Tab does not repeat. Releasing ⌘ does nothing, and ⇧⌘Tab keeps its normal behavior.
+The right ⌘ key keeps its Meta bindings in right ⌘ mode. Meta + Esc still opens on the current window.
+With `overview-on-control-up = on`, ⌃↑ opens on the current window and ⌃↑ again confirms.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
 right after tinywm focuses one. Within a second and with no click or key press since, tinywm
@@ -410,6 +419,7 @@ Window IDs like `w3` change every run, so each window is stored as a descriptor:
 bundle ID, title, pid and the name given in the overview, if any. A name comes back with the window
 its slot is matched to. After tinywm restarts the CGWindowID always finds it. After the app
 relaunches the match goes by title, so a name can be lost, or land on a similar window of the same app.
+The last 20 focused windows are saved the same way, so ⌘Tab keeps its history after a restart.
 
 At startup `LayoutPersistence` holds the windows the first scan finds. After a short settle
 time, `SavedLayout.plan` matches them to saved slots, each slot used once: first CGWindowID with

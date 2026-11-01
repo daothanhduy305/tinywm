@@ -100,6 +100,7 @@ public struct LayoutPlan: Equatable, Sendable {
     public var unplaced: [String] = []
     /// The names given to placed windows, by window id.
     public var names: [String: String] = [:]
+    public var focusHistory: [String] = []
 }
 
 extension SavedLayout {
@@ -134,6 +135,10 @@ extension SavedLayout {
         var plan = LayoutPlan()
         let named = Dictionary(slots.compactMap { s, d in d.name.map { (s, $0) } }, uniquingKeysWith: { a, _ in a })
         for (id, slot) in assigned { plan.names[id] = named[slot] }
+        plan.focusHistory = (focusHistory ?? []).compactMap { descriptor in
+            guard let slot = slots.first(where: { $0.1 == descriptor })?.0 else { return nil }
+            return assigned.first(where: { $0.value == slot })?.key
+        }
         plan.unplaced = windows.map(\.id).filter { assigned[$0] == nil }
         var serial = 0
         for d in displays {

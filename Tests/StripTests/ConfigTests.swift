@@ -149,6 +149,20 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("overview-as-mission-control = maybe").issues.count == 1)
     }
 
+    @Test func overviewSwitchOnReleaseDefaultsOnAndParses() {
+        #expect(StripConfig().overviewSwitchOnRelease)
+        #expect(StripConfig.parse("overview-switch-on-release = on").config.overviewSwitchOnRelease)
+        #expect(!StripConfig.parse("overview-switch-on-release = off").config.overviewSwitchOnRelease)
+        #expect(StripConfig.parse("overview-switch-on-release = maybe").issues.count == 1)
+    }
+
+    @Test func overviewOnControlUpDefaultsOffAndParses() {
+        #expect(!StripConfig().overviewOnControlUp)
+        #expect(StripConfig.parse("overview-on-control-up = on").config.overviewOnControlUp)
+        #expect(!StripConfig.parse("overview-on-control-up = off").config.overviewOnControlUp)
+        #expect(StripConfig.parse("overview-on-control-up = maybe").issues.count == 1)
+    }
+
     @Test func overviewFloatingDefaultsToVerticalAndParses() {
         #expect(StripConfig().overviewFloating == .vertical)
         #expect(StripConfig.parse("overview-floating = horizontal").config.overviewFloating == .horizontal)

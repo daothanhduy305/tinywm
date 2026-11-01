@@ -25,6 +25,11 @@ final class MetaKey {
     private(set) var lastKeyDown: (code: Int, at: Date)?
     /// ⌘Tab opens the overview instead of the macOS app switcher.
     var commandTab = false
+    var switchOnRelease = true
+    var controlUp = false
+    var commandTabPressed: (_ shift: Bool) -> Void = { _ in }
+    var commandTabReleased: () -> Void = {}
+    private var switching = false
     /// Moves windows dragged with the meta key held.
     weak var dragger: WindowDragger?
     /// Whether a meta press may start a drag now, e.g. not while the overview is open.
@@ -88,7 +93,7 @@ final class MetaKey {
     }
 
     /// The parts of an event tinywm reads, copied out on the tap's thread.
-    fileprivate struct KeyEvent: Sendable {
+    struct KeyEvent: Sendable {
         let type: CGEventType
         let keyCode: Int
         let isRepeat: Bool
@@ -99,14 +104,16 @@ final class MetaKey {
 
     private static let escape = 53
     private static let tab = 48
+    private static let up = 126
 
-    private static func onlyCommand(_ raw: UInt64) -> Bool {
+    private func commandTabModifiers(_ raw: UInt64) -> Bool {
         let flags = CGEventFlags(rawValue: raw)
-        return flags.contains(.maskCommand) && flags.isDisjoint(with: [.maskShift, .maskAlternate, .maskControl])
+        return flags.contains(.maskCommand) && flags.isDisjoint(with: [.maskAlternate, .maskControl])
+            && (switchOnRelease || !flags.contains(.maskShift))
     }
 
     /// Returns true when the event belongs to tinywm and must not reach apps.
-    fileprivate func handle(_ e: KeyEvent) -> Bool {
+    func handle(_ e: KeyEvent) -> Bool {
         let type = e.type
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
@@ -115,16 +122,28 @@ final class MetaKey {
             return false
         case .flagsChanged:
             rightCommandDown = e.flags & Self.rightCommandBit != 0
+            if switching, !CGEventFlags(rawValue: e.flags).contains(.maskCommand) {
+                switching = false
+                if switchOnRelease { commandTabReleased() }
+            }
             return false
         case .leftMouseDown, .leftMouseDragged, .leftMouseUp:
             return mouse(e)
         case .keyDown where e.keyCode == Self.escape && dragger?.isActive == true:
             dragger?.cancel()
             return true
-        case .keyDown where commandTab && e.keyCode == Self.tab && Self.onlyCommand(e.flags)
-            && !(mode == .rightCommand && rightCommandDown):
+        case .keyDown where controlUp && e.keyCode == Self.up
+            && CGEventFlags(rawValue: e.flags).intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]) == .maskControl:
             lastKeyDown = (e.keyCode, Date())
             if !e.isRepeat { run("overview") }
+            return true
+        case .keyDown where commandTab && e.keyCode == Self.tab && commandTabModifiers(e.flags)
+            && !(mode == .rightCommand && rightCommandDown):
+            lastKeyDown = (e.keyCode, Date())
+            if switchOnRelease || !e.isRepeat {
+                switching = switchOnRelease
+                commandTabPressed(CGEventFlags(rawValue: e.flags).contains(.maskShift))
+            }
             return true
         case .keyDown, .keyUp:
             if type == .keyDown { lastKeyDown = (e.keyCode, Date()) }

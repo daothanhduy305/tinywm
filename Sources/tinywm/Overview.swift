@@ -171,7 +171,12 @@ final class Overview {
         view.onKey = { [weak self] in self?.handle($0) }
         // The rename key would otherwise type into the search bar when no shortcut takes it first.
         panel.onKeyDown = { [weak self] e in
-            guard let self, keys.isRename(keyCode: Int(e.keyCode), flags: UInt64(e.modifierFlags.rawValue)) else { return false }
+            guard let self else { return false }
+            if e.keyCode == 53, e.modifierFlags.contains(.command) {
+                handle(.cancel)
+                return true
+            }
+            guard keys.isRename(keyCode: Int(e.keyCode), flags: UInt64(e.modifierFlags.rawValue)) else { return false }
             handle(.rename)
             return true
         }
@@ -232,9 +237,9 @@ final class Overview {
 
     // MARK: Opening
 
-    /// Opens on `engine`'s display with its focused window selected. Only the active one takes
+    /// Opens on `engine`'s display with the chosen or focused window selected. Only the active one takes
     /// keys. False when there is nothing to show.
-    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:]) -> Bool {
+    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:], select: String? = nil) -> Bool {
         // Also while closing, so the hotkey works again at once.
         guard phase != .open, pictures.available, let screen else { return false }
         let ws = engine.workspaces
@@ -251,7 +256,7 @@ final class Overview {
         viewport = engine.viewport
         metrics = m
         previous = windows.focusedWindow
-        let focus = ws.current.focusedWindow.flatMap { probe.window($0) != nil ? $0 : nil } ?? first
+        let focus = (select ?? ws.current.focusedWindow).flatMap { probe.window($0) != nil ? $0 : nil } ?? first
         selected = focus
         home = focus
         pan = focus.map { probe.pan(toReveal: $0, current: 0) } ?? 0
@@ -822,6 +827,7 @@ final class Overviews {
     private var query = ""
     /// True while waiting for new pictures before opening.
     private var waiting = false
+    private var confirmWhenShown = false
     private final class DragState {
         let source: Overview
         let id: String
@@ -843,6 +849,7 @@ final class Overviews {
     private var committing = false
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
+    var isBusy: Bool { isOpen || waiting }
 
     init(pictures: WindowPictures, windows: AXWindows, hud: SizeHUD) {
         self.pictures = pictures
@@ -851,13 +858,14 @@ final class Overviews {
     }
 
     /// Opens on every display, or closes onto the active display's highlighted window.
-    func toggle(_ engine: StripEngine, displays: StripDisplays) {
+    func toggle(_ engine: StripEngine, displays: StripDisplays, select: String? = nil) {
         // Overviews still zooming closed open again.
         if byDisplay.values.contains(where: \.isShowing) {
             active?.handle(.confirm)
             return
         }
         guard !waiting else { return }
+        confirmWhenShown = false
         // Pictures of on-screen windows open right over the windows, so an old one would show
         // and then jump. Wait briefly for new ones first.
         var onScreen: Set<String> = []
@@ -872,11 +880,12 @@ final class Overviews {
         pictures.snapshots.freshen(onScreen) { [weak self] in
             guard let self else { return }
             waiting = false
-            show(engine, displays: displays)
+            show(engine, displays: displays, select: select)
         }
     }
 
-    private func show(_ engine: StripEngine, displays: StripDisplays) {
+    private func show(_ engine: StripEngine, displays: StripDisplays, select: String?) {
+        defer { confirmWhenShown = false }
         let start = CACurrentMediaTime()
         self.displays = displays
         query = ""
@@ -893,8 +902,9 @@ final class Overviews {
             o.floating = floating
             o.keys = keys
             let here = full.filter { displays.engine(owning: $0.value) === e }
-            guard o.open(e, on: Screens.screen(id: id), active: false, fullScreen: here) else { continue }
-            if active == nil, !o.ids.isEmpty { active = o }
+            guard o.open(e, on: Screens.screen(id: id), active: false, fullScreen: here, select: select) else { continue }
+            if let select, o.layout?.window(select) != nil { active = o }
+            else if active == nil, !o.ids.isEmpty { active = o }
             opened.append(o)
         }
         guard !opened.isEmpty else { return }
@@ -902,6 +912,12 @@ final class Overviews {
         active?.takeKeys()
         Log.note("overview", "opened on \(opened.count) displays in \(Int((CACurrentMediaTime() - start) * 1000)) ms")
         pictures.snapshots.beginLive(opened.reduce(into: Set()) { $0.formUnion($1.ids) }, rate: opened[0].rate)
+        if confirmWhenShown { active?.handle(.confirm) }
+    }
+
+    func release() {
+        if waiting { confirmWhenShown = true }
+        else { active?.handle(.confirm) }
     }
 
     func handle(_ command: OverviewCommand) {

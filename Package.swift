@@ -18,5 +18,6 @@ let package = Package(
         .executableTarget(name: "tinywm", dependencies: ["StripEngine", "StripModel", "WindowCore", "WindowKit"]),
         .testTarget(name: "StripTests", dependencies: ["StripModel", "StripEngine", "WindowCore"]),
         .testTarget(name: "WindowCoreTests", dependencies: ["WindowCore"]),
+        .testTarget(name: "TinyWMTests", dependencies: ["tinywm", "WindowKit", "WindowCore"]),
     ]
 )

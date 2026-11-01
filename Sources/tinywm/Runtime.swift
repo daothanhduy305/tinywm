@@ -161,6 +161,16 @@ final class Runtime {
         metaKey.canDrag = { [unowned self] in !overview.isOpen }
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab
+        metaKey.switchOnRelease = config.overviewSwitchOnRelease
+        metaKey.controlUp = config.overviewOnControlUp
+        metaKey.commandTabPressed = { [unowned self] shift in
+            if config.overviewSwitchOnRelease, overview.isBusy {
+                overview.handle(shift ? .previous : .next)
+            } else if !dragger.isActive, let engine = displays.active(pointer: Screens.pointer()) {
+                overview.toggle(engine, displays: displays, select: config.overviewSwitchOnRelease ? windows.previousFocus : nil)
+            }
+        }
+        metaKey.commandTabReleased = { [unowned self] in overview.release() }
         overview.floating = config.overviewFloating
         metaKey.start()
         startSwipes()
@@ -203,6 +213,8 @@ final class Runtime {
         commands.reload()
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab
+        metaKey.switchOnRelease = config.overviewSwitchOnRelease
+        metaKey.controlUp = config.overviewOnControlUp
         overview.floating = config.overviewFloating
         displays.settings = config.applied(to: displays.settings)
         for engine in displays.engines.values {

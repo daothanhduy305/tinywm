@@ -258,9 +258,9 @@ public final class StripDisplays {
 
     /// Rebuilds each enabled display from `saved` around the windows found at startup, then adds
     /// the windows no slot claimed the normal way. Call once, before any other window joins.
-    /// Returns the saved names of the windows it placed, by window id.
+    /// Returns the plan, including saved names and focus history mapped to live window ids.
     @discardableResult
-    public func restore(_ saved: SavedLayout, pending: [Pending]) -> [String: String] {
+    public func restore(_ saved: SavedLayout, pending: [Pending]) -> LayoutPlan {
         let ids = ordered.map(\.id)
         let plan = saved.plan(displays: ids, windows: pending.map(\.live),
                               floating: Set(pending.filter(\.floating).map(\.live.id)))
@@ -275,7 +275,7 @@ public final class StripDisplays {
             guard let p = byID[id] else { continue }
             windowAdded(id, frame: p.frame, floating: p.floating, takesFocus: p.takesFocus)
         }
-        return plan.names
+        return plan
     }
 
     public func floatWindow(_ id: String) { engine(holding: id)?.floatWindow(id) }
