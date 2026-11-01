@@ -199,6 +199,8 @@ final class WindowLifecycle {
     /// closes a tab's window before it shows the tab that takes its place.
     private var closingTabs: Set<String> = []
     private let tabSwapWait = 0.5
+    /// Whether `id` closed and is only held for a tab that may replace it.
+    func isClosing(_ id: String) -> Bool { closingTabs.contains(id) }
 
     // MARK: Removal
 
@@ -227,6 +229,7 @@ final class WindowLifecycle {
             // when the window server lists no other window of the app if that lag shows.
             if !temporary, windows.knownFocus == id, closingTabs.insert(id).inserted {
                 Log.note("tracker", "\(Log.name(id)) closed with focus; held \(tabSwapWait) s for a tab that replaces it")
+                focusMoved()  // the border leaves with the window, not after the hold
                 DispatchQueue.main.asyncAfter(deadline: .now() + tabSwapWait) { [weak self] in
                     MainActor.assumeIsolated { if self?.closingTabs.remove(id) != nil { self?.forget(id) } }
                 }

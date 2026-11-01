@@ -460,7 +460,7 @@ final class Runtime {
     /// another app is in front, such as a fullscreen game tinywm leaves alone, the border is hidden:
     /// it shows on every Space and would sit over that app.
     private func updateHighlight() {
-        guard let id = windows.focusedWindow, let engine = displays.engine(holding: id),
+        guard let id = windows.focusedWindow, !lifecycle.isClosing(id), let engine = displays.engine(holding: id),
               engine.strip.focusedWindow == id || engine.strip.floating.contains(id) else {
             highlight.show(nil, frame: nil)
             return
