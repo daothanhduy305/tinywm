@@ -446,6 +446,13 @@ public final class AXWindows: WindowSystem {
         knownFocus = id
         focusRevision += 1
         for hook in onFocusRequested { hook(id) }
+        // Our overview can hold key focus without activating the app; hand it to the real window.
+        if pid == getpid(), let number = w.number,
+           let window = NSApp.windows.first(where: { $0.windowNumber == Int(number) }) {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         // An app started through a wrapper can be listed with process ID -1, and activating
         // that entry does nothing, so such an app is brought to the front through Accessibility.
         let app = NSRunningApplication(processIdentifier: pid)

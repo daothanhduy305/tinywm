@@ -307,6 +307,7 @@ and `overview-switch-on-release = on` (the default), ⌘Tab opens with the previ
 selected. Its display takes the keys.
 Hold ⌘ and press Tab or ⇧Tab to cycle. Release ⌘ to confirm, or press Esc to cancel.
 A quick tap switches to the previous window, even if its pictures are still loading.
+Picking tinywm's own window hands key focus from the overview to that window through AppKit.
 Closed windows are skipped, so ⌘Tab falls back through the focus history.
 With `overview-switch-on-release = off`, ⌘Tab opens on the current window and ⌘Tab again confirms.
 Holding Tab does not repeat. Releasing ⌘ does nothing, and ⇧⌘Tab keeps its normal behavior.
