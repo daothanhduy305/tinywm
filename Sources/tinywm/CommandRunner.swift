@@ -39,7 +39,7 @@ enum CommandRunner {
 
     /// Posts the stroke with exactly its own modifiers, to `pid` or else to the front app. The
     /// right ⌘ the user still holds is left out, so the target sees the combination as written.
-    private static func press(_ s: KeyStroke, pid: pid_t? = nil) {
+    static func press(_ s: KeyStroke, pid: pid_t? = nil) {
         // Left-side device bits alongside the generic masks, for apps that check which side.
         var flags: UInt64 = 0
         if s.command { flags |= CGEventFlags.maskCommand.rawValue | 0x08 }

@@ -80,7 +80,8 @@ final class Overview {
     /// Keeps the rows clear of the search bar at the top.
     private static let style = OverviewStyle(top: 46)
     private var style: OverviewStyle { OverviewStyle(top: Self.style.top, floating: floating) }
-    /// The windows the query matches, or nil with no query.
+    private var scope: Set<String>?
+    /// The windows the scope and query match, or nil when neither is set.
     private var matching: Set<String>?
 
     private var phase = Phase.closed
@@ -239,7 +240,7 @@ final class Overview {
 
     /// Opens on `engine`'s display with the chosen or focused window selected. Only the active one takes
     /// keys. False when there is nothing to show.
-    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:], select: String? = nil) -> Bool {
+    func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:], select: String? = nil, app: pid_t? = nil) -> Bool {
         // Also while closing, so the hotkey works again at once.
         guard phase != .open, pictures.available, let screen else { return false }
         let ws = engine.workspaces
@@ -267,6 +268,7 @@ final class Overview {
         away = (onFullScreen ? Set(layout!.windows.map(\.id)) : Set(self.fullScreen.keys)).subtracting([previous].compactMap { $0 })
         phase = .open
         token += 1
+        scope = app.map { app in Set(probe.windows.map(\.id).filter { windows.pid(of: $0) == app }) }
         matching = nil
         faded = []
         showQuery("")
@@ -348,6 +350,7 @@ final class Overview {
             label.add(fade, forKey: "fade")
             label.opacity = 1
         }
+        _ = filter("")
         return true
     }
 
@@ -356,7 +359,10 @@ final class Overview {
     func handle(_ key: OverviewCommand) {
         guard phase == .open, let layout else { return }
         if key == .cancel, cancelDragging() { return }
-        if key == .cancel, selected == nil { chose(nil); return }
+        if key == .cancel {
+            if searchField.stringValue.isEmpty { chose(nil) } else { clearSearch() }
+            return
+        }
         guard let selected else { return }
         let next: String?
         switch key {
@@ -366,8 +372,10 @@ final class Overview {
         case .down: next = move(layout, selected, .down)
         case .next: next = overviewStep(layout, from: selected, by: 1, matching: matching)
         case .previous: next = overviewStep(layout, from: selected, by: -1, matching: matching)
-        case .confirm: return chose(selected)
-        case .cancel: return matching == nil ? chose(nil) : clearSearch()
+        case .confirm:
+            if matching?.contains(selected) ?? true { chose(selected) }
+            return
+        case .cancel: return
         case .rename: return layout.window(selected).map { startRename($0.id, at: $0.rect) } ?? ()
         }
         if let next {
@@ -416,7 +424,7 @@ final class Overview {
     /// nothing on this display matches.
     func filter(_ query: String) -> Bool {
         guard phase == .open, let layout else { return false }
-        matching = query.isEmpty ? nil : Set(titles.filter { OverviewKeys.matches($0.value, query: query) }.keys)
+        matching = OverviewKeys.matching(titles, query: query, scope: scope)
         showQuery(query)
         for (id, layer) in holders {
             let opacity: Float = matching?.contains(id) ?? true ? 1 : 0.25
@@ -424,7 +432,8 @@ final class Overview {
             labels[id]?.opacity = opacity
         }
         guard let matching else { return true }
-        guard let first = layout.windows.first(where: { matching.contains($0.id) })?.id else { return false }
+        guard let first = (query.isEmpty ? selected.flatMap { matching.contains($0) ? $0 : nil } : nil)
+            ?? layout.windows.first(where: { matching.contains($0.id) })?.id else { return false }
         select(first, "search")
         home = first
         return true
@@ -858,7 +867,7 @@ final class Overviews {
     }
 
     /// Opens on every display, or closes onto the active display's highlighted window.
-    func toggle(_ engine: StripEngine, displays: StripDisplays, select: String? = nil) {
+    func toggle(_ engine: StripEngine, displays: StripDisplays, select: String? = nil, app: pid_t? = nil) {
         // Overviews still zooming closed open again.
         if byDisplay.values.contains(where: \.isShowing) {
             active?.handle(.confirm)
@@ -880,11 +889,11 @@ final class Overviews {
         pictures.snapshots.freshen(onScreen) { [weak self] in
             guard let self else { return }
             waiting = false
-            show(engine, displays: displays, select: select)
+            show(engine, displays: displays, select: select, app: app)
         }
     }
 
-    private func show(_ engine: StripEngine, displays: StripDisplays, select: String?) {
+    private func show(_ engine: StripEngine, displays: StripDisplays, select: String?, app: pid_t?) {
         defer { confirmWhenShown = false }
         let start = CACurrentMediaTime()
         self.displays = displays
@@ -902,13 +911,14 @@ final class Overviews {
             o.floating = floating
             o.keys = keys
             let here = full.filter { displays.engine(owning: $0.value) === e }
-            guard o.open(e, on: Screens.screen(id: id), active: false, fullScreen: here, select: select) else { continue }
+            guard o.open(e, on: Screens.screen(id: id), active: false, fullScreen: here, select: select, app: app) else { continue }
             if let select, o.layout?.window(select) != nil { active = o }
             else if active == nil, !o.ids.isEmpty { active = o }
             opened.append(o)
         }
         guard !opened.isEmpty else { return }
         if active == nil { active = opened.first }
+        search()
         active?.takeKeys()
         Log.note("overview", "opened on \(opened.count) displays in \(Int((CACurrentMediaTime() - start) * 1000)) ms")
         pictures.snapshots.beginLive(opened.reduce(into: Set()) { $0.formUnion($1.ids) }, rate: opened[0].rate)

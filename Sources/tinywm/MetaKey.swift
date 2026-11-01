@@ -26,7 +26,11 @@ final class MetaKey {
     /// ⌘Tab opens the overview instead of the macOS app switcher.
     var commandTab = false
     var switchOnRelease = true
+    var exposeShowing: () -> Bool = { false }
+    var closeExpose: () -> Void = { CommandRunner.press(KeyStroke(keyCode: 53)) }
     var controlUp = false
+    var controlDown = false
+    var openAppOverview: () -> Void = {}
     var canCancelOverview: () -> Bool = { false }
     var cancelOverview: () -> Void = {}
     var commandTabPressed: (_ shift: Bool) -> Void = { _ in }
@@ -142,11 +146,17 @@ final class MetaKey {
         case .keyDown where controlUp && e.keyCode == Self.up
             && Self.onlyControl(e.flags):
             lastKeyDown = (e.keyCode, Date())
-            if !e.isRepeat { run("overview") }
+            if !e.isRepeat {
+                if exposeShowing() { closeExpose() } else { run("overview") }
+            }
             return true
         case .keyDown where e.keyCode == Self.down && Self.onlyControl(e.flags) && canCancelOverview():
             lastKeyDown = (e.keyCode, Date())
             if !e.isRepeat { cancelOverview() }
+            return true
+        case .keyDown where controlDown && e.keyCode == Self.down && Self.onlyControl(e.flags):
+            lastKeyDown = (e.keyCode, Date())
+            if !e.isRepeat { openAppOverview() }
             return true
         case .keyDown where commandTab && e.keyCode == Self.tab && commandTabModifiers(e.flags)
             && !(mode == .rightCommand && rightCommandDown):

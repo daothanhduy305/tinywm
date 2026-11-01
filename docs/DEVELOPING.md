@@ -37,6 +37,9 @@ swift build
 swift test
 ```
 
+Overview matching tests use the pure `OverviewKeys` filter in StripTests.
+Tests must not open overview panels or read screen captures or desktop wallpaper. Those can trigger privacy prompts.
+
 If `swift test` reports that the plugin for module `TestingMacros` is not found, pass the
 path of the command line tools plugins:
 
@@ -152,6 +155,7 @@ center-focus = off              # on: scrolling to a window centres it, unless t
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
 overview-switch-on-release = on  # off: ⌘Tab again confirms instead of releasing ⌘
 overview-on-control-up = off     # on: ⌃↑ opens the overview instead of Mission Control
+overview-on-control-down = off   # on: ⌃↓ opens the overview for the focused app
 overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview
 focus-crosses-displays = off    # on: focus and move continue past the strip's ends onto the next display
 bind focus-left = n             # the meta key is implied
@@ -314,6 +318,12 @@ With `overview-switch-on-release = off`, ⌘Tab opens on the current window and 
 Holding Tab does not repeat. Releasing ⌘ does nothing, and ⇧⌘Tab keeps its normal behavior.
 The right ⌘ key keeps its Meta bindings in right ⌘ mode. Meta + Esc still opens on the current window.
 With `overview-on-control-up = on`, ⌃↑ opens on the current window and ⌃↑ again confirms.
+If macOS App Exposé or Mission Control is showing, ⌃↑ sends Esc to close it instead.
+The Dock's Accessibility notifications track that state, including after the Dock restarts.
+tinywm also clears the state when it sends Esc, so a missed exit notification cannot keep it stuck.
+With `overview-on-control-down = on`, ⌃↓ opens with only the focused app's windows in scope.
+Other apps fade. Search narrows within the app, and Tab and the arrows move among its matches
+on every display. Esc and ⌃↓ clear a typed search first, then close. The app scope stays until close.
 
 An app with windows on several displays, such as a browser, may make another of its windows key
 right after tinywm focuses one. Within a second and with no click or key press since, tinywm

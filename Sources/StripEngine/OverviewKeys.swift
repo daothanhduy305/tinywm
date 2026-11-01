@@ -60,6 +60,12 @@ public struct OverviewKeys: Equatable, Sendable {
         query.split(separator: " ").allSatisfy { text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
     }
 
+    /// Intersects the search with the app scope. Nil means every window matches.
+    public static func matching(_ titles: [String: String], query: String, scope: Set<String>?) -> Set<String>? {
+        if query.isEmpty { return scope }
+        return Set(titles.filter { (scope?.contains($0.key) ?? true) && matches($0.value, query: query) }.keys)
+    }
+
     /// The command for an action fired through the meta key while the overview is open. An action
     /// on the rename chord renames. Other actions are ignored then, so they cannot move real windows.
     public func command(forAction name: String) -> OverviewCommand? {

@@ -163,6 +163,13 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("overview-on-control-up = maybe").issues.count == 1)
     }
 
+    @Test func overviewOnControlDownDefaultsOffAndParses() {
+        #expect(!StripConfig().overviewOnControlDown)
+        #expect(StripConfig.parse("overview-on-control-down = on").config.overviewOnControlDown)
+        #expect(!StripConfig.parse("overview-on-control-down = off").config.overviewOnControlDown)
+        #expect(StripConfig.parse("overview-on-control-down = maybe").issues.count == 1)
+    }
+
     @Test func overviewFloatingDefaultsToVerticalAndParses() {
         #expect(StripConfig().overviewFloating == .vertical)
         #expect(StripConfig.parse("overview-floating = horizontal").config.overviewFloating == .horizontal)
@@ -426,6 +433,19 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         let off = StripConfig.parse("unbind overview-rename").config
         #expect(off.overviewRename == nil)
         #expect(!OverviewKeys(rename: off.overviewRename).isRename(keyCode: 15, flags: 0x100000 | 0x10))
+    }
+
+    @Test func appScopeIntersectsSearchAndSurvivesClearingIt() {
+        let titles = ["a": "Editor — Alpha", "b": "Editor — Beta", "other": "Browser — Alpha"]
+        let scope: Set<String> = ["a", "b"]
+        #expect(OverviewKeys.matching(titles, query: "", scope: scope) == scope)
+        #expect(OverviewKeys.matching(titles, query: "alpha", scope: scope) == ["a"])
+        #expect(OverviewKeys.matching(titles, query: "browser", scope: scope) == [])
+        #expect(OverviewKeys.matching(titles, query: "", scope: scope) == scope)
+        #expect(OverviewKeys.matching(titles, query: "", scope: []) == [])
+        #expect(OverviewKeys.matching(titles, query: "alpha", scope: []) == [])
+        #expect(OverviewKeys.matching(titles, query: "", scope: nil) == nil)
+        #expect(OverviewKeys.matching(titles, query: "alpha", scope: nil) == ["a", "other"])
     }
 
     @Test func searchMatchesEveryWordIgnoringCaseAndAccents() {

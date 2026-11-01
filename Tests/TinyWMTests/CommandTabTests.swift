@@ -2,7 +2,7 @@ import CoreGraphics
 import ApplicationServices
 import Testing
 import WindowCore
-import WindowKit
+@testable import WindowKit
 @testable import tinywm
 
 @MainActor @Suite struct CommandTabTests {
@@ -153,6 +153,61 @@ import WindowKit
         #expect(!key.handle(event(.keyDown, key: 125, flags: flags)))
         #expect(!key.handle(event(.keyDown, key: 125, flags: flags, repeatKey: true)))
         #expect(cancels == 2)
+    }
+
+    @Test func controlDownOpensAppOverviewOnlyWhenEnabledAndClosed() {
+        let key = MetaKey()
+        var open = false
+        var opens = 0
+        var cancels = 0
+        key.canCancelOverview = { open }
+        key.cancelOverview = { cancels += 1 }
+        key.openAppOverview = { opens += 1; open = true }
+        let flags: CGEventFlags = [.maskControl, .maskNumericPad, .maskSecondaryFn]
+        #expect(!key.handle(event(.keyDown, key: 125, flags: flags)))
+        key.controlDown = true
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags, repeatKey: true)))
+        #expect(opens == 0)
+        for extra: CGEventFlags in [.maskShift, .maskAlternate, .maskCommand] {
+            #expect(!key.handle(event(.keyDown, key: 125, flags: flags.union(extra))))
+        }
+        #expect(!key.handle(event(.keyDown, key: 125)))
+        #expect(!key.handle(event(.keyUp, key: 125, flags: flags)))
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags)))
+        #expect(opens == 1)
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags, repeatKey: true)))
+        #expect(cancels == 0)
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags)))
+        #expect(cancels == 1)
+        #expect(opens == 1)
+    }
+
+    @Test func controlUpClearsExposeStateEvenWithoutAnExitNotification() {
+        let key = MetaKey()
+        let expose = ExposeWatcher()
+        key.exposeShowing = { expose.isShowing }
+        var closes = 0
+        var opens = 0
+        key.closeExpose = { closes += 1; expose.closed() }
+        let registry = ShortcutRegistry.shared
+        registry.register(action: "overview", defaultKey: nil, handler: { opens += 1 })
+        defer { registry.unregister { $0 == "overview" } }
+        let up = event(.keyDown, key: 126, flags: .maskControl)
+        for notification in ["AXExposeShowAllWindows", "AXExposeShowFrontWindows", "AXExposeShowDesktop"] {
+            expose.received(notification)
+            #expect(expose.isShowing)
+            key.controlUp = false
+            #expect(!key.handle(up))
+            key.controlUp = true
+            #expect(key.handle(up))
+            #expect(key.handle(event(.keyDown, key: 126, flags: .maskControl, repeatKey: true)))
+            #expect(!expose.isShowing)
+            #expect(key.handle(up))
+            expose.received("AXExposeExit")
+            #expect(!expose.isShowing)
+        }
+        #expect(closes == 3)
+        #expect(opens == 3)
     }
 
     @Test func controlUpIsTakenOnlyWhenEnabledWithOnlyControlAndDoesNotRepeat() {

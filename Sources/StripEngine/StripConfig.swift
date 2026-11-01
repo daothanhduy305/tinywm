@@ -31,6 +31,7 @@ public struct StripConfig: Equatable, Sendable {
     public var overviewOnCommandTab = false
     public var overviewSwitchOnRelease = true
     public var overviewOnControlUp = false
+    public var overviewOnControlDown = false
     /// Where the overview shows floating windows.
     public var overviewFloating = OverviewFloating.vertical
     /// Bound actions only; an unbound action has no entry.
@@ -266,6 +267,8 @@ public struct StripConfig: Equatable, Sendable {
             config.overviewSwitchOnRelease = try onOff(value, for: name)
         case "overview-on-control-up":
             config.overviewOnControlUp = try onOff(value, for: name)
+        case "overview-on-control-down":
+            config.overviewOnControlDown = try onOff(value, for: name)
         case "overview-floating":
             guard let f = OverviewFloating(rawValue: value.lowercased()) else {
                 throw Failure(message: "overview-floating must be vertical, horizontal or off, not '\(value)'")
@@ -391,6 +394,7 @@ public struct StripConfig: Equatable, Sendable {
             "overview-as-mission-control = off",
             "overview-switch-on-release = on",
             "overview-on-control-up = off",
+            "overview-on-control-down = off",
             "overview-floating = \(d.overviewFloating.rawValue) # vertical, horizontal or off: where the overview shelves floating windows",
         ]
     }

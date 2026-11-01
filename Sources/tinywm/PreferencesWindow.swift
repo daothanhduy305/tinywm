@@ -227,6 +227,7 @@ struct PreferencesView: View {
                 toggle("Switch when ⌘ is released", "overview-switch-on-release", \.overviewSwitchOnRelease, "Opens on the previous window, like the macOS app switcher. Off: ⌘Tab again picks.")
                     .disabled(!model.config.overviewOnCommandTab)
                 toggle("Show overview with ⌃ + ↑", "overview-on-control-up", \.overviewOnControlUp, "Replaces Mission Control's shortcut.")
+                toggle("Show app windows with ⌃ + ↓", "overview-on-control-down", \.overviewOnControlDown, "Replaces App Exposé's shortcut.")
                 VStack(alignment: .leading) {
                     Picker("Show floating windows strip in overview", selection: Binding(get: { model.config.overviewFloating.rawValue }, set: { model.setting("overview-floating", $0) })) {
                         Text("Vertical").tag("vertical"); Text("Horizontal").tag("horizontal"); Text("Off").tag("off")

@@ -40,6 +40,7 @@ final class Runtime {
     private let persistence: LayoutPersistence
     private let focusKeeper: FocusKeeper
     private let metaKey = MetaKey()
+    private let expose = ExposeWatcher()
     /// Meta + left drag moves windows; the overlay draws the picture and the drop marker.
     private let dragger: WindowDragger
     private let dragOverlay: DragOverlay
@@ -165,6 +166,7 @@ final class Runtime {
         metaKey.commandTab = config.overviewOnCommandTab
         metaKey.switchOnRelease = config.overviewSwitchOnRelease
         metaKey.controlUp = config.overviewOnControlUp
+        metaKey.controlDown = config.overviewOnControlDown
         metaKey.commandTabPressed = { [unowned self] shift in
             if config.overviewSwitchOnRelease, overview.isBusy {
                 overview.handle(shift ? .previous : .next)
@@ -172,8 +174,19 @@ final class Runtime {
                 overview.toggle(engine, displays: displays, select: config.overviewSwitchOnRelease ? windows.previousFocus : nil)
             }
         }
+        metaKey.openAppOverview = { [unowned self] in
+            guard !dragger.isActive, let engine = displays.active(pointer: Screens.pointer()),
+                  let focus = windows.knownFocus, let app = windows.pid(of: focus) else { return }
+            overview.toggle(engine, displays: displays, select: focus, app: app)
+        }
         metaKey.commandTabReleased = { [unowned self] in overview.release() }
         overview.floating = config.overviewFloating
+        expose.start()
+        metaKey.exposeShowing = { [unowned self] in expose.isShowing }
+        metaKey.closeExpose = { [unowned self] in
+            expose.closed()
+            CommandRunner.press(KeyStroke(keyCode: 53))
+        }
         metaKey.start()
         startSwipes()
         persistence.reading = { [unowned self] in tracker.isProbing || arrivals.isJudging }
@@ -217,6 +230,7 @@ final class Runtime {
         metaKey.commandTab = config.overviewOnCommandTab
         metaKey.switchOnRelease = config.overviewSwitchOnRelease
         metaKey.controlUp = config.overviewOnControlUp
+        metaKey.controlDown = config.overviewOnControlDown
         overview.floating = config.overviewFloating
         displays.settings = config.applied(to: displays.settings)
         for engine in displays.engines.values {
