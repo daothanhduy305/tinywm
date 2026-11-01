@@ -136,6 +136,10 @@ final class Runtime {
         release.install()
 
         lifecycle.focusMoved = { [unowned self] in updateHighlight() }
+        lifecycle.floatDragging = { [unowned self] on in
+            highlight.setFaded(on)
+            if !on { updateHighlight() }
+        }
         lifecycle.retileAll = { [unowned self] in retileAll() }
         lifecycle.install()
 

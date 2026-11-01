@@ -68,6 +68,14 @@ final class FocusHighlight {
         if !on { refresh() }
     }
 
+    /// Fades the border out while its window is dragged, since it trails the window, and back in after.
+    func setFaded(_ on: Bool) {
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = on ? 0.05 : 0.2
+            border.animator().alphaValue = on ? 0 : 1
+        }
+    }
+
     private func refresh() {
         guard !suspended else { return }
         guard let (id, frame) = current,

@@ -12,6 +12,8 @@ import WindowKit
 final class WindowLifecycle {
     /// Called when focus may have moved, so the focus border can follow.
     var focusMoved: () -> Void = {}
+    /// A floating window started (true) or stopped (false) following the mouse.
+    var floatDragging: (Bool) -> Void = { _ in }
     /// Writes every window's frame again.
     var retileAll: () -> Void = {}
     /// The rules in force, read afresh each time so a config reload applies at once.
@@ -431,6 +433,10 @@ final class WindowLifecycle {
         // while the app is busy redrawing. Reports that arrive during one read share it.
         tracker.onFrameChanged = { [unowned self] element, _ in
             guard !screenLocked, let id = windows.knownID(for: element) else { return }
+            // Faded on the report itself, not after the frame read, which waits on a busy app.
+            if NSEvent.pressedMouseButtons != 0, displays.engine(holding: id)?.strip.floating.contains(id) == true {
+                floatDragStarted()
+            }
             readChangedFrame(id)
         }
     }
@@ -483,6 +489,24 @@ final class WindowLifecycle {
             }
         }
     }
+
+    /// Tells `floatDragging` when the mouse drags a floating window and when it lets go, so the
+    /// border, which lags behind the window, can fade out for the drag.
+    private func floatDragStarted() {
+        guard !floatDragHeld else { return }
+        floatDragHeld = true
+        floatDragging(true)
+        func wait() {
+            guard NSEvent.pressedMouseButtons == 0 else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { MainActor.assumeIsolated(wait) }
+                return
+            }
+            floatDragHeld = false
+            floatDragging(false)
+        }
+        wait()
+    }
+    private var floatDragHeld = false
 
     /// Writes a dragged window's slot frame back as soon as the mouse button is up. Writing
     /// during the drag would fight the pointer.
