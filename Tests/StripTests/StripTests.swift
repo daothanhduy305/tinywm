@@ -528,6 +528,26 @@ final class CountingWindows: WindowSystem {
 
 @MainActor
 @Suite struct PresenterTests {
+    @Test func focusingAFloatOnAnotherWorkspaceKeepsItsPictureAboveTiles() {
+        let w = FakeWindows()
+        let e = StripEngine(windows: w, viewport: screen, settings: halfWidth)
+        let p = FakePresenter()
+        e.presenter = p
+        w.focusedWindow = "a"; e.windowAdded("a")
+        w.frames["float"] = Rect(x: 120, y: 80, width: 300, height: 200)
+        e.windowAdded("float", floating: true)
+        e.switchWorkspace(by: 1)
+        w.focusedWindow = "b"; e.windowAdded("b")
+        p.focused = []
+
+        // Overview reports the selection before the window system changes focus.
+        e.windowFocused("float")
+
+        #expect(w.focusedWindow == "b")
+        #expect(e.strip.focusedWindow == "a")
+        #expect(p.focused == ["float"])
+    }
+
     func make() -> (StripEngine, CountingWindows, FakePresenter, TestClock) {
         let w = CountingWindows()
         var s = StripSettings(); s.defaultWidth = 0.5; s.gap = 0

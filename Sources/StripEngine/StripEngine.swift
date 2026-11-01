@@ -51,6 +51,11 @@ public final class StripEngine {
     private var departing: (id: String, from: Rect, to: Rect)?
 
     private let windows: WindowSystem
+    private var focusing: String?
+    private var presentationFocus: String? {
+        if let id = focusing ?? windows.focusedWindow, strip.floating.contains(id) { return id }
+        return strip.focusedWindow
+    }
     /// The frame each window should have now: the layout's target, set before it is written, so a
     /// write under a motion can still be pending. Not what the window last reported.
     private var targetFrames: [String: Rect] = [:]
@@ -336,6 +341,9 @@ public final class StripEngine {
     /// brings that workspace into view, as niri does.
     public func windowFocused(_ id: String) {
         guard let w = workspaces.workspace(of: id) else { return }
+        // Overview reports focus before the window system has focused the selection.
+        focusing = id
+        defer { focusing = nil }
         if w != workspaces.active {
             changeWorkspaces(raise: false) {
                 $0.switchTo(w)
@@ -380,7 +388,7 @@ public final class StripEngine {
         let offset = travel + dy
         verticalTravel = offset
         let neighbour = workspaces.active + (offset > 0 ? 1 : -1)
-        var focused = strip.focusedWindow
+        var focused = presentationFocus
         var ring: (rect: Rect, opacity: Double)?
         if workspaces.strips.indices.contains(neighbour) {
             let next = workspaces.strips[neighbour]
@@ -440,7 +448,7 @@ public final class StripEngine {
         swipeScroll = scroll
         var preview = strip
         preview.scroll = rubberBand(scroll)
-        _ = presenter?.preview(frames: stripFrames(preview, metrics, clamp: false), focused: strip.focusedWindow)
+        _ = presenter?.preview(frames: stripFrames(preview, metrics, clamp: false), focused: presentationFocus)
     }
 
     /// Snaps to the column nearest where the swipe was heading, then lands like any other move.
@@ -917,7 +925,7 @@ public final class StripEngine {
         let finals = moves.filter { $0.key != departing?.id }.mapValues { $0.then ?? $0.to }
         if !moves.isEmpty, let presenter,
            let token = presenter.begin(moves: moves.mapValues { (from: $0.from, to: $0.to) }, still: still,
-                                       focused: strip.focusedWindow, lifted: lifted) {
+                                       focused: presentationFocus, lifted: lifted) {
             let write: @MainActor () -> Void = { [weak self, weak presenter] in
                 guard let self else { return }
                 // A window given another frame since, or taken off this strip, has a newer write coming
