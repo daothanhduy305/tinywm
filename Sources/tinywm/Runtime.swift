@@ -159,6 +159,8 @@ final class Runtime {
         dragger.presenter = dragOverlay
         metaKey.dragger = dragger
         metaKey.canDrag = { [unowned self] in !overview.isOpen }
+        metaKey.canCancelOverview = { [unowned self] in overview.isOpen }
+        metaKey.cancelOverview = { [unowned self] in overview.handle(.cancel) }
         metaKey.setMode(config.meta)
         metaKey.commandTab = config.overviewOnCommandTab
         metaKey.switchOnRelease = config.overviewSwitchOnRelease

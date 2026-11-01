@@ -273,7 +273,7 @@ The overview opens on every display with windows, each with its focused window h
 waits up to 150 ms for new pictures of the windows on screen, so they don't jump from an old
 picture; pictures that arrive later fade in. In the active display's overview, the arrows and the
 focus keys held with the meta key move the selection, Tab and ⇧Tab step through windows, Return or
-Meta + Esc confirms, and Esc cancels. A search bar at the top of every display holds one shared
+Meta + Esc confirms, and Esc cancels. ⌃↓ also cancels. A search bar at the top of every display holds one shared
 query; the bar on the display with the keys is bright and takes typing as soon as the overview
 opens, so plain letters type rather than move. Clicking another display's bar moves the keys there.
 The windows whose app name and title don't contain every typed word fade, and the selection jumps to

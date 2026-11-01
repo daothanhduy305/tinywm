@@ -129,6 +129,32 @@ import WindowKit
         #expect(windows.focusHistory == (5..<25).reversed().map { "window\($0)" })
     }
 
+    @Test func controlDownCancelsOnlyAnOpenOverviewWithoutRepeating() {
+        let key = MetaKey()
+        var open = false
+        var cancels = 0
+        key.canCancelOverview = { open }
+        key.cancelOverview = { cancels += 1 }
+        let flags: CGEventFlags = [.maskControl, .maskNumericPad, .maskSecondaryFn]
+        #expect(!key.handle(event(.keyDown, key: 125, flags: flags)))
+        #expect(cancels == 0)
+        open = true
+        #expect(key.handle(event(.keyDown, key: 125, flags: .maskControl)))
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags, repeatKey: true)))
+        #expect(cancels == 1)
+        #expect(key.handle(event(.keyDown, key: 125, flags: flags)))
+        for extra: CGEventFlags in [.maskShift, .maskAlternate, .maskCommand] {
+            #expect(!key.handle(event(.keyDown, key: 125, flags: flags.union(extra))))
+        }
+        #expect(!key.handle(event(.keyDown, key: 125, flags: [.maskNumericPad, .maskSecondaryFn])))
+        #expect(!key.handle(event(.keyUp, key: 125, flags: flags)))
+        #expect(cancels == 2)
+        open = false
+        #expect(!key.handle(event(.keyDown, key: 125, flags: flags)))
+        #expect(!key.handle(event(.keyDown, key: 125, flags: flags, repeatKey: true)))
+        #expect(cancels == 2)
+    }
+
     @Test func controlUpIsTakenOnlyWhenEnabledWithOnlyControlAndDoesNotRepeat() {
         let key = MetaKey()
         let registry = ShortcutRegistry.shared

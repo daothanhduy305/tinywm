@@ -27,6 +27,8 @@ final class MetaKey {
     var commandTab = false
     var switchOnRelease = true
     var controlUp = false
+    var canCancelOverview: () -> Bool = { false }
+    var cancelOverview: () -> Void = {}
     var commandTabPressed: (_ shift: Bool) -> Void = { _ in }
     var commandTabReleased: () -> Void = {}
     private var switching = false
@@ -105,6 +107,11 @@ final class MetaKey {
     private static let escape = 53
     private static let tab = 48
     private static let up = 126
+    private static let down = 125
+
+    private static func onlyControl(_ raw: UInt64) -> Bool {
+        CGEventFlags(rawValue: raw).intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]) == .maskControl
+    }
 
     private func commandTabModifiers(_ raw: UInt64) -> Bool {
         let flags = CGEventFlags(rawValue: raw)
@@ -133,9 +140,13 @@ final class MetaKey {
             dragger?.cancel()
             return true
         case .keyDown where controlUp && e.keyCode == Self.up
-            && CGEventFlags(rawValue: e.flags).intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]) == .maskControl:
+            && Self.onlyControl(e.flags):
             lastKeyDown = (e.keyCode, Date())
             if !e.isRepeat { run("overview") }
+            return true
+        case .keyDown where e.keyCode == Self.down && Self.onlyControl(e.flags) && canCancelOverview():
+            lastKeyDown = (e.keyCode, Date())
+            if !e.isRepeat { cancelOverview() }
             return true
         case .keyDown where commandTab && e.keyCode == Self.tab && commandTabModifiers(e.flags)
             && !(mode == .rightCommand && rightCommandDown):
