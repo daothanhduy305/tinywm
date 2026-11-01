@@ -428,16 +428,16 @@ final class Runtime {
         motionDisplays.remove(id)
     }
 
-    /// Puts the highlight on the strip's focused window when it really has focus. While another
-    /// app is in front, such as a fullscreen game tinywm leaves alone, the border is hidden: it
-    /// shows on every Space and would sit over that app.
+    /// Puts the highlight on the strip's focused or floating window when it really has focus. While
+    /// another app is in front, such as a fullscreen game tinywm leaves alone, the border is hidden:
+    /// it shows on every Space and would sit over that app.
     private func updateHighlight() {
         guard let id = windows.focusedWindow, let engine = displays.engine(holding: id),
-              engine.strip.focusedWindow == id else {
+              engine.strip.focusedWindow == id || engine.strip.floating.contains(id) else {
             highlight.show(nil, frame: nil)
             return
         }
-        highlight.show(id, frame: engine.frame(of: id))
+        highlight.show(id, frame: engine.frame(of: id) ?? windows.frameOf(id))
     }
 
     // MARK: Swipes
