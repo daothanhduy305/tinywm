@@ -295,7 +295,8 @@ puts floating windows on a shelf. Its plate spans the available height or width 
 the rows pan. `vertical`
 (the default) stacks them down the right side as pictures of the same width, `horizontal` lines them
 up along the bottom as pictures of the same height, and `off` shows them at their real place, above
-the strip. Fullscreen windows sit on the shelf too, after the floating ones; picking one switches to
+the strip. Floats that open or restore mostly off-screen are centred on their display, keeping their size.
+Fullscreen windows sit on the shelf too, after the floating ones; picking one switches to
 its Space. The arrow keys move right into a vertical shelf and left out of it, or down into a
 horizontal one. Each picture has its app name and window title under it. Right-click a picture and
 choose Rename…, or press Meta + R, to name the selected window. `bind overview-rename = <key>`

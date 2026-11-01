@@ -54,4 +54,13 @@ extension Rect {
         guard x1 > x0, y1 > y0 else { return nil }
         return Rect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
     }
+
+    /// Centres a mostly off-screen frame on the display, keeping its size.
+    public func rescued(on display: Rect) -> Rect {
+        let visible = overlap(display).map { $0.width * $0.height } ?? 0
+        guard visible < width * height / 2 else { return self }
+        return Rect(x: display.center.x - width / 2,
+                    y: display.center.y - height / 2,
+                    width: width, height: height)
+    }
 }

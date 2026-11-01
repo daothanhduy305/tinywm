@@ -452,6 +452,54 @@ final class FakeWindows: WindowSystem {
         #expect(f.frames["a"]?.x == 0)
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func mostlyOffScreenFloatsAreRescuedOnArrivalAndRestore(restoring: Bool, hidden: Bool) {
+        let f = FakeWindows()
+        let display = Rect(x: 0, y: 39, width: 1710, height: 1073)
+        let e = StripEngine(windows: f, viewport: display)
+        f.frames["float"] = Rect(x: 1709, y: 1060, width: 230, height: 408)
+        if restoring {
+            var ws = Workspaces()
+            ws.current.insert("tile", width: 0.5, columnID: "tile", focus: true)
+            ws.normalize()
+            ws.add("float", toWorkspace: hidden ? 2 : 1, width: 0.5, columnID: "float", floating: true)
+            e.restore(ws)
+        } else {
+            e.windowAdded("tile")
+            e.windowAdded("float", floating: true, workspace: hidden ? 2 : 1)
+        }
+        if hidden { e.switchWorkspace(by: 1) }
+        #expect(f.frames["float"] == Rect(x: 740, y: 371.5, width: 230, height: 408))
+        #expect(Rect(x: 2000, y: 2000, width: 2000, height: 1200).rescued(on: display)
+                == Rect(x: -145, y: -24.5, width: 2000, height: 1200))
+    }
+
+    @Test(arguments: [false, true])
+    func mostlyVisibleFloatsKeepTheirHomeAcrossParking(restoring: Bool) {
+        let f = FakeWindows()
+        let display = Rect(x: 0, y: 39, width: 1710, height: 1073)
+        let home = Rect(x: 1560, y: 150, width: 230, height: 408)
+        let e = StripEngine(windows: f, viewport: display)
+        f.frames["float"] = home
+        if restoring {
+            var ws = Workspaces()
+            ws.current.addFloating("float")
+            ws.normalize()
+            e.restore(ws)
+        } else { e.windowAdded("float", floating: true) }
+        #expect(f.frames["float"] == home)
+        e.switchWorkspace(by: 1)
+        let parked = f.frames["float"]
+        e.apply()
+        e.switchWorkspace(by: -1)
+        #expect(f.frames["float"] == home)
+        // The app can still report its parked position while an unpark write is pending.
+        f.frames["float"] = parked
+        e.switchWorkspace(by: 1)
+        e.switchWorkspace(by: -1)
+        #expect(f.frames["float"] == home)
+    }
+
     @Test func movingTheOnlyWindowDownLeavesOneEmptyWorkspaceAbove() {
         let f = FakeWindows()
         let e = StripEngine(windows: f, viewport: screen, settings: halfWidth)

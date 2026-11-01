@@ -162,6 +162,19 @@ public final class StripEngine {
     }
     private var forceWrite = false
 
+    private func floatHome(_ id: String) -> Rect? {
+        guard let frame = windows.frameOf(id) ?? targetFrames[id] else { return nil }
+        let rescued = frame.rescued(on: viewport)
+        // An unpark write may still be pending while the app reports its parked frame.
+        if rescued != frame, let target = targetFrames[id] { return target.rescued(on: viewport) }
+        return rescued
+    }
+
+    private func adoptFloatHome(_ id: String) {
+        guard !parked.contains(id), let home = floatHome(id), home != windows.frameOf(id) else { return }
+        floatHomes[id] = home
+    }
+
     // MARK: Window lifecycle
 
     /// Adds a new window right of the focused column. With `takesFocus`, it becomes the strip's
@@ -179,6 +192,7 @@ public final class StripEngine {
         guard workspaces.workspace(of: id) == nil else {
             return Log.note("anomaly", "\(label) windowAdded: \(Log.name(id)) is already in workspace \(workspaces.workspace(of: id)!)")
         }
+        if floating { adoptFloatHome(id) }
         if let workspace, workspaces.index(ofWorkspace: workspace) != workspaces.active {
             let width = rememberedWidth(id) ?? settings.defaultWidth
             changeWorkspaces(raise: false) { $0.add(id, toWorkspace: workspace, width: width, columnID: newColumnID(), floating: floating) }
@@ -196,6 +210,7 @@ public final class StripEngine {
     public func floatWindow(_ id: String) {
         Log.note("engine", "\(label) floatWindow \(Log.name(id))")
         guard let w = workspaces.workspace(of: id), workspaces.strips[w].column(of: id) != nil else { return }
+        adoptFloatHome(id)
         changeWorkspaces(raise: false) { $0.strips[w].floatOut(id) }
     }
 
@@ -253,6 +268,7 @@ public final class StripEngine {
         guard workspaces.workspace(of: id) == nil else { return }
         let w = min(slot.workspace, workspaces.strips.count - 1)
         let columnID = newColumnID()
+        if slot.column == nil { adoptFloatHome(id) }
         changeWorkspaces(raise: false) {
             if let c = slot.column { $0.strips[w].insert(id, width: slot.width, columnID: columnID, at: c) }
             else { $0.strips[w].addFloating(id) }
@@ -309,6 +325,7 @@ public final class StripEngine {
         workspaces = Workspaces()
         targetFrames = [:]
         parked = []
+        floatHomes = [:]
         shownWorkspace = 0
         return out
     }
@@ -331,6 +348,7 @@ public final class StripEngine {
             next.strips[i].scroll = max(0, min(reach, next.strips[i].scroll))
         }
         workspaces = next
+        for s in next.strips { for id in s.floating { adoptFloatHome(id) } }
         // A layout kept from an earlier engine has its column IDs; new columns must not reuse them.
         for s in next.strips { for c in s.columns { if c.id.hasPrefix("c"), let n = Int(c.id.dropFirst()) { nextID = max(nextID, n) } } }
         Log.note("engine", "\(label) restored layout\n" + next.summary)
@@ -812,7 +830,7 @@ public final class StripEngine {
         var parkedNow: Set<String> = []
         for (i, other) in workspaces.strips.enumerated() where i != workspaces.active {
             for id in other.floating where !parked.contains(id) {
-                if let home = windows.frameOf(id) ?? targetFrames[id] { floatHomes[id] = home }
+                floatHomes[id] = floatHomes[id] ?? floatHome(id)
             }
             // A tiled window is parked at its column's size, so its picture has the right shape
             // even before its workspace is first shown, as after a restart.
@@ -824,8 +842,8 @@ public final class StripEngine {
                 parkedNow.insert(id)
             }
         }
-        // Floating windows coming back return to where they were; otherwise they are left alone.
-        for id in strip.floating where parked.contains(id) {
+        // Returning or rescued floats take their home; other active floats are left alone.
+        for id in strip.floating {
             if let home = floatHomes.removeValue(forKey: id) { frames[id] = home }
         }
         let wasParked = parked
