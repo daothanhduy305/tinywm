@@ -153,7 +153,7 @@ pinch-overview = on # pinch opens the overview; spread closes it
 pinch-fingers = 5   # 4 or 5, thumb included
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
-overview-switch-on-release = on  # off: ⌘Tab again confirms instead of releasing ⌘
+overview-switch-on-release = on  # off: the overview stays open on the previous window; ⌘Tab again confirms
 overview-on-control-up = off     # on: ⌃↑ opens the overview instead of Mission Control
 overview-on-control-down = off   # on: ⌃↓ opens the overview for the focused app
 overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview
@@ -314,7 +314,7 @@ Hold ⌘ and press Tab or ⇧Tab to cycle. Release ⌘ to confirm, or press Esc 
 A quick tap switches to the previous window, even if its pictures are still loading.
 Picking tinywm's own window hands key focus from the overview to that window through AppKit.
 Closed windows are skipped, so ⌘Tab falls back through the focus history.
-With `overview-switch-on-release = off`, ⌘Tab opens on the current window and ⌘Tab again confirms.
+With `overview-switch-on-release = off`, ⌘Tab opens on the previous window and the overview stays open. Return or ⌘Tab again confirms.
 Holding Tab does not repeat. Releasing ⌘ does nothing, and ⇧⌘Tab keeps its normal behavior.
 The right ⌘ key keeps its Meta bindings in right ⌘ mode. Meta + Esc still opens on the current window.
 With `overview-on-control-up = on`, ⌃↑ opens on the current window and ⌃↑ again confirms.

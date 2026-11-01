@@ -224,7 +224,7 @@ struct PreferencesView: View {
                 toggle("Center active window", "center-focus", \.centerFocus, "Scrolling to a window centres it, as far as the strip's ends allow.")
                 toggle("Continue to the next display", "focus-crosses-displays", \.focusCrossesDisplays, "Focus and move keys go past the strip's last column onto the display beside it.")
                 toggle("Show overview with ⌘ + Tab", "overview-as-mission-control", \.overviewOnCommandTab, "Replaces the macOS app switcher.")
-                toggle("Switch when ⌘ is released", "overview-switch-on-release", \.overviewSwitchOnRelease, "Opens on the previous window, like the macOS app switcher. Off: ⌘Tab again picks.")
+                toggle("Switch when ⌘ is released", "overview-switch-on-release", \.overviewSwitchOnRelease, "Opens on the previous window. On: releasing ⌘ switches to it, like the macOS app switcher. Off: the overview stays open; Return or ⌘Tab again picks.")
                     .disabled(!model.config.overviewOnCommandTab)
                 toggle("Show overview with ⌃ + ↑", "overview-on-control-up", \.overviewOnControlUp, "Replaces Mission Control's shortcut.")
                 toggle("Show app windows with ⌃ + ↓", "overview-on-control-down", \.overviewOnControlDown, "Replaces App Exposé's shortcut.")
