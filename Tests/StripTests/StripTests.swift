@@ -542,7 +542,11 @@ final class FakePresenter: StripPresenter {
     var lifted: [String?] = []
     var landedIDs: [String] = []
     var issued: Set<String>?
+    var carriedVelocities: [Point] = []
+    var begunVelocities: [Point?] = []
+    func carry(velocity: Point) { carriedVelocities.append(velocity) }
     func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?, lifted: String?) -> Int? {
+        begunVelocities.append(carriedVelocities.last)
         begun.append((moves, still))
         self.focused.append(focused)
         self.lifted.append(lifted)
@@ -1002,6 +1006,48 @@ final class CountingWindows: WindowSystem {
         e.endSwipe(velocity: 0)
         #expect(e.strip.scroll == 0)
         #expect(p.endedPreviews == 1)
+    }
+
+    @Test(arguments: [1, -1])
+    func verticalSwipeLandingUsesLiftOffVelocity(direction: Int) {
+        for (travel, velocity, switches) in [(0.04, 0.5, true), (0.04, 0.49, false), (0.2, -0.5, false)] {
+            let (e, _, p) = make()
+            let original = e.workspaces.active
+            let speed = Double(direction) * velocity
+            e.beginVerticalSwipe()
+            e.swipeVertical(by: Double(direction) * travel)
+            e.endVerticalSwipe(velocity: speed)
+            #expect(e.workspaces.active == original + (switches ? direction : 0))
+            let carried = Point(x: 0, y: -speed * e.swipeScale * screen.height)
+            #expect(p.carriedVelocities == [carried])
+            #expect(p.begunVelocities.last == carried)
+        }
+    }
+
+    @Test(arguments: [1, -1])
+    func verticalSwipeResistsTravelPastOneWorkspace(direction: Int) {
+        let (e, _, p) = make()
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: Double(direction) / e.swipeScale)
+        #expect(abs((p.previews.last?["a"]?.y ?? 0) + Double(direction) * screen.height) < 0.001)
+        e.swipeVertical(by: Double(direction) * 0.4 / e.swipeScale)
+        let offset = -Double(direction) * 1.12 * screen.height
+        #expect(abs((p.previews.last?["a"]?.y ?? 0) - offset) < 0.001)
+        e.endVerticalSwipe(velocity: 0)
+        #expect(e.workspaces.active == 1 + direction)
+    }
+
+    @Test(arguments: [1, -1])
+    func verticalFlickAtAnEndSpringsBackWithResistedVelocity(direction: Int) {
+        let (e, _, p) = make()
+        e.switchWorkspace(by: direction)
+        let original = e.workspaces.active
+        e.beginVerticalSwipe()
+        e.swipeVertical(by: Double(direction) * 0.04)
+        let speed = Double(direction) * 0.6
+        e.endVerticalSwipe(velocity: speed)
+        #expect(e.workspaces.active == original)
+        #expect(p.carriedVelocities == [Point(x: 0, y: -speed * e.swipeScale * screen.height * 0.3)])
     }
 
     @Test func verticalSwipeFadesTheRingAtItsLandingSpotAcrossAnEmptyWorkspace() {

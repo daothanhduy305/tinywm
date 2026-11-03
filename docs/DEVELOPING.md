@@ -413,7 +413,9 @@ Pinch works even with `swipe = off`.
 A sideways swipe drags the strip under your fingers and settles on the nearest column.
 A quick flick carries on and moves at least one column the way the fingers went.
 An up or down swipe drags the workspaces under your fingers. Travel past 0.08 of the trackpad
-changes workspace on release. A shorter swipe springs back. Past either end, the workspace
+changes workspace on release. A quick flick also changes workspace. A flick against the travel
+springs back. A shorter, slow swipe springs back. The workspaces keep moving at the fingers' speed
+after lift. Travel past one workspace moves with resistance. Past either end, the workspace
 moves with resistance and springs back. When the main thread falls behind, contact frames waiting for it
 are merged, so the strip jumps to the fingers instead of replaying old frames. While that many fingers are down, an event tap keeps the scroll
 and gesture events macOS makes from them away from apps, so the app under the pointer does not

@@ -10,6 +10,9 @@ import WindowCore
 /// - Without pictures, windows are written directly, the windows with no animation.
 @MainActor
 public protocol StripPresenter: AnyObject {
+    /// The pictures move at `velocity` (screen points per second, the strip's coordinates) as the next motion begins,
+    /// so a swipe's landing carries on from the fingers. Applies only to the next `begin`.
+    func carry(velocity: Point)
     /// Starts a motion. `focused` is the window that has focus once it lands, so the focus border
     /// can travel with the pictures. `lifted` is the window a command moved: its picture shrinks,
     /// travels over the others, then grows back. Returns a token for it, or nil when pictures are unavailable.
@@ -35,6 +38,7 @@ public protocol StripPresenter: AnyObject {
 }
 
 public extension StripPresenter {
+    func carry(velocity: Point) {}
     func preview(frames: [String: Rect], focused: String?) -> Bool {
         preview(frames: frames, focused: focused, ring: nil)
     }

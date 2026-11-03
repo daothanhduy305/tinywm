@@ -437,7 +437,9 @@ public final class StripEngine {
         let direction = travel > 0 ? 1 : -1
         let neighbour = workspaces.active + direction
         let hasNeighbour = workspaces.strips.indices.contains(neighbour)
-        let offset = -travel * swipeScale * viewport.height * (hasNeighbour ? 1 : 0.3)
+        let distance = abs(travel) * swipeScale
+        let resisted = hasNeighbour ? min(distance, 1) + max(distance - 1, 0) * 0.3 : distance * 0.3
+        let offset = -Double(direction) * resisted * viewport.height
         var frames = stripFrames(strip, metrics, clamp: false)
         if hasNeighbour {
             for (id, var frame) in stripFrames(workspaces.strips[neighbour], metrics, clamp: false) {
@@ -452,14 +454,18 @@ public final class StripEngine {
         }
     }
 
-    public func endVerticalSwipe(velocity _: Double) {
+    public func endVerticalSwipe(velocity: Double) {
         guard let travel = verticalTravel else { return }
         // As with strip swipes, changed targets make even a return to the same layout spring back.
         let frames = verticalSwipeFrames()
         for id in strip.allWindows { targetFrames[id] = frames[id] }
         verticalTravel = nil
         let direction = travel > 0 ? 1 : -1
-        if abs(travel) > 0.08, workspaces.strips.indices.contains(workspaces.active + direction) {
+        let hasNeighbour = workspaces.strips.indices.contains(workspaces.active + direction)
+        let flick = abs(velocity) >= flickVelocity
+        let followsTravel = velocity * Double(direction) > 0
+        presenter?.carry(velocity: Point(x: 0, y: -velocity * swipeScale * viewport.height * (hasNeighbour ? 1 : 0.3)))
+        if hasNeighbour, flick ? followsTravel : abs(travel) > 0.08 {
             switchWorkspace(by: direction)
         } else {
             apply()

@@ -80,6 +80,7 @@ final class PictureMotion: StripPresenter {
         var deferred: Set<String> = []
     }
     private var current = Motion()
+    private var carriedVelocity: Point?
     /// Pictures are retaken this often while anything moves. A motion lasts under half a
     /// second, so a picture taken as it begins stays good, and capturing more often costs drawing time.
     var motionRate = 4.0
@@ -143,7 +144,17 @@ final class PictureMotion: StripPresenter {
 
     // MARK: StripPresenter
 
+    func carry(velocity: Point) {
+        carriedVelocity = velocity
+    }
+
     func begin(moves: [String: (from: Rect, to: Rect)], still: [String: Rect], focused: String?, lifted: String?) -> Int? {
+        let velocity = carriedVelocity.map { v in
+            let origin = local(Rect(x: 0, y: 0, width: 0, height: 0))
+            let end = local(Rect(x: v.x, y: v.y, width: 0, height: 0))
+            return NSPoint(x: end.midX - origin.midX, y: end.midY - origin.midY)
+        }
+        carriedVelocity = nil
         guard pictures.available else { return nil }
         current = Motion(began: CACurrentMediaTime())
         token += 1
@@ -257,7 +268,7 @@ final class PictureMotion: StripPresenter {
                 group = slide(from: from, to: to)
                 layer.followCover(from: from.size, to: to.size) { keyframes("position", [$0, $0, $1, $1]) }
             } else {
-                group = springs(from: from, to: to)
+                group = springs(from: from, to: to, velocity: moves[id] == nil ? nil : velocity)
                 layer.followCover(from: from.size, to: to.size) { spring("position", $0, $1) }
             }
             // A picture still shrunk from an interrupted lift grows back as it goes.
@@ -401,6 +412,7 @@ final class PictureMotion: StripPresenter {
     }
 
     func endPreview() {
+        carriedVelocity = nil
         guard phase == .previewing else { return }
         fade(token)
     }
@@ -506,9 +518,15 @@ final class PictureMotion: StripPresenter {
         Spring.critical(key, from: a, to: b, stiffness: stiffness)
     }
 
-    private func springs(from: NSRect, to: NSRect) -> CAAnimationGroup {
+    private func springs(from: NSRect, to: NSRect, velocity: NSPoint? = nil) -> CAAnimationGroup {
         let move = spring("position", NSValue(point: NSPoint(x: from.midX, y: from.midY)),
                           NSValue(point: NSPoint(x: to.midX, y: to.midY)))
+        let dx = to.midX - from.midX, dy = to.midY - from.midY
+        let distanceSquared = dx * dx + dy * dy
+        if let velocity, distanceSquared >= 1 {
+            move.initialVelocity = (velocity.x * dx + velocity.y * dy) / distanceSquared
+            move.duration = move.settlingDuration
+        }
         let size = spring("bounds.size", NSValue(size: from.size), NSValue(size: to.size))
         let group = CAAnimationGroup()
         group.animations = [move, size]
