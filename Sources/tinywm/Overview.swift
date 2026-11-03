@@ -103,6 +103,7 @@ final class Overview {
 
     var isOpen: Bool { phase != .closed }
     var isShowing: Bool { phase == .open }
+    fileprivate var phaseName: String { String(describing: phase) }
     /// False when a search is typed and no window here matches it.
     var hasMatches: Bool { !ids.isEmpty && (matching.map { !$0.isEmpty } ?? true) }
     /// The windows whose pictures are shown.
@@ -242,7 +243,18 @@ final class Overview {
     /// keys. False when there is nothing to show.
     func open(_ engine: StripEngine, on screen: NSScreen?, active: Bool, fullScreen: [String: Rect] = [:], select: String? = nil, app: pid_t? = nil) -> Bool {
         // Also while closing, so the hotkey works again at once.
-        guard phase != .open, pictures.available, let screen else { return false }
+        guard phase != .open else {
+            Log.note("overview", "already open")
+            return false
+        }
+        guard pictures.available else {
+            Log.note("overview", "pictures unavailable")
+            return false
+        }
+        guard let screen else {
+            Log.note("overview", "no screen")
+            return false
+        }
         let ws = engine.workspaces
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
@@ -363,7 +375,10 @@ final class Overview {
             if searchField.stringValue.isEmpty { chose(nil) } else { clearSearch() }
             return
         }
-        guard let selected else { return }
+        guard let selected else {
+            if key == .confirm { Log.note("overview", "confirm does nothing: no selection") }
+            return
+        }
         let next: String?
         switch key {
         case .left: next = move(layout, selected, .left)
@@ -374,6 +389,7 @@ final class Overview {
         case .previous: next = overviewStep(layout, from: selected, by: -1, matching: matching)
         case .confirm:
             if matching?.contains(selected) ?? true { chose(selected) }
+            else { Log.note("overview", "confirm does nothing: selection does not match") }
             return
         case .cancel: return
         case .rename: return layout.window(selected).map { startRename($0.id, at: $0.rect) } ?? ()
@@ -519,6 +535,7 @@ final class Overview {
     /// gives focus back to the window that had it before.
     func close(selecting id: String?, refocus: Bool) {
         guard phase == .open, let engine else { return }
+        Log.note("overview", "closes on \(id.map(Log.name) ?? "nothing")")
         drag = nil
         marker.isHidden = true
         phase = .closing
@@ -870,10 +887,11 @@ final class Overviews {
     func toggle(_ engine: StripEngine, displays: StripDisplays, select: String? = nil, app: pid_t? = nil) {
         // Overviews still zooming closed open again.
         if byDisplay.values.contains(where: \.isShowing) {
+            Log.note("overview", "toggle confirms on \(engine.label); active is \(active?.phaseName ?? "none")")
             active?.handle(.confirm)
             return
         }
-        guard !waiting else { return }
+        guard !waiting else { return Log.note("overview", "toggle ignored: still waiting for pictures") }
         confirmWhenShown = false
         // Pictures of on-screen windows open right over the windows, so an old one would show
         // and then jump. Wait briefly for new ones first.
@@ -886,8 +904,11 @@ final class Overviews {
             }
         }
         waiting = true
+        Log.note("overview", "toggle waits for \(onScreen.count) pictures")
+        let start = CACurrentMediaTime()
         pictures.snapshots.freshen(onScreen) { [weak self] in
             guard let self else { return }
+            Log.note("overview", "pictures ready after \(Int((CACurrentMediaTime() - start) * 1000)) ms")
             waiting = false
             show(engine, displays: displays, select: select, app: app)
         }
@@ -916,7 +937,7 @@ final class Overviews {
             else if active == nil, !o.ids.isEmpty { active = o }
             opened.append(o)
         }
-        guard !opened.isEmpty else { return }
+        guard !opened.isEmpty else { return Log.note("overview", "nothing opened") }
         if active == nil { active = opened.first }
         search()
         active?.takeKeys()
@@ -926,8 +947,13 @@ final class Overviews {
     }
 
     func release() {
-        if waiting { confirmWhenShown = true }
-        else { active?.handle(.confirm) }
+        if waiting {
+            Log.note("overview", "release confirms when pictures are ready")
+            confirmWhenShown = true
+        } else {
+            Log.note("overview", "release confirms; active is \(active?.phaseName ?? "none")")
+            active?.handle(.confirm)
+        }
     }
 
     func handle(_ command: OverviewCommand) {

@@ -47,7 +47,9 @@ final class ShortcutCommands {
                 switch spec.name {
                 case "overview":
                     run = { [unowned self] in
-                        guard !dragger.isActive, let engine = activeEngine else { return }
+                        Log.note("key", "overview")
+                        guard !dragger.isActive else { return Log.note("key", "overview ignored during a drag") }
+                        guard let engine = activeEngine else { return Log.note("key", "overview: no active display") }
                         overview.toggle(engine, displays: displays)
                     }
                 case "close-window":
