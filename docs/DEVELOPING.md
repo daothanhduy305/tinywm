@@ -444,7 +444,10 @@ the same pid and app, then bundle ID with the exact title, then bundle ID with a
 windows left over take its slots left over, in saved order, so a relaunched browser whose titles
 all changed still gets its places.
 Each display's workspaces are rebuilt and normalised, written once without motion, and windows
-that no slot claimed join the usual way. Displays that are unplugged or switched off keep their
+that no slot claimed join the usual way. When tinywm starts while the screen is locked, apps list
+no windows, so the restore waits for the unlock and the next sweep.
+When a logout, restart or shutdown begins, the layout is saved once and then held, so apps
+quitting one by one do not empty it. Displays that are unplugged or switched off keep their
 saved layout in the file. The layout is always saved and restored.
 
 Each display setup keeps its own layout. A setup is the set of attached displays, by UUID; their

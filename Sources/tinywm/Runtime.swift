@@ -196,6 +196,7 @@ final class Runtime {
         persistence.reading = { [unowned self] in tracker.isProbing || arrivals.isJudging }
         arrivals.waitsForMouse = { [unowned self] in !persistence.isRestoring }
         persistence.beginRestore()
+        persistence.watchPowerOff()
         // An app that hangs would otherwise hold each call for macOS's default of 6 seconds.
         // Set on the system-wide element, the limit applies to every element.
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 1.0)

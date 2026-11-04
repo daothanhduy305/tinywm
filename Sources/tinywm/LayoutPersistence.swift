@@ -59,7 +59,23 @@ final class LayoutPersistence {
         holding = true
         // Counted from the first check, so the settle time does not count against the read limit.
         var start: Double?
+        var waitedForUnlock = false
         func check() {
+            // While the screen is locked, apps list no windows, so matching now would place every
+            // window as new once it is unlocked.
+            if Self.screenLocked {
+                if !waitedForUnlock { Log.note("restore", "screen is locked; waiting for the unlock") }
+                waitedForUnlock = true
+                start = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { MainActor.assumeIsolated(check) }
+                return
+            }
+            if waitedForUnlock {
+                // The windows come back with the tracker's next sweep, which runs every 3 s.
+                waitedForUnlock = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { MainActor.assumeIsolated(check) }
+                return
+            }
             if start == nil { start = ProcessInfo.processInfo.systemUptime }
             guard let start else { return }
             let waited = ProcessInfo.processInfo.systemUptime - start
@@ -71,6 +87,10 @@ final class LayoutPersistence {
             finishRestore()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + settle) { MainActor.assumeIsolated(check) }
+    }
+
+    private static var screenLocked: Bool {
+        (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 
     /// Takes a window that is about to be placed. Returns true when it is held for the restore.
@@ -99,13 +119,16 @@ final class LayoutPersistence {
             // The layout made for this display setup, else each display's last layout.
             let key = displays.setupKey
             var current = saved
-            current.displays = saved.setups?[key] ?? saved.displays
+            // An empty setup, left by a start that found no windows, does not count.
+            current.displays = saved.setups?[key].flatMap { $0.isEmpty ? nil : $0 } ?? saved.displays
             let restored = displays.restore(current, pending: pending)
             names = restored.names
             // Other setups get their windows now, while every window found at startup is known.
             let live = pending.map(\.live), floating = Set(pending.filter(\.floating).map(\.live.id))
             for (k, s) in saved.setups ?? [:] where k != key {
                 let plan = SavedLayout(displays: s).plan(displays: Array(s.keys), windows: live, floating: floating)
+                // A setup none of these windows match keeps what the file has.
+                guard !plan.workspaces.isEmpty else { continue }
                 displays.seed(k, plan.workspaces)
                 names.merge(plan.names) { kept, _ in kept }
             }
@@ -134,6 +157,29 @@ final class LayoutPersistence {
 
     // MARK: Save
 
+    /// Set once a logout, restart or shutdown begins. Apps then quit one by one and their windows
+    /// leave the layout, so saving stops and the file keeps the layout from before.
+    private var poweringOff = false
+    private var powerOffWatch: NSObjectProtocol?
+
+    /// Saves once while every window is still placed, then stops saving until the power-off ends.
+    func watchPowerOff() {
+        powerOffWatch = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.poweringOff else { return }
+                Log.note("restore", "logout or shutdown begins; saving the layout and holding it")
+                self.saveNow(wait: true)
+                self.poweringOff = true
+                // ponytail: a cancelled logout gives no notification, so saving resumes after a while.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in
+                    MainActor.assumeIsolated { self?.poweringOff = false }
+                }
+            }
+        }
+    }
+
     func changed() {
         guard ready else { return }
         scheduleSave()
@@ -151,7 +197,7 @@ final class LayoutPersistence {
     /// `wait` blocks until the file is written, for a save just before tinywm quits.
     func saveNow(wait: Bool = false) {
         pendingSave?.cancel()
-        guard ready else { return }
+        guard ready, !poweringOff else { return }
         let describe = { [self] (id: String) in descriptor(of: id) }
         let current = displays.engines.mapValues { SavedWorkspaces($0.workspaces, describe: describe) }
         var setups = displays.setups.mapValues { $0.mapValues { SavedWorkspaces($0, describe: describe) } }
