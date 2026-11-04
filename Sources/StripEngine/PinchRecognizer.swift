@@ -11,7 +11,10 @@ public struct PinchRecognizer: Sendable {
 
     public init() {}
 
-    public mutating func feed(_ touches: [(x: Double, y: Double)], at t: Double) -> Event? {
+    /// Reports only `want`, measured from the widest spread of this touch for a pinch or the
+    /// narrowest for a spread. The other direction never uses up the touch, so fingers that
+    /// settle outward first can still pinch.
+    public mutating func feed(_ touches: [(x: Double, y: Double)], at t: Double, want: Event) -> Event? {
         guard touches.count == fingers else {
             origin = nil
             fired = false
@@ -22,16 +25,16 @@ public struct PinchRecognizer: Sendable {
         let y = touches.map(\.y).reduce(0, +) / Double(touches.count)
         let spread = touches.map { (($0.x - x) * ($0.x - x) + ($0.y - y) * ($0.y - y)).squareRoot() }
             .reduce(0, +) / Double(touches.count)
-        guard let origin else {
+        guard let start = origin else {
             origin = spread
             return nil
         }
-        guard origin > 0 else { return nil }
-        let event: Event
-        if spread <= origin * ratio { event = .pinchIn }
-        else if spread >= origin / ratio { event = .spreadOut }
-        else { return nil }
+        let base = want == .pinchIn ? max(start, spread) : min(start, spread)
+        origin = base
+        guard base > 0 else { return nil }
+        let hit = want == .pinchIn ? spread <= base * ratio : spread >= base / ratio
+        guard hit else { return nil }
         fired = true
-        return event
+        return want
     }
 }

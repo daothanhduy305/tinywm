@@ -876,6 +876,8 @@ final class Overviews {
 
     var isOpen: Bool { byDisplay.values.contains { $0.isOpen } }
     var isBusy: Bool { isOpen || waiting }
+    /// Open and not zooming closed.
+    var isShowing: Bool { byDisplay.values.contains(where: \.isShowing) }
 
     init(pictures: WindowPictures, windows: AXWindows, hud: SizeHUD) {
         self.pictures = pictures

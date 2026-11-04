@@ -478,9 +478,9 @@ final class Runtime {
     /// up or down steps one workspace, with content following the fingers' direction.
     private func startSwipes() {
         touches.onFrame = { [unowned self] contacts, t in
-            if config.pinchOverview, let event = pinch.feed(contacts, at: t), !dragger.isActive,
-               (event == .pinchIn && !overview.isOpen) || (event == .spreadOut && overview.isOpen),
-               let engine = displays.active(pointer: Screens.pointer()) {
+            // An overview still zooming closed is not showing, so a pinch then reopens it.
+            if config.pinchOverview, pinch.feed(contacts, at: t, want: overview.isShowing ? .spreadOut : .pinchIn) != nil,
+               !dragger.isActive, let engine = displays.active(pointer: Screens.pointer()) {
                 if swipeAxis != nil { handle(.cancelled) }
                 overview.toggle(engine, displays: displays)
             }

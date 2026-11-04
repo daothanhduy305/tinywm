@@ -409,6 +409,7 @@ Pinch with your thumb and four fingers to open the overview, and spread them to 
 Set `pinch-fingers = 4` to use your thumb and three fingers instead.
 Turn off macOS's matching pinch, change `pinch-fingers`, or set `pinch-overview = off` to leave it to macOS.
 Pinch works even with `swipe = off`.
+A pinch also reopens the overview while it is still zooming closed.
 
 A sideways swipe drags the strip under your fingers and settles on the nearest column.
 A quick flick carries on and moves at least one column the way the fingers went.
