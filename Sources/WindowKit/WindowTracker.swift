@@ -289,12 +289,32 @@ public final class WindowTracker {
     /// the old tab's window and reports nothing; a window that stops being shown is reported, and
     /// its app's windows are read again to find the tab that replaced it.
     private func watchWindowServer() {
+        guard !watching else { return }
+        watching = true
         numbers = numbers.filter { registered.contains($0.key) }
-        let states = WindowNumbers.states(Array(numbers.values))
+        let asked = numbers
+        let listAll = !paused
+        // The window server can take tens of milliseconds to answer while it draws a motion,
+        // so it is asked off the main thread.
+        windowServerQueue.async { [weak self] in
+            let start = CFAbsoluteTimeGetCurrent()
+            let states = WindowNumbers.states(Array(asked.values))
+            let onScreen = listAll ? Self.onScreenWindows() : nil
+            let ms = Int((CFAbsoluteTimeGetCurrent() - start) * 1000)
+            if ms > 16 { Log.note("tracker", "window server took \(ms) ms to list windows") }
+            DispatchQueue.main.async { MainActor.assumeIsolated {
+                self?.watching = false
+                self?.applyWindowServer(asked, states, onScreen)
+            } }
+        }
+    }
+
+    private func applyWindowServer(_ asked: [AXRef: CGWindowID], _ states: [CGWindowID: Bool], _ onScreen: [(CGWindowID, pid_t)]?) {
         var vanishedNow: Set<AXRef> = []
         var shownNow: Set<AXRef> = []
         var hidden: [pid_t: [AXRef]] = [:]
-        for (ref, number) in numbers {
+        // Windows that left or changed number while the window server answered are skipped.
+        for (ref, number) in asked where numbers[ref] == number {
             switch states[number] {
             case nil:
                 guard vanished.contains(ref) else { vanishedNow.insert(ref); continue }
@@ -315,20 +335,28 @@ public final class WindowTracker {
         vanished = vanishedNow
         shown = shownNow
         for (pid, refs) in hidden { rescan(pid: pid, from: .listed, hidden: refs) }
-        if !paused { findUnannounced() }
+        if !paused, let onScreen { findUnannounced(onScreen) }
+    }
+
+    /// The shown normal windows, with their app.
+    private nonisolated static func onScreenWindows() -> [(CGWindowID, pid_t)] {
+        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        return info.compactMap { window in
+            guard (window[kCGWindowLayer as String] as? Int) == 0,
+                  let number = window[kCGWindowNumber as String] as? CGWindowID,
+                  let pid = window[kCGWindowOwnerPID as String] as? pid_t else { return nil }
+            return (number, pid)
+        }
     }
 
     /// Some apps never report a new window, so it would wait for a focus change or the sweep.
     /// The window server shows it at once: a window of a watched app that is shown but unknown
     /// has its app's windows read again. Each window number is tried once while it is shown.
-    private func findUnannounced() {
-        let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    private func findUnannounced(_ windows: [(CGWindowID, pid_t)]) {
         let known = Set(numbers.values)
         var onScreen: Set<CGWindowID> = []
         var pids: Set<pid_t> = []
-        for window in info where (window[kCGWindowLayer as String] as? Int) == 0 {
-            guard let number = window[kCGWindowNumber as String] as? CGWindowID,
-                  let pid = window[kCGWindowOwnerPID as String] as? pid_t else { continue }
+        for (number, pid) in windows {
             onScreen.insert(number)
             guard !known.contains(number), observers[pid] != nil, tried.insert(number).inserted else { continue }
             pids.insert(pid)
@@ -336,6 +364,8 @@ public final class WindowTracker {
         tried.formIntersection(onScreen)
         for pid in pids { rescan(pid: pid, from: .windowServer) }
     }
+    private var watching = false
+    private let windowServerQueue = DispatchQueue(label: "tinywm.windowserver", qos: .userInitiated)
     /// Shown window numbers that were unknown and have had their app's windows read once.
     private var tried: Set<CGWindowID> = []
     private var windowServerWatch: Timer?
