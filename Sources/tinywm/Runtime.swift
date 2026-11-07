@@ -482,12 +482,16 @@ final class Runtime {
             // An overview still zooming closed is not showing, so a pinch then reopens it.
             if config.pinchOverview, pinch.feed(contacts, at: t, want: overview.isShowing ? .spreadOut : .pinchIn) != nil,
                !dragger.isActive, let engine = displays.active(pointer: Screens.pointer()) {
-                Log.note("pinch", "fired with \(contacts.count) contacts")
-                if swipeAxis != nil { handle(.cancelled) }
-                overview.toggle(engine, displays: displays)
+                // Only a pinch with the same fingers as the swipe gets here: the touch stays a swipe.
+                if swipeAxis != nil {
+                    Log.note("pinch", "ignored during swipe")
+                } else {
+                    Log.note("pinch", "fired with \(contacts.count) contacts")
+                    overview.toggle(engine, displays: displays)
+                }
             }
             guard swipeEnabled else { return }
-            for event in recognizer.feed(contacts.map { ($0.x, $0.y) }, at: t) { handle(event) }
+            for event in recognizer.feed(contacts, at: t) { handle(event) }
             if swipeAxis != nil {
                 swipeFrames += 1
                 let delay = CACurrentMediaTime() - t

@@ -412,6 +412,10 @@ Pinch works even with `swipe = off`.
 Only fingers that move count, so a palm or thumb resting on the pad does not change the count.
 A pinch also reopens the overview while it is still zooming closed.
 
+A swipe starts only when all its fingers move the same way. In a pinch they move toward each other,
+so a pinch does not start a swipe even with `swipe-fingers` and `pinch-fingers` the same.
+Once a swipe starts, the touch stays a swipe: a pinch with the same fingers is ignored until they lift.
+
 A sideways swipe drags the strip under your fingers and settles on the nearest column.
 A quick flick carries on and moves at least one column the way the fingers went.
 An up or down swipe drags the workspaces under your fingers. Travel past 0.08 of the trackpad

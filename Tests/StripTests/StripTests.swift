@@ -859,8 +859,8 @@ final class CountingWindows: WindowSystem {
     @Test func aPinchDoesNotBeginASwipe() {
         var r = SwipeRecognizer()
         r.fingers = 4
-        func four(_ spread: Double, x: Double = 0.5) -> [(x: Double, y: Double)] {
-            [(x - spread, 0.5), (x + spread, 0.5), (x, 0.5 - spread), (x, 0.5 + spread)]
+        func four(_ spread: Double, x: Double = 0.5) -> [(id: Int, x: Double, y: Double)] {
+            [(0, x - spread, 0.5), (1, x + spread, 0.5), (2, x, 0.5 - spread), (3, x, 0.5 + spread)]
         }
         #expect(r.feed(four(0.3), at: 0).isEmpty)
         #expect(r.feed(four(0.2, x: 0.54), at: 0.01).isEmpty)
@@ -870,8 +870,25 @@ final class CountingWindows: WindowSystem {
         #expect(r.feed(four(0.1, x: 0.55), at: 0.05).first == .began(.horizontal))
     }
 
-    func three(_ x: Double, _ y: Double = 0.5) -> [(x: Double, y: Double)] {
-        [(x - 0.1, y), (x, y), (x + 0.1, y)]
+    func three(_ x: Double, _ y: Double = 0.5) -> [(id: Int, x: Double, y: Double)] {
+        [(0, x - 0.1, y), (1, x, y), (2, x + 0.1, y)]
+    }
+
+    @Test func aThumbPinchDoesNotBeginASwipe() {
+        var r = SwipeRecognizer()
+        r.fingers = 4
+        /// Three fingers along the top shifted by `x`, and the thumb below them.
+        func hand(x: Double = 0, thumb: (x: Double, y: Double) = (0.45, 0.3)) -> [(id: Int, x: Double, y: Double)] {
+            [(0, 0.4 + x, 0.7), (1, 0.5 + x, 0.72), (2, 0.6 + x, 0.7), (3, thumb.x, thumb.y)]
+        }
+        #expect(r.feed(hand(), at: 0).isEmpty)
+        // The thumb sweeps up and across while the fingers barely drift: the average moves 0.041
+        // and the spread changes less than that, yet the fingers do not move with the thumb.
+        #expect(r.feed(hand(x: 0.01, thumb: (0.55, 0.4)), at: 0.05).isEmpty)
+        #expect(r.feed([], at: 0.1).isEmpty)
+        // The whole hand moving sideways is a swipe.
+        #expect(r.feed(hand(), at: 0.15).isEmpty)
+        #expect(r.feed(hand(x: 0.05, thumb: (0.5, 0.3)), at: 0.2).first == .began(.horizontal))
     }
 
     @Test func aSwipeStartsAfterTheThresholdAndLocksSideways() {
@@ -896,7 +913,7 @@ final class CountingWindows: WindowSystem {
 
     @Test func twoFingersNeverStartAThreeFingerSwipe() {
         var r = SwipeRecognizer()
-        for i in 0..<10 { #expect(r.feed([(0.3 + Double(i) * 0.05, 0.5), (0.4, 0.5)], at: Double(i) * 0.01).isEmpty) }
+        for i in 0..<10 { #expect(r.feed([(0, 0.3 + Double(i) * 0.05, 0.5), (1, 0.4, 0.5)], at: Double(i) * 0.01).isEmpty) }
     }
 
     @Test func diagonalTravelWaitsForAClearAxis() {
