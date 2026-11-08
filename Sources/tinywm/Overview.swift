@@ -255,6 +255,19 @@ final class Overview {
             Log.note("overview", "no screen")
             return false
         }
+        // Reopened while zooming closed: everything starts where it is on screen, not over the real windows.
+        var shown: [String: (centre: CGPoint, width: CGFloat, opacity: Float, label: CGPoint?, labelOpacity: Float)] = [:]
+        var shownRing: NSRect?
+        var shownDim: Float = 0
+        if phase == .closing {
+            for (id, h) in holders {
+                let p = h.presentation() ?? h
+                let l = labels[id].map { $0.presentation() ?? $0 }
+                shown[id] = (p.position, p.transform.m11 * h.bounds.width, p.opacity, l?.position, l?.opacity ?? 0)
+            }
+            shownRing = (ring.presentation() ?? ring).frame
+            shownDim = (dim.presentation() ?? dim).opacity
+        }
         let ws = engine.workspaces
         let m = engine.metrics
         let size = Size(width: m.viewport.width, height: m.viewport.height)
@@ -316,7 +329,12 @@ final class Overview {
             layer.borderColor = NSColor.white.withAlphaComponent(0.15).cgColor
             pictures.show(w.id, on: layer)
             holder.addSublayer(layer)
-            if away.contains(w.id) {
+            if let s = shown[w.id] {
+                holder.position = s.centre
+                let scale = s.width / holder.bounds.width
+                holder.transform = CATransform3DMakeScale(scale, scale, 1)
+                holder.opacity = s.opacity
+            } else if away.contains(w.id) {
                 holder.position = CGPoint(x: w.rect.center.x, y: w.rect.center.y)
                 let scale = CGFloat(w.rect.width) / holder.bounds.width
                 holder.transform = CATransform3DMakeScale(scale, scale, 1)
@@ -332,14 +350,19 @@ final class Overview {
             }
             label.frame = labelFrame(away.contains(w.id) ? w.rect : r)
             label.opacity = 0
+            if let s = shown[w.id], let p = s.label {
+                label.position = p
+                label.opacity = s.labelOpacity
+            }
             root.addSublayer(label)
             labels[w.id] = label
         }
         styleRing()
         ring.removeAllAnimations()
         ring.isHidden = focus == nil
-        if let focus, let frame = real[focus] { ring.frame = outset(NSRect(frame)) }
-        dim.opacity = 0
+        if let shownRing { ring.frame = shownRing } else if let focus, let frame = real[focus] { ring.frame = outset(NSRect(frame)) }
+        dim.removeAllAnimations()
+        dim.opacity = shownDim
         dock.opacity = 0
         searchBar.removeAllAnimations()
         CATransaction.commit()
@@ -352,15 +375,9 @@ final class Overview {
         }
 
         relayout(animated: true, fromModel: true)
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0
-        fade.toValue = 1
-        fade.duration = 0.25
-        dim.add(fade, forKey: "dim")
-        dim.opacity = 1
-        for label in labels.values.map { $0 as CALayer } + [dock] + away.compactMap({ holders[$0] }) {
-            label.add(fade, forKey: "fade")
-            label.opacity = 1
+        fade(dim, to: 1, duration: 0.25, key: "dim")
+        for layer in labels.values.map({ $0 as CALayer }) + [dock] + away.compactMap({ holders[$0] }) {
+            fade(layer, to: 1, duration: 0.25)
         }
         _ = filter("")
         return true
@@ -569,33 +586,18 @@ final class Overview {
             guard !fading.contains(wid), let t = targets[wid] ?? real[wid] else { continue }
             longest = max(longest, move(layer, to: CGPoint(x: t.center.x, y: t.center.y),
                                         scale: CGFloat(t.width) / layer.bounds.width))
+            // The label rides with its picture rather than staying behind as it fades.
+            if let label = labels[wid] { moveLabel(label, to: t) }
         }
         if let ringTarget { longest = max(longest, moveRing(to: outset(NSRect(ringTarget)))) }
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = dim.presentation()?.opacity ?? 1
-        fade.toValue = 0
-        fade.duration = longest
-        dim.add(fade, forKey: "dim")
-        dim.opacity = 0
-        // Labels leave quickly so they do not trail the pictures zooming in.
-        let out = CABasicAnimation(keyPath: "opacity")
-        out.fromValue = 1
-        out.toValue = 0
-        out.duration = 0.15
-        for label in labels.values.map { $0 as CALayer } + [dock] {
-            label.add(out, forKey: "fade")
-            label.opacity = 0
-        }
-        searchBar.add(out, forKey: "fade")
-        searchBar.opacity = 0
+        fade(dim, to: 0, duration: longest, key: "dim")
+        // Labels leave quickly so they are gone before the pictures land.
+        for layer in labels.values.map({ $0 as CALayer }) + [dock, searchBar] { fade(layer, to: 0, duration: 0.15) }
         searchField.isHidden = true
         finishRename(nil)
         // Faded pictures come back as they zoom into place.
         for (wid, layer) in holders where !fading.contains(wid) { layer.opacity = 1 }
-        for wid in fading {
-            holders[wid]?.add(out, forKey: "fade")
-            holders[wid]?.opacity = 0
-        }
+        for wid in fading { holders[wid].map { fade($0, to: 0, duration: 0.15) } }
         CATransaction.commit()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + longest) { [weak self] in
@@ -651,12 +653,9 @@ final class Overview {
                 layer.transform = CATransform3DMakeScale(scale, scale, 1)
             }
             if let label = labels[w.id] {
-                let target = labelFrame(w.rect)
-                let from = fromModel ? label.position : (label.presentation()?.position ?? label.position)
-                label.removeAnimation(forKey: "move")
-                label.frame = target
-                if animated {
-                    label.add(spring("position", NSValue(point: from), NSValue(point: label.position)), forKey: "move")
+                if animated { moveLabel(label, to: w.rect, fromModel: fromModel) } else {
+                    label.removeAnimation(forKey: "move")
+                    label.frame = labelFrame(w.rect)
                 }
             }
         }
@@ -712,6 +711,24 @@ final class Overview {
 
     private func spring(_ key: String, _ from: Any, _ to: Any) -> CASpringAnimation {
         Spring.critical(key, from: from, to: to, stiffness: stiffness)
+    }
+
+    /// Puts the label under `rect` and springs it there from where it is, as its picture moves.
+    private func moveLabel(_ label: CATextLayer, to rect: Rect, fromModel: Bool = false) {
+        let from = fromModel ? label.position : (label.presentation()?.position ?? label.position)
+        label.removeAnimation(forKey: "move")
+        label.frame = labelFrame(rect)
+        label.add(spring("position", NSValue(point: from), NSValue(point: label.position)), forKey: "move")
+    }
+
+    /// Fades to `opacity` from what is on screen, so a fade cut short does not flash.
+    private func fade(_ layer: CALayer, to opacity: Float, duration: CFTimeInterval, key: String = "fade") {
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = layer.presentation()?.opacity ?? layer.opacity
+        fade.toValue = opacity
+        fade.duration = duration
+        layer.add(fade, forKey: key)
+        layer.opacity = opacity
     }
 
     private func pictureArrived(_ id: String) {

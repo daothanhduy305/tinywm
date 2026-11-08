@@ -410,7 +410,7 @@ Set `pinch-fingers = 4` to use your thumb and three fingers instead.
 Turn off macOS's matching pinch, change `pinch-fingers`, or set `pinch-overview = off` to leave it to macOS.
 Pinch works even with `swipe = off`.
 Only fingers that move count, so a palm or thumb resting on the pad does not change the count.
-A pinch also reopens the overview while it is still zooming closed.
+A pinch also reopens the overview while it is still zooming closed. It picks up from where the pictures and labels are.
 
 A swipe starts only when all its fingers move the same way. In a pinch they move toward each other,
 so a pinch does not start a swipe even with `swipe-fingers` and `pinch-fingers` the same.
