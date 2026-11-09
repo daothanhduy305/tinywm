@@ -77,7 +77,7 @@ final class WindowLifecycle {
             windows.read(id) { [unowned self] reading in
                 guard let reading else { return }
                 let facts = Self.facts(reading)
-                done(.init(recognition: recognition(id, facts), facts: facts, frame: reading.frame))
+                done(.init(recognition: recognition(id, facts), facts: facts, frame: reading.frame, tabs: reading.tabs))
             }
         }
         arrivals.place = { [unowned self] id, judged in place(id, judged) }
@@ -145,6 +145,11 @@ final class WindowLifecycle {
             replace(old, by: id)
             return displays.engine(holding: id)?.frame(of: id)
         }
+        if let old = tabInBar(of: id, tabs: judged.tabs) {
+            Log.note("place", "\(Log.name(id)) is a tab in the bar of \(Log.name(old)); it takes that tab's place")
+            replace(old, by: id)
+            return displays.engine(holding: id)?.frame(of: id)
+        }
         if let number = windows.number(of: id), let slot = hiddenSlots.removeValue(forKey: number),
            displays.restore(id, to: slot) {
             Log.note("place", "\(Log.name(id)) returns to its slot from before it hid: \(slot)")
@@ -169,6 +174,18 @@ final class WindowLifecycle {
         displays.newWindowAdded(id, frame: judged.frame,
                                 floating: recognition.placement != .tiled, takesFocus: recognition.allowsFocus, openOn: openOn)
         return displays.engine(holding: id)?.frame(of: id)
+    }
+
+    /// The window on a strip named in the new window's tab bar, before the old tab hides.
+    private func tabInBar(of id: String, tabs: [String]) -> String? {
+        guard !tabs.isEmpty, let pid = windows.pid(of: id) else { return nil }
+        let title = windows.cachedTitle(of: id)
+        func qualifies(_ old: String) -> Bool {
+            old != id && windows.pid(of: old) == pid && displays.engine(holding: old) != nil
+                && windows.cachedTitle(of: old).map { $0 != title && tabs.contains($0) } == true
+        }
+        if let focused = windows.knownFocus, qualifies(focused) { return focused }
+        return windows.ids(ofPID: pid).first(where: qualifies)
     }
 
     /// The window on a strip that a new one replaces as a tab: one of the same app at the same

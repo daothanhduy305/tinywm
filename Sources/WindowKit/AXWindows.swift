@@ -274,6 +274,8 @@ public final class AXWindows: WindowSystem {
         public var bundleID: String?
         public var appName: String?
         public var title: String?
+        /// Titles in the window's native tab bar.
+        public var tabs: [String]
         public var isTileable: Bool
         public var isDockable: Bool
         public var frame: Rect?
@@ -292,7 +294,20 @@ public final class AXWindows: WindowSystem {
             let app = NSRunningApplication(processIdentifier: pid)
             let focused = AX.attribute(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute, as: AnyObject.self)
             let seen = AX.inspect(ref.element)
+            let children = AX.attribute(ref.element, kAXChildrenAttribute, as: [AXUIElement].self) ?? []
+            let tabs = children.filter {
+                AX.attribute($0, kAXRoleAttribute, as: String.self) == kAXTabGroupRole
+            }.flatMap { group -> [String] in
+                var items = AX.attribute(group, kAXTabsAttribute, as: [AXUIElement].self) ?? []
+                if items.isEmpty {
+                    items = (AX.attribute(group, kAXChildrenAttribute, as: [AXUIElement].self) ?? []).filter {
+                        AX.attribute($0, kAXRoleAttribute, as: String.self) == kAXRadioButtonRole
+                    }
+                }
+                return items.compactMap { AX.attribute($0, kAXTitleAttribute, as: String.self) }
+            }
             let reading = Reading(bundleID: app?.bundleIdentifier, appName: app?.localizedName, title: seen.title,
+                                  tabs: tabs,
                                   isTileable: seen.isTileable, isDockable: seen.isDockable, frame: seen.frame,
                                   isFocused: focused.map { CFEqual($0, ref.element) } ?? false)
             DispatchQueue.main.async { MainActor.assumeIsolated {

@@ -17,6 +17,7 @@ final class WindowArrivals {
         var recognition: Recognition
         var facts: WindowFacts
         var frame: Rect?
+        var tabs: [String]
     }
 
     /// Adds a window to a strip. Returns the frame it was given, if it was tiled.
