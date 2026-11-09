@@ -156,6 +156,29 @@ private func layout(_ displays: [String: SavedWorkspaces]) -> SavedLayout { Save
 }
 
 @Suite struct LayoutPlanTests {
+    @Test func placeholderDescriptorsRoundTrip() {
+        let id = WindowDescriptor.placeholderID("app.dia", "w3")
+        #expect(id == "app:w3:app.dia")
+        #expect(WindowDescriptor(placeholder: id) == desc(nil, "app.dia", "", pid: 0))
+        for invalid in ["w3", "app", "app:w3", "app::app.dia", "app:w3:", "other:w3:app.dia"] {
+            #expect(WindowDescriptor(placeholder: invalid) == nil)
+        }
+    }
+
+    @Test func unmatchedTiledSlotsCanKeepTheirApp() throws {
+        let file = layout(["A": saved([[desc(1, "app.dia")], [desc(2, nil)]], floating: [desc(3)])])
+        #expect(file.plan(displays: ["A"], windows: []).workspaces.isEmpty)
+        let plan = file.plan(displays: ["A"], windows: [], keepUnmatched: true)
+        let workspace = try #require(plan.workspaces["A"])
+        let id = try #require(workspace.current.allWindows.first)
+        #expect(workspace.current.allWindows == [id])
+        #expect(WindowDescriptor(placeholder: id)?.bundleID == "app.dia")
+        #expect(workspace.current.floating.isEmpty)
+        let captured = SavedWorkspaces(workspace, describe: { WindowDescriptor(placeholder: $0) })
+        let restored = layout(["A": captured]).plan(displays: ["A"], windows: [live("n", desc(9, "app.dia"))])
+        #expect(restored.workspaces["A"]?.current.allWindows == ["n"])
+    }
+
     @Test func windowsLandInTheirSavedPlaces() {
         let file = layout(["A": saved([[desc(1)], [desc(2), desc(3)]], focusedColumn: 1, widths: [0.3, 0.7])])
         // Opened in a different order than saved.

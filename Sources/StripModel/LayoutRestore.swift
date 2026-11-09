@@ -1,3 +1,15 @@
+extension WindowDescriptor {
+    public static func placeholderID(_ bundle: String, _ n: String) -> String {
+        "app:\(n):\(bundle)"
+    }
+
+    public init?(placeholder id: String) {
+        let parts = id.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0] == "app", !parts[1].isEmpty, !parts[2].isEmpty else { return nil }
+        self.init(windowNumber: nil, bundleID: String(parts[2]), title: "", pid: 0)
+    }
+}
+
 /// A saved window slot: a place in a saved layout that one live window can fill.
 public struct LayoutSlot: Hashable, Sendable {
     public var display: String
@@ -94,7 +106,7 @@ public enum LayoutMatcher {
 }
 
 public struct LayoutPlan: Equatable, Sendable {
-    /// The rebuilt workspaces of each display that got at least one window back.
+    /// The rebuilt workspaces of each display with a window or a kept placeholder.
     public var workspaces: [String: Workspaces] = [:]
     /// Windows no saved slot claimed, in the order they were given.
     public var unplaced: [String] = []
@@ -125,12 +137,21 @@ extension SavedLayout {
     }
 
     /// Rebuilds the layout of `displays` around the running windows. Saved slots with no window
-    /// are dropped. Windows in `floating` stay floating even where they were tiled.
-    public func plan(displays: [String], windows: [LiveWindow], floating: Set<String> = []) -> LayoutPlan {
+    /// are dropped unless `keepUnmatched` keeps their app as a tiled placeholder.
+    /// Windows in `floating` stay floating even where they were tiled.
+    public func plan(displays: [String], windows: [LiveWindow], floating: Set<String> = [], keepUnmatched: Bool = false) -> LayoutPlan {
         let slots = slots(for: displays)
         let assigned = LayoutMatcher.assign(slots: slots, windows: windows)
         var byDisplay: [String: [LayoutSlot: String]] = [:]
         for (id, slot) in assigned { byDisplay[slot.display, default: [:]][slot] = id }
+        if keepUnmatched {
+            for (n, entry) in slots.enumerated() {
+                let (slot, descriptor) = entry
+                guard slot.column != nil, let bundle = descriptor.bundleID,
+                      byDisplay[slot.display]?[slot] == nil else { continue }
+                byDisplay[slot.display, default: [:]][slot] = WindowDescriptor.placeholderID(bundle, String(n))
+            }
+        }
 
         var plan = LayoutPlan()
         let named = Dictionary(slots.compactMap { s, d in d.name.map { (s, $0) } }, uniquingKeysWith: { a, _ in a })

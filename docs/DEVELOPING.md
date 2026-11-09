@@ -458,11 +458,12 @@ saved layout in the file. The layout is always saved and restored.
 Each display setup keeps its own layout. A setup is the set of attached displays, by UUID; their
 arrangement and resolution do not count, and turning tiling off for one is not a new setup. When
 the setup changes, `StripDisplays.update` keeps the layout of the setup being left. If the new
-setup was seen before, every display gets that setup's layout back, without the windows that closed
-since. Windows the layout does not name stay on their display, or join the first display if theirs
-went away. A window keeps its place in the other setups while it is fullscreen, on a display
-that is not tiled, or swapped for another tab; only closing it drops it. In a setup not seen before, windows of a display
-that went away move to the first display and go back when it returns. The file keeps these layouts
+setup was seen before, every display gets that setup's layout back. A closed window's place goes
+to another open window of its app that the layout does not already place. Windows the layout does
+not name stay on their display, or join the first display if theirs went away. A window keeps its
+place in the other setups while it is fullscreen, on a display that is not tiled, or swapped for
+another tab. Closing a tiled window leaves its app in that slot. In a setup not seen before,
+windows of a display that went away move to the first display and go back when it returns. The file keeps these layouts
 under `setups`, keyed by the sorted UUIDs joined with commas. At startup the current setup's layout
 is restored, else each display's own; the other setups are matched against the same windows so a
 later switch finds them.

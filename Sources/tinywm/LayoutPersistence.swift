@@ -126,8 +126,7 @@ final class LayoutPersistence {
             // Other setups get their windows now, while every window found at startup is known.
             let live = pending.map(\.live), floating = Set(pending.filter(\.floating).map(\.live.id))
             for (k, s) in saved.setups ?? [:] where k != key {
-                let plan = SavedLayout(displays: s).plan(displays: Array(s.keys), windows: live, floating: floating)
-                // A setup none of these windows match keeps what the file has.
+                let plan = SavedLayout(displays: s).plan(displays: Array(s.keys), windows: live, floating: floating, keepUnmatched: true)
                 guard !plan.workspaces.isEmpty else { continue }
                 displays.seed(k, plan.workspaces)
                 names.merge(plan.names) { kept, _ in kept }
@@ -231,6 +230,7 @@ final class LayoutPersistence {
 
     /// Built from what is already known, since asking each app would hold up the main thread.
     private func descriptor(of id: String) -> WindowDescriptor? {
+        if let descriptor = WindowDescriptor(placeholder: id) { return descriptor }
         guard windows.element(of: id) != nil, let pid = windows.pid(of: id) else { return nil }
         return WindowDescriptor(windowNumber: windows.number(of: id), bundleID: windows.bundleID(of: id),
                                 title: windows.cachedTitle(of: id) ?? "", pid: pid, name: names[id])

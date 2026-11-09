@@ -103,11 +103,31 @@ public final class StripDisplays {
     /// Gives a setup a layout, as one matched from the saved file at startup.
     public func seed(_ key: String, _ layout: [String: Workspaces]) { setups[key] = layout }
 
-    /// Lays every display out as `snapshot` had it; `windowRemoved` already took closed windows
-    /// out. Returns the windows the snapshot does not place, for the primary display to adopt;
+    /// Lays every display out as `snapshot` had it, filling closed windows' slots by app.
+    /// Returns the windows the snapshot does not place, for the primary display to adopt;
     /// windows of a restored display that the snapshot does not name stay on that display.
     private func rearrange(_ snapshot: [String: Workspaces], orphans: [StripEngine.Released]) -> [StripEngine.Released] {
-        let layouts = snapshot.filter { engines[$0.key] != nil }
+        var layouts = snapshot.filter { engines[$0.key] != nil }
+        let placed = Set(layouts.values.flatMap { $0.strips.flatMap { $0.allWindows + $0.floating } })
+        var candidates = orphans.filter { !$0.floating }.map(\.id)
+        candidates += ordered.flatMap { engines[$0.id]?.workspaces.strips.flatMap(\.allWindows) ?? [] }
+        candidates.removeAll { placed.contains($0) }
+        for d in ordered where layouts[d.id] != nil {
+            for i in layouts[d.id]!.strips.indices {
+                for id in layouts[d.id]!.strips[i].allWindows {
+                    guard let placeholder = WindowDescriptor(placeholder: id) else { continue }
+                    if let n = candidates.firstIndex(where: { app(of: $0) == placeholder.bundleID }) {
+                        let replacement = candidates[n]
+                        candidates.removeAll { $0 == replacement }
+                        layouts[d.id]!.strips[i].replace(id, with: replacement)
+                    } else {
+                        // ponytail: unfilled placeholders are dropped at plug-in; keep them in the engine to place apps opened later.
+                        layouts[d.id]!.strips[i].remove(id)
+                    }
+                }
+            }
+            layouts[d.id]!.normalize()
+        }
         var claimed = Set<String>()
         for layout in layouts.values { for s in layout.strips { claimed.formUnion(s.allWindows + s.floating) } }
         var stay: [String: [StripEngine.Released]] = [:]
@@ -316,19 +336,26 @@ public final class StripDisplays {
         return app
     }
 
-    /// Takes a window off its strip. Only a window that `closed` leaves the layouts of other
-    /// setups and of displays that went away; one that went fullscreen or left the strip
-    /// keeps its place there.
+    /// Takes a window off its strip. A closed tiled window leaves its app in other setups.
+    /// One that went fullscreen or left the strip keeps its exact place there.
     public func windowRemoved(_ id: String, refocus: Bool = true, closed: Bool = true) {
         guard closed else { engine(holding: id)?.windowRemoved(id, refocus: refocus); return }
-        if let s = slot(of: id)?.slot, s.column != nil, let app = app(of: id), widths[app] != s.width {
+        let app = app(of: id)
+        if let s = slot(of: id)?.slot, s.column != nil, let app, widths[app] != s.width {
             widths[app] = s.width
             onWidthsChanged?(widths)
         }
         apps[id] = nil
         engine(holding: id)?.windowRemoved(id, refocus: refocus)
         for d in retired.keys { retired[d]?.remove(id) }
-        for k in setups.keys { for d in setups[k]!.keys { setups[k]![d]!.remove(id) } }
+        for k in setups.keys { for d in setups[k]!.keys {
+            if let app, let i = setups[k]![d]!.workspace(of: id),
+               setups[k]![d]!.strips[i].column(of: id) != nil {
+                setups[k]![d]!.strips[i].replace(id, with: WindowDescriptor.placeholderID(app, id))
+            } else {
+                setups[k]![d]!.remove(id)
+            }
+        } }
     }
 
     public func windowReplaced(_ old: String, by new: String) {

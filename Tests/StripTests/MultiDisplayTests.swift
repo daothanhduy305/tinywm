@@ -322,6 +322,52 @@ private func overlapsAny(_ r: Rect, _ others: [Rect]) -> Bool { others.contains 
         #expect(d.engines["A"]?.strip.allWindows == ["x"])
     }
 
+    @Test func aClosedWindowsAppFillsItsSlotInAnotherSetup() {
+        let (d, _) = make()
+        d.appOf = { ["y": "dia", "n": "dia"][$0] }
+        d.update([a, b])
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.update([a])
+        d.windowRemoved("y")
+        d.windowAdded("n", frame: rect(100, 100, 300, 300))
+        d.update([a, b])
+        #expect(d.engines["B"]?.strip.allWindows == ["n"])
+        #expect(d.engine(holding: "n") === d.engines["B"])
+        #expect(d.engines["A"]?.strip.allWindows.contains("n") == false)
+    }
+
+    @Test func anUnfilledAppSlotIsDroppedWhenItsSetupReturns() {
+        let (d, _) = make()
+        d.appOf = { $0 == "y" ? "dia" : nil }
+        d.update([a, b])
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.update([a])
+        d.windowRemoved("y")
+        #expect(d.setups["A,B"]?["B"]?.current.allWindows == ["app:y:dia"])
+        d.update([a, b])
+        #expect(d.engines["B"]?.strip.allWindows == [])
+        #expect(d.engines.values.allSatisfy { engine in
+            engine.workspaces.strips.allSatisfy { strip in
+                (strip.allWindows + strip.floating).allSatisfy { !$0.hasPrefix("app:") }
+            }
+        })
+    }
+
+    @Test func anAppSlotDoesNotTakeAWindowAlreadyPlacedOrFloating() {
+        let (d, _) = make()
+        d.appOf = { _ in "dia" }
+        d.update([a, b])
+        d.windowAdded("x", frame: rect(100, 100, 300, 300))
+        d.windowAdded("y", frame: rect(1100, 100, 300, 300))
+        d.update([a])
+        d.windowRemoved("y")
+        d.windowAdded("f", frame: rect(100, 100, 300, 300), floating: true)
+        d.update([a, b])
+        #expect(d.engines["B"]?.strip.allWindows == [])
+        #expect(d.engines["A"]?.strip.allWindows == ["x"])
+        #expect(d.engines["A"]?.strip.floating == ["f"])
+    }
+
     @Test func aWindowThatLeftTheStripForAWhileKeepsItsPlaceInOtherSetups() {
         let (d, _) = make()
         d.update([a])
