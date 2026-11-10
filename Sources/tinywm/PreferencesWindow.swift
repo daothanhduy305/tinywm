@@ -119,8 +119,10 @@ final class PreferencesWindow {
     func show(_ page: PreferencesPage? = nil) {
         if let page { model.page = page }
         model.refresh()
-        NSApp.activate()
+        // The window goes up first: macOS ignores a polite activate() from a menu-bar app with
+        // no window on screen, which left the first open after launch behind the front app.
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
