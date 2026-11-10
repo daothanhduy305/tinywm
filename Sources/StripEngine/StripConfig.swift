@@ -30,6 +30,8 @@ public struct StripConfig: Equatable, Sendable {
     /// Whether ⌘Tab opens the overview instead of the macOS app switcher.
     public var overviewOnCommandTab = false
     public var overviewSwitchOnRelease = true
+    /// Whether picking a window in the overview centres the pointer on it.
+    public var overviewMovesPointer = false
     public var overviewOnControlUp = false
     public var overviewOnControlDown = false
     /// Where the overview shows floating windows.
@@ -265,6 +267,8 @@ public struct StripConfig: Equatable, Sendable {
             config.overviewOnCommandTab = try onOff(value, for: name)
         case "overview-switch-on-release":
             config.overviewSwitchOnRelease = try onOff(value, for: name)
+        case "overview-moves-pointer":
+            config.overviewMovesPointer = try onOff(value, for: name)
         case "overview-on-control-up":
             config.overviewOnControlUp = try onOff(value, for: name)
         case "overview-on-control-down":
@@ -393,6 +397,7 @@ public struct StripConfig: Equatable, Sendable {
             "center-focus = off",
             "overview-as-mission-control = off",
             "overview-switch-on-release = on",
+            "overview-moves-pointer = off",
             "overview-on-control-up = off",
             "overview-on-control-down = off",
             "overview-floating = \(d.overviewFloating.rawValue) # vertical, horizontal or off: where the overview shelves floating windows",

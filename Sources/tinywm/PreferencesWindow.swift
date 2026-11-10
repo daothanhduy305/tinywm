@@ -241,6 +241,7 @@ struct PreferencesView: View {
                 toggle("Show overview with ⌘ + Tab", "overview-as-mission-control", \.overviewOnCommandTab, "Replaces the macOS app switcher.")
                 toggle("Switch when ⌘ is released", "overview-switch-on-release", \.overviewSwitchOnRelease, "Opens on the previous window. On: releasing ⌘ switches to it, like the macOS app switcher. Off: the overview stays open; Return or ⌘Tab again picks.")
                     .disabled(!model.config.overviewOnCommandTab)
+                toggle("Move pointer to the chosen window", "overview-moves-pointer", \.overviewMovesPointer, "Picking a window puts the pointer at its centre.")
                 toggle("Show overview with ⌃ + ↑", "overview-on-control-up", \.overviewOnControlUp, "Replaces Mission Control's shortcut.")
                 toggle("Show app windows with ⌃ + ↓", "overview-on-control-down", \.overviewOnControlDown, "Replaces App Exposé's shortcut.")
                 VStack(alignment: .leading) {

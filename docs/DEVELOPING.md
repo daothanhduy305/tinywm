@@ -157,6 +157,7 @@ pinch-fingers = 5   # 4 or 5, thumb included
 center-focus = off              # on: scrolling to a window centres it, unless that would show space past the strip's ends; a swipe settles on a centred column
 overview-as-mission-control = off # on: ⌘Tab opens the overview instead of the macOS app switcher
 overview-switch-on-release = on  # off: the overview stays open on the previous window; ⌘Tab again confirms
+overview-moves-pointer = off     # on: picking a window in the overview moves the pointer to its centre
 overview-on-control-up = off     # on: ⌃↑ opens the overview instead of Mission Control
 overview-on-control-down = off   # on: ⌃↓ opens the overview for the focused app
 overview-floating = vertical      # vertical, horizontal or off: the shelf of floating windows in the overview

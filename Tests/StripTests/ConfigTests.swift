@@ -156,6 +156,13 @@ private func key(_ name: String, shift: Bool = false, alt: Bool = false, control
         #expect(StripConfig.parse("overview-switch-on-release = maybe").issues.count == 1)
     }
 
+    @Test func overviewMovesPointerDefaultsOffAndParses() {
+        #expect(!StripConfig().overviewMovesPointer)
+        #expect(StripConfig.parse("overview-moves-pointer = on").config.overviewMovesPointer)
+        #expect(!StripConfig.parse("overview-moves-pointer = off").config.overviewMovesPointer)
+        #expect(StripConfig.parse("overview-moves-pointer = maybe").issues.count == 1)
+    }
+
     @Test func overviewOnControlUpDefaultsOffAndParses() {
         #expect(!StripConfig().overviewOnControlUp)
         #expect(StripConfig.parse("overview-on-control-up = on").config.overviewOnControlUp)

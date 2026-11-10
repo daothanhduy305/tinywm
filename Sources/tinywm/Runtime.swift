@@ -122,6 +122,11 @@ final class Runtime {
             defer { overviewPicking = false }
             displays.windowFocused(id)
             windows.focus(id)
+            if config.overviewMovesPointer,
+               let frame = displays.engine(holding: id)?.frame(of: id) ?? windows.frameOf(id) {
+                let c = frame.center
+                CGWarpMouseCursorPosition(CGPoint(x: c.x, y: c.y))
+            }
         }
         overview.name = { [unowned self] id in persistence.names[id] }
         overview.fullScreen = { [unowned self] in lifecycle.fullScreenWindows() }
