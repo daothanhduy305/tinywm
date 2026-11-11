@@ -717,7 +717,10 @@ final class Overview {
     private func moveLabel(_ label: CATextLayer, to rect: Rect, fromModel: Bool = false) {
         let from = fromModel ? label.position : (label.presentation()?.position ?? label.position)
         label.removeAnimation(forKey: "move")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         label.frame = labelFrame(rect)
+        CATransaction.commit()
         label.add(spring("position", NSValue(point: from), NSValue(point: label.position)), forKey: "move")
     }
 
