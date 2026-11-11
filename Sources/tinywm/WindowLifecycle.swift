@@ -140,6 +140,12 @@ final class WindowLifecycle {
             Log.note("place", "\(Log.name(id)) is already on a strip; left as it is")
             return nil
         }
+        if let shown = tabBehind(id, at: judged.frame) {
+            Log.note("place", "\(Log.name(id)) is a hidden tab behind \(Log.name(shown)); left off the strip")
+            if let number = windows.number(of: id) { hiddenSlots[number] = nil }
+            forget(id, refocus: false)
+            return nil
+        }
         if let old = tabReplaced(by: id, at: judged.frame) {
             Log.note("place", "\(Log.name(id)) is another tab of \(Log.name(old)); it takes that tab's place")
             replace(old, by: id)
@@ -186,6 +192,18 @@ final class WindowLifecycle {
         }
         if let focused = windows.knownFocus, qualifies(focused) { return focused }
         return windows.ids(ofPID: pid).first(where: qualifies)
+    }
+
+    /// The shown tab on a strip that a hidden window of the same app sits behind at the same frame.
+    private func tabBehind(_ id: String, at frame: Rect?) -> String? {
+        guard let frame, let pid = windows.pid(of: id), let number = windows.number(of: id),
+              WindowNumbers.states([number])[number] == false else { return nil }
+        let candidates = windows.ids(ofPID: pid).filter {
+            $0 != id && displays.engine(holding: $0) != nil
+                && windows.frameOf($0)?.isApproximately(frame, tolerance: 2) == true
+        }
+        let states = WindowNumbers.states(candidates.compactMap { windows.number(of: $0) })
+        return candidates.first { windows.number(of: $0).map { states[$0] == true } ?? false }
     }
 
     /// The window on a strip that a new one replaces as a tab: one of the same app at the same

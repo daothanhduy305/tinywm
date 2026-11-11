@@ -21,6 +21,7 @@ under the screen, and workspaces stack vertically, as in niri.
 - `WindowLifecycle` handles what the system reports about windows: arrivals, moves, focus, hides, removals and screen locks.
   A new native tab takes the place of the tab it hides, with the same column, width and overview name.
   A new tab that shows before the old one hides is found in its tab bar, and takes the old tab's place.
+  A hidden tab the app lists as a new window stays off the strip until it shows.
   Swapping tabs does not show the minimap.
   A focused window that closes stays on the strip for half a second. Ghostty closes a tab's
   window before it shows the next tab, and that tab then takes the column and keeps focus.
